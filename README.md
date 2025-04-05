@@ -1,121 +1,196 @@
-# Hypernote Elements
+# Hypernote Language Specification
 
-The plan: given a note id, render the note using a "pauls-note-viewer" hypernote element which is composed of a "note" view element and a "profile" view element.
+Hypernote allows creating interactive, hypermedia experiences on Nostr using a declarative syntax built on Markdown, a focused query language, and Nostr events.
 
-Element (`#`)
-Query (`$`)
-Event (`@`)
+## Core Concepts
 
-## Component Kind and Arguments
+* **Hypernote:** A document defining content, logic, and style, typically published as a Nostr event itself.
+* **Elements (`#`)**: Reusable components defined in separate Hypernotes and referenced via Nostr identifiers.
+* **Queries (`$`)**: Declarative Nostr data fetching and minimal transformation pipelines.
+* **Events (`@`)**: Templates for creating new Nostr events based on user interaction (forms).
+* **HNMD**: Markdown extended with variables, control flow, and component embedding.
+* **Styling**: A minimal, non-cascading styling system defined in the frontmatter.
 
-Each Hypernote element has a `kind` value in its frontmatter that determines what type of NIP-19 encoded entity it expects as its primary argument:
+## Hypernote Frontmatter
 
-- **Kind 0**: Expects an `npub` (NIP-19 encoded public key)
-- **Kind 1**: Expects an `nevent` (NIP-19 encoded event ID)
+The frontmatter (YAML block at the start) defines the Hypernote's properties, queries, event templates, imported components, and styles.
 
-The kind serves as a type signature that makes component usage predictable and consistent.
-
-### feed
-```md
+```yaml
 ---
-kind: 0  # Expects an npub
-$feed:
-  pubkey: npub123abc...
-  pipe:
-    - kind: 1
-      authors: $pubkey
-      limit: 20
-      since: $last_day
+# Component Properties (if this Hypernote defines a reusable component)
+kind: 1  # 0 for npub input, 1 for nevent input
+
+# Component Imports (aliasing external Hypernote components)
+"#profile": naddr1abc...  # Reference to a kind 0 component definition
+"#note": nevent1def...   # Reference to a kind 1 component definition
+
+# Queries
+"$query_name":
+  # ... query definition ...
+
+# Event Templates
+"@event_name":
+  # ... event template definition ...
+
+# Styling
+style:
+  "#main-title":
+    text-color: primary
+  button:
+    bg-color: blue-500
 ---
 
-[each $feed as $note]
-  # {$note.content}
-  by {$note.pubkey} at {$note.created_at}
+# Markdown content follows...
 ```
 
-### pauls-note-viewer
+> **Important:** YAML keys that start with special characters such as `@`, `$`, or `#` **must be quoted** to avoid parsing issues. For example, use `"@event_name"` instead of `@event_name`.
+
+## Hypernote Elements (`#`) - Components
+
+Hypernotes can define reusable components. These component definitions are themselves published as distinct Nostr events (e.g., Kind 31990 or similar, TBD).
+
+### Component Definition (`kind`)
+
+A Hypernote intended as a reusable component *must* declare a `kind` in its frontmatter. This specifies the type of Nostr identifier it expects as its single argument when used:
+
+* **`kind: 0`**: Expects an `npub` (NIP-19 encoded public key) string as its argument. The component's logic can access this via the `target.pubkey` variable. Data for the profile (`kind: 0` event) associated with this `npub` is typically fetched automatically and made available via `target`.
+* **`kind: 1`**: Expects an `nevent` (NIP-19 encoded event ID) string as its argument. The component's logic can access the event ID via `target.id` and the pubkey via `target.pubkey`. The event data is fetched automatically and made available via `target` (e.g., `target.content`, `target.created_at`).
+
+### Component Imports (`#alias: identifier`)
+
+To use an external component within a Hypernote, you must import and alias it in the frontmatter using its Nostr identifier (`naddr`, `nevent`, potentially others TBD):
+
+```yaml
+---
+# Import a profile component (kind 0) defined elsewhere
+"#profile_card": naddr1...
+
+# Import a note rendering component (kind 1) defined elsewhere
+"#note_display": nevent1...
+---
+```
+
+These aliases (`#profile_card`, `#note_display`) can then be used in the HNMD body.
+
+### Component Usage (`[#alias argument]`)
+
+In the HNMD body, components are instantiated using their alias and providing the *single required argument* (an `npub` or `nevent` string):
 
 ```md
 ---
-kind: 1  # Expects an nevent
-#profile: nhne1abc123...
-#note: nhne1defg456...
+kind: 0 # This component takes an npub
+$user_posts:
+  authors: [ target.pubkey ] # Use the input pubkey
+  kinds: [1]
+  limit: 5
+#profile_viewer: naddr1... # Import a profile component
+#note_viewer: nevent1...  # Import a note component
 ---
 
-[#profile { self.pubkey }]
+# View Profile for {target.pubkey}
 
-[#note { self.content }]
+[#profile_viewer target.pubkey]
+
+## Recent Posts:
+
+[each $user_posts as $post]
+  [#note_viewer $post.id] # Pass the nevent string
 ```
 
-### profile
-```md
----
-kind: 0  # Expects an npub
----
+*Target Context (`target`):* Within a component's definition (both its frontmatter queries/events and its HNMD body), the `target` variable refers to the data associated with the input argument.
+    * For `kind: 0`, `target` typically holds the profile data (Kind 0 event content like `name`, `picture`, etc.) and `target.pubkey` holds the input `npub`.
+    * For `kind: 1`, `target` typically holds the event data (Kind 1 event content like `content`, `created_at`, tags, etc.) and `target.id` and `target.pubkey` hold the input event's details.
 
-![profile image]({ self.picture || self.image })
+### Client Component Overrides
 
-{ self.name || self.username }
+A Hypernote client MAY provide default components for common use cases such as displaying notes, profiles, and buttons for zapping, emoji reactions, commments, etc.
 
-{ self.nip05 }
-```
+TODO: come up with "default" syntax and list of default components that can be provided by a client.
 
-### note
-```md
----
-kind: 1  # Expects an nevent
----
-{ self.content }
+All hypernotes should be defined in such a way however that there are hypernotes that can be rendered without any client component overrides.
 
-{ self.created_at }
-```
+## Hypernote Query Language (HQL - `$`)
 
-## Hypernote Query Language
-
-Hypernote Query Language (HQL) allows you to define complex nostr queries and data transformations in a clean, declarative syntax. HQL uses a minimal subset of jq for data extraction, making it powerful yet constrained.
+HQL defines Nostr queries and minimal data transformations using YAML syntax in the frontmatter.
 
 ### Syntax
 
-In Hypernote frontmatter, queries are defined with a `$` prefix:
-
-```md
+```yaml
 ---
-$queryname:
-  parameter: value
+"$query_name":
+  # Nostr filter parameters (required)
+  kinds: [1]
+  authors: [ "npub1..." ] # Explicitly provide parameters
+  limit: 10
+  # ... other valid Nostr filter fields ...
+
+  # Optional pipeline for minimal transformation
   pipe:
-    - operation1
-    - operation2
+    # Supported operations:
+    # - extract: ".jq.path.expression" as $variable_name
+    # Limited jq syntax: .prop, .[index], .[], | (pipe), select()
+    - extract: ".tags[] | select(.[0] == \"p\") | .[1]" as $followed_pubkeys
+
+    # Use extracted variables in subsequent filters
+    - kinds: [1]
+      authors: $followed_pubkeys # Use the variable defined above
+      limit: 50
 ---
 ```
 
-The query results can then be accessed in the content section using the same variable name: `{$queryname}`.
+### Key Features:
 
-### Example: Following Feed Query
+* **Nostr Filters:** Directly uses standard Nostr filter syntax.
+* **Explicit Inputs:** Queries must explicitly define their parameters (like `authors`, `ids`, `limit`). There are no implicit global variables like `$last_day`. The rendering client *may* provide context (e.g., the viewing user's pubkey) that can be referenced if explicitly designed into the query structure, but this is implementation-dependent.
+* **Pipeline (`pipe`):** Allows chaining operations. The output of one step becomes the input for the next filter or `extract`.
+* **Minimal Extraction (`extract`)**: Uses a *very limited subset* of `jq` syntax for pulling specific data points out of fetched events.
+    * **Supported jq:**
+        * Property access: `.property`
+        * Array index: `.[index]`
+        * Array iteration: `.[]`
+        * Pipe: `|`
+        * Filter: `select(condition)` (conditions should be simple comparisons like `.[0] == "p"`)
+    * **Variable Assignment:** Use `as $name` to store extracted data for use in later pipeline stages or the HNMD body.
+* **Templating Access:** Query results (or extracted variables) are available in the HNMD body using `{$query_name}` or `{$variable_name}`.
 
-This example shows how to fetch a "following feed" - getting all recent notes from accounts that a user follows:
+### Context Variable (`user`)
+
+The `user` variable provides access to information about the current user and environment:
+
+* **User Information:** Access the current user's data via `user.pubkey` (the user's public key).
+* **Time:** Access current time as a Unix timestamp (milliseconds since epoch) via `time.now`. Use simple arithmetic for relative times.
+
+Example usage in queries:
+```yaml
+$my_feed:
+  authors: [user.pubkey] # Current user's pubkey
+  since: time.now - 86400000 # 24 hours ago (in milliseconds)
+  limit: 20
+```
+
+### Example: Following Feed
 
 ```md
 ---
-$following_feed:
-  pubkey: npub1...  # Starting user
-  
+# Use the user variable to access the current user's pubkey
+"$following_feed":
+  pubkey: user.pubkey # Use the user variable
   pipe:
-    # Step 1: Get the user's follow list (kind 3 event)
-    - kind: 3
-      authors: $pubkey
+    # 1. Get follow list (Kind 3) for the viewing user
+    - kinds: [3]
+      authors: [$pubkey] # Refers to the 'pubkey' defined above
       limit: 1
-    
-    # Step 2: Extract followed pubkeys from p tags
+    # 2. Extract followed pubkeys
     - extract: ".tags[] | select(.[0] == \"p\") | .[1]" as $follows
-    
-    # Step 3: Query recent notes from those pubkeys
-    - kind: 1
-      authors: $follows
-      limit: 50
-      since: $last_day
+    # 3. Get recent notes (Kind 1) from followed pubkeys
+    - kinds: [1]
+      authors: $follows # Use extracted variable
+      limit: 20
+      # Use time directly with arithmetic
+      since: time.now - 86400000 # 24 hours ago
 ---
 
-# My Following Feed
+# Following Feed
 
 [each $following_feed as $note]
   ## {$note.pubkey}
@@ -123,401 +198,221 @@ $following_feed:
   Posted at {$note.created_at}
 ```
 
-### Key Features
+## Hypernote Markdown (HNMD)
 
-- **Pipeline Processing**: Each query stage feeds into the next
-- **Named Variables**: Define custom variables with `as $name` syntax
-- **jq Extraction**: Use a subset of jq for powerful data transformations
-- **Time Variables**: Built-in variables like `$last_day`, `$last_week`
-- **Nostr Filter Integration**: Direct mapping to nostr filter parameters
-- **Templating**: Query results can be used in content templates with `{$queryname}`
-
-### Minimal jq Subset
-
-HQL supports these jq operations:
-
-- `.property` - Object property access
-- `.[index]` - Array element access
-- `.[]` - Array iteration
-- `|` - Pipe operator
-- `select(condition)` - Filter elements based on a condition
-
-## Hypernote Markdown
-
-Hypernote Markdown (HNMD) extends regular markdown with template directives and component syntax, allowing for dynamic content generation based on nostr data.
+HNMD extends Markdown for dynamic content rendering based on HQL results and component interactions.
 
 ### Variables
 
-Variables from queries are accessed using curly braces:
+Access query results, extracted variables, or component `target` data using curly braces:
 
 ```md
 {$note.content}
-{$profile.name}
+{target.name}
 ```
 
 ### Control Structures
 
-HNMD uses indentation-based blocks for control structures:
-
-#### Iteration
+Use indentation-based blocks for loops and conditionals:
 
 ```md
-[each $notes as $note]
-  # {$note.content}
-  by {$note.pubkey}
-```
-
-#### Conditionals
-
-Simple boolean evaluation (truthy/falsy):
-
-```md
-[if $note]
-  # Note content: {$note.content}
-
-[if $profile.website]
-  Website: {$profile.website}
-```
-
-### Components
-
-Components are referenced with a `#` prefix and expect NIP-19 encoded entities based on their kind:
-
-```md
-# For a kind 0 component (expects npub)
-[#profile $note.pubkey]
-
-# For a kind 1 component (expects nevent) 
-[#note $note.id]
-```
-
-With nested components:
-
-```md
-[each $follows as $pubkey]
-  [#profile $pubkey]  # Kind 0: expects npub
-  [#latest-note $pubkey]  # Kind 0: uses pubkey to find latest note
-```
-
-### Complete Example
-
-```md
----
-$profile:
-  pubkey: npub1...
-  pipe:
-    - kind: 0
-      authors: $pubkey
-      limit: 1
-
-$posts:
-  pubkey: npub1...
-  pipe:
-    - kind: 1
-      authors: $pubkey
-      limit: 10
----
-
-# {$profile.name}'s Profile
-
-[if $profile.website]
-  Website: {$profile.website}
-
-## Recent Posts
+# Iteration
 [each $posts as $post]
-  ### {$post.created_at}
+  ## Post by {$post.pubkey}
   {$post.content}
+
+# Conditional (Truthy/Falsy Check)
+[if target.picture]
+  ![Profile Picture]({target.picture})
 ```
 
-HNMD's design ensures that the templating syntax feels consistent with both the query language and markdown, creating a unified experience across the entire Hypernote ecosystem.
+### Component Usage
 
-## Hypernote Events
+Embed imported components using their alias and the single required argument:
 
-Hypernote Events (`@`) allow users to publish Nostr events in response to user actions. Events are templates that define how to construct Nostr events from form inputs and existing data.
+```md
+[#profile_card $note.pubkey]
+[#note_display $note.id]
+```
+
+### Manual Element IDs (`{#id}`)
+
+Assign a specific ID to an HTML element generated from Markdown for styling or linking purposes:
+
+```md
+{#my-cool-header}
+# This Header Gets the ID "my-cool-header"
+
+Some paragraph with an explicitly ID'd span: {#special-text} *important*.
+```
+The `{ #id }` syntax must appear at the beginning of the line or immediately following the element it applies to (like the span example). The `#` differentiates it from `{$variable}`.
+
+## Hypernote Events (`@`)
+
+Define templates in the frontmatter to publish Nostr events triggered by user interaction with forms in the HNMD body.
 
 ### Syntax
 
-In Hypernote frontmatter, events are defined with an `@` prefix:
-
-```md
+```yaml
 ---
-@eventname:
-  kind: 1  # The Nostr event kind
-  content: "{$formdata.message}"  # Content from form input
-  tags:  # Event tags
-    - ["e", "{$reference.id}"]
-    - ["p", "{$reference.pubkey}"]
+"@event_alias":
+  # Nostr event fields
+  kind: 1
+  content: "Reply to {target.pubkey}: {form.message}" # Use form directly
+  tags:
+    - ["e", "{target.id}"] # Use component's input event data
+    - ["p", "{target.pubkey}"]
+    # ... other tags
 ---
 ```
-
-Events can reference:
-- Form inputs using `$formdata`
-- Query results using any query variable
-- Component data using `self`
 
 ### Forms and User Interaction
 
-Forms are used to trigger events with user input:
+Use the `[form]` directive in HNMD to create an HTML form that triggers a defined event template.
 
 ```md
-[form @eventname]
-  [input name="message" placeholder="Type your message"]
-  [button "Submit"]
-```
-
-When the user submits the form, the event template is used to construct and publish a Nostr event.
-
-### Example: Comment Form (NIP-22)
-
-This example shows a component that renders a comment form for replying to a note, following the NIP-22 standard:
-
-```md
----
-kind: 1  # Expects an nevent as input
-@comment:
-  kind: 1111  # Comment event kind (NIP-22)
-  content: "{$formdata.comment_text}"
-  tags:
-    # Root reference
-    - ["E", "{self.id}", "", "{self.pubkey}"]
-    - ["K", "{self.kind}"]
-    - ["P", "{self.pubkey}"]
-    
-    # Parent reference (same as root for top-level comments)
-    - ["e", "{self.id}", "", "{self.pubkey}"]
-    - ["k", "{self.kind}"]
-    - ["p", "{self.pubkey}"]
----
-
-## Add a comment
-
-[form @comment]
-  [textarea name="comment_text" placeholder="Write your comment here..."]
-  [button "Post Comment"]
-```
-
-### Comment Thread Example
-
-This example shows a feed with comment forms:
-
-```md
----
-kind: 0  # Expects an npub
-$feed:
-  pubkey: npub123abc...
-  pipe:
-    - kind: 1
-      authors: $pubkey
-      limit: 20
-      since: $last_day
----
-
-[each $feed as $note]
-  [#note-viewer $note]
-  
-  ## Comments
-  
-  # Query for comments that reference this note
-  $comments:
-    pipe:
-      - kind: 1111  # Comment kind (NIP-22)
-        "#e": [$note.id]  # Filter for comments that reference this note
-        limit: 10
-  
-  [each $comments as $comment]
-    [#comment-view $comment]
-  
-  [#comment-form $note]
-```
-
-### Complex Event Processing
-
-For more complex scenarios, event templates can reference results from previous pipeline steps:
-
-```md
----
-$post:
-  id: nevent123...
-  pipe:
-    - kind: 1
-      ids: $id
-      limit: 1
-    - extract: ".pubkey" as $author
-
-@reply:
-  kind: 1
-  content: "{$formdata.reply}"
-  tags:
-    - ["e", "{$post.id}", "", "{$post.pubkey}"]
-    - ["p", "{$author}"]
----
-
-[#post-viewer $post]
-
-[form @reply]
-  [textarea name="reply" placeholder="Reply to this post"]
+[form @event_alias]  # Trigger '@event_alias', data available via 'form'
+  [input name="message" placeholder="Type your reply..."]
   [button "Send Reply"]
 ```
 
-Hypernote Events provide a powerful way to interact with the Nostr network without requiring complex JavaScript handlers, maintaining the declarative style of the entire Hypernote ecosystem.
+When the form is submitted:
+1.  The form data is collected into the global `form` variable.
+2.  The corresponding "@event_alias" template is processed, interpolating values from the form variable (e.g., `form.message`) and the component's `target` context.
+3.  The user is prompted to sign and publish the resulting Nostr event.
+
+### Example: Comment Form (NIP-22 Style)
+
+```md
+---
+kind: 1 # This component expects an nevent (the post being commented on)
+"@post_comment": # Define the event template
+  kind: 1111 # Example comment kind
+  content: "{form.comment_text}" # Use form variable directly
+  tags:
+    # Root ('E', 'K', 'P') and Parent ('e', 'k', 'p') tags referencing the input event ('target')
+    - ["E", "{target.id}", "", "{target.pubkey}"]
+    - ["K", "{target.kind}"]
+    - ["P", "{target.pubkey}"]
+    - ["e", "{target.id}", "", "{target.pubkey}"]
+    - ["k", "{target.kind}"]
+    - ["p", "{target.pubkey}"]
+---
+
+## Add a comment to event {target.id}
+
+[form @post_comment]  # Trigger '@post_comment', data available via 'form'
+  [textarea name="comment_text" placeholder="Write your comment..."]
+  [button "Post Comment"]
+```
+
+### Security Note
+
+Hypernote does not include arbitrary scripting capabilities, making it generally safe to render untrusted Hypernotes. Nostr's protocol design anticipates potentially hostile event data. The primary security consideration for users interacting with Hypernotes is **event signing**. Implementations *must* make it clear to the user exactly what Nostr event (kind, content, tags) they are being asked to sign and publish when interacting with a form/button.
+
+## Form Response Targeting
+
+To update a specific component with the result of a form submission (e.g., display a newly created note), you can directly target a component instance.
+
+### Syntax & Mechanism
+
+1.  **Assign ID to Component:** Add a unique ID directly to a component instance call, immediately after its argument:
+    ```hnmd
+    [#component_alias "initial_arg" {#unique-id}]
+    ```
+
+2.  **Target from Form:** Use the `target` attribute on the `[form]` directive, referencing the component's unique ID:
+    ```hnmd
+    [form @event_template target="#unique-id"]
+      ```
+
+3.  **Update Process:** Upon successful form submission and event publication:
+    * The client obtains the new event identifier (e.g., `nevent`).
+    * It locates the component instance matching the `target="#unique-id"`.
+    * It re-renders *only that specific component*, passing the new event identifier as its argument.
+
+The targeted component (e.g., `#note_viewer`) must be compatible with the result type (e.g., `kind: 1` for an `nevent`) and should handle its initial state gracefully (e.g., when `initial_arg` is `""`).
+
+### Example
+
+```yaml
+---
+#note_viewer: nevent1xyz... # Import a kind: 1 component
+"@post_note":                # Event template creates a kind: 1 note
+  kind: 1
+  content: "{form.message}"
+---
+
+# Post a note, targeting the viewer below
+[form @post_note target="#note-display"]
+  [textarea name="message" placeholder="New post..."]
+  [button "Post"]
+
+# This specific instance will be updated
+[#note_viewer "" {#note-display}]
+```
+
+This provides a direct, unambiguous link between a form's output and a specific UI element update, similar to `hx-target` in htmx.
 
 ## Hypernote Styling
 
-Hypernote Styling provides a minimal subset of CSS capabilities through a YAML-based syntax, allowing for direct element styling without complex cascading rules. Styles are applied directly to elements using element IDs.
+Define styles in the `style:` block of the frontmatter using a YAML-based, non-cascading subset of CSS properties, inspired by Tailwind utility classes.
 
 ### Syntax
 
-In Hypernote frontmatter, styles are defined with a `style` key:
-
-```md
+```yaml
 ---
 style:
-  # Target element by ID
-  header-title:
+  # Target elements by ID (using Markdown {#id} or auto-generated header IDs)
+  "#header-title":
     text-size: lg
     text-color: primary
     font-weight: bold
-    
-  # Target root element (global styles)
-  ":root":
-    text-color: neutral-800
-    bg-color: neutral-100
----
-```
 
-### Element Targeting
-
-Styles can target elements in several ways:
-
-#### By ID
-
-Markdown headers automatically generate IDs. For example:
-
-```md
-# This is a header
-```
-
-The above header automatically gets the ID `this-is-a-header` and can be styled using the `#` prefix:
-
-```md
----
-style:
-  "#this-is-a-header":
-    text-size: xl
-    text-color: secondary
----
-```
-
-#### By HTML Tag
-
-You can target all instances of a specific HTML tag:
-
-```md
----
-style:
+  # Target elements by HTML tag name
   h1:
-    text-size: 3xl
-    font-weight: bold
-    
+    text-size: 2xl
   p:
     text-color: neutral-700
----
-```
-
-#### Targeting Form Elements
-
-Form elements like buttons, inputs, and textareas can be styled directly:
-
-```md
----
-style:
   button:
     bg-color: primary
     text-color: white
     rounded: md
-    
   input:
     border-color: neutral-300
     rounded: sm
-    
-  textarea:
-    height: 100px
-    width: 300px
+
+  # Target the root container (applies default styles)
+  ":root":
+    bg-color: neutral-100
+    text-color: neutral-800
 ---
 ```
 
-This allows you to create consistent styles for all elements of a certain type throughout your Hypernote.
+### Key Features:
 
-### Available Properties
+* **Selectors:** Target elements by ID (`#my-id`), HTML tag name (`h1`, `p`, `button`, `input`, `textarea`, etc.), or the root container (`:root`).
+* **Non-Cascading:** Styles apply *only* to the targeted element. Child elements do *not* inherit styles and must be targeted explicitly if styling is needed.
+* **No Overrides:** Inline style overrides (`style="..."`) on component calls (`[#component ...]`) are **not** supported. Styling is controlled solely by the `style:` block.
+* **Minimal Properties:** Uses a limited set of predefined properties inspired by Tailwind. (The exact list and values need to be specified by the implementation).
+    ```yaml
+    # Example Properties (Implementation Defined)
+    # text-size: [xs, sm, base, lg, xl, ...]
+    # text-color: [primary, secondary, neutral-500, blue-500, ...]
+    # font-weight: [normal, medium, bold]
+    # bg-color: [primary, secondary, neutral-100, ...]
+    # border-color: [primary, neutral-300, ...]
+    # rounded: [none, sm, md, lg, full]
+    # padding, margin: [0, 1, 2, 4, 6, 8, ...]
+    # width, height: [px values, percentages, screen units (TBD)]
+    ```
 
-Hypernote uses a minimal subset of styling properties inspired by Tailwind:
+## Error Handling
 
-```md
-# Text styling
-text-size:    [xs, sm, base, lg, xl, 2xl, 3xl]
-text-color:   [primary, secondary, color-scale (e.g. blue-500)]
-font-weight:  [normal, medium, bold]
+Hypernote implementations should prioritize clear and precise error reporting. When an error occurs (e.g., invalid syntax in frontmatter, HQL pipe failure, unknown component alias, incorrect argument type, missing variable in template, invalid style property), the system should:
 
-# Layout
-x:            [px values]
-y:            [px values]
-width:        [px values]
-height:       [px values]
-padding:      [0, 1, 2, 4, 6, 8]
-margin:       [0, 1, 2, 4, 6, 8]
+1.  **Fail Explicitly:** Do not attempt to guess or recover. Stop processing/rendering at the point of error.
+2.  **Be Verbose:** Provide a detailed error message explaining what went wrong.
+3.  **Be Precise:** Indicate the exact location (file, line number, component, query, template section) where the error occurred.
 
-# Appearance
-bg-color:     [primary, secondary, color-scale]
-rounded:      [none, sm, md, lg, full]
-```
-
-### Style Overrides for Components
-
-When using components, you can pass style overrides that will apply only to that instance:
-
-```md
-[#profile $note.pubkey style="bg-color: primary; rounded: lg"]
-```
-
-### Non-cascading Design
-
-Unlike traditional CSS, Hypernote styles do not cascade to child elements. Each element must be explicitly styled:
-
-```md
----
-style:
-  parent-element:
-    bg-color: blue-100
-    
-  child-element:
-    text-color: blue-900
-    # Must be explicitly styled, won't inherit from parent
----
-
-[#parent-element]
-  [#child-element]
-    This text needs its own styling rules
-```
-
-### Parent Value References
-
-While Hypernote doesn't use cascading styles, child elements can reference parent values using the `parent()` function:
-
-```md
----
-style:
-  parent-card:
-    bg-color: primary
-    rounded: lg
-    
-  child-header:
-    text-color: parent(bg-color)  # Uses the parent's bg-color value
-    font-weight: bold
----
-
-[#parent-card]
-  [#child-header]
-    This header's text color matches the parent's background
-```
-
-This approach provides flexibility without cascading, allowing children to adapt to parent styles without creating complex inheritance chains or requiring prop drilling.
+This approach aids developers in debugging Hypernotes effectively.

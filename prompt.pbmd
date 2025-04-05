@@ -1,0 +1,16 @@
+can you write me a few very simple test cases for me? I'll be using the bun test framework
+
+they should be hypernote language documents, with a yaml frontmatter and markdown content as defined in README.md
+
+and the output should be a valid nostr event, as defined in OUTPUT.md
+
+let's start really simple hello world stuff, like an h1 and a button in a form that posts a hardcoded "hello world" note
+
+<context>
+OUTPUT.md
+</context>
+
+<context>
+README.md
+</context>
+
