@@ -104,6 +104,9 @@ export function tokenize(content: string): Token[] {
         
         let event = '';
         if (content[pos] === '@') {
+          // Include the @ in the event name
+          event = '@';
+          pos++; // Skip '@'
           while (pos < content.length && content[pos] !== ']' && content[pos] !== ' ') {
             event += content[pos];
             pos++;
@@ -117,6 +120,7 @@ export function tokenize(content: string): Token[] {
           value: elementType,
           attributes: { event }
         });
+        continue;
       } else {
         // Handle other elements (e.g., [button "Text"])
         let attributes: Record<string, string> = {};
@@ -177,8 +181,8 @@ export function tokenize(content: string): Token[] {
           value: elementType,
           attributes
         });
+        continue;
       }
-      continue;
     }
     
     // Handle plain text
@@ -249,63 +253,80 @@ export function parseTokens(tokens: Token[]): any[] {
       const formElements: any[] = [];
       currentIndex++;
       
-      // Collect form elements
+      // Process all elements until we're done with the form's children
+      // Forms don't have an explicit end token in our simplified syntax
+      // so we'll process until the next token at the same level
       while (currentIndex < tokens.length && 
-             tokens[currentIndex].type !== TokenType.FORM_END &&
-             tokens[currentIndex].type !== TokenType.EOF) {
-        
+             tokens[currentIndex].type !== TokenType.EOF &&
+             tokens[currentIndex].type !== TokenType.FORM_END) {
         // Skip newlines
         if (tokens[currentIndex].type === TokenType.NEWLINE) {
           currentIndex++;
           continue;
         }
         
-        // Handle form elements (buttons, inputs, etc.)
+        // Process form child elements (indented)
         if (tokens[currentIndex].type === TokenType.ELEMENT_START) {
-          const elementToken = tokens[currentIndex];
-          const element: any = {
-            type: elementToken.value
+          const childElement = {
+            type: tokens[currentIndex].value,
+            content: tokens[currentIndex].attributes?.content ? [tokens[currentIndex].attributes.content] : [],
+            attributes: { ...tokens[currentIndex].attributes }
           };
           
-          // Add attributes
-          if (elementToken.attributes) {
-            // Special handling for content attribute
-            if (elementToken.attributes.content) {
-              element.content = [elementToken.attributes.content];
-              delete elementToken.attributes.content;
-            }
-            
-            // Handle other attributes
-            const remainingAttrs = { ...elementToken.attributes };
-            if (Object.keys(remainingAttrs).length > 0) {
-              element.attributes = remainingAttrs;
-            }
+          // Remove content from attributes since we've moved it to the content array
+          if (childElement.attributes && 'content' in childElement.attributes) {
+            delete childElement.attributes.content;
           }
           
-          formElements.push(element);
+          formElements.push(childElement);
+          currentIndex++;
+          continue;
+        }
+        
+        // If we encounter another major element (not indented), break out
+        if (tokens[currentIndex].type === TokenType.HEADING ||
+            tokens[currentIndex].type === TokenType.FORM_START) {
+          break;
         }
         
         currentIndex++;
       }
       
-      // Create the form element
-      const form = {
+      const formElement = {
         type: 'form',
-        event: (token.attributes?.event || '').trim(),
+        event: token.attributes?.event,
         elements: formElements
       };
       
       // Apply ID if present
       if (currentId) {
-        form['id'] = currentId;
+        formElement['id'] = currentId;
         currentId = null;
       }
       
-      elements.push(form);
+      elements.push(formElement);
       continue;
     }
     
-    // Skip newlines and move to next token for unhandled types
+    // Handle text
+    if (token.type === TokenType.TEXT) {
+      const paragraph = {
+        type: 'p',
+        content: [token.value]
+      };
+      
+      // Apply ID if present
+      if (currentId) {
+        paragraph['id'] = currentId;
+        currentId = null;
+      }
+      
+      elements.push(paragraph);
+      currentIndex++;
+      continue;
+    }
+    
+    // Skip newlines and other tokens we don't handle
     currentIndex++;
   }
   

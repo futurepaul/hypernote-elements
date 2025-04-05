@@ -1,39 +1,125 @@
 import "./index.css";
-import { APITester } from "./APITester";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { 
+  ResizableHandle, 
+  ResizablePanel, 
+  ResizablePanelGroup 
+} from "@/components/ui/resizable";
+import { useNostrStore } from "./stores/nostrStore";
+import { HypernoteRenderer } from "./renderer";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Toaster } from "sonner";
 
-import logo from "./logo.svg";
-import reactLogo from "./react.svg";
+const TEMPLATES = {
+  blank: "",
+  form: `---
+"@post_message":
+  kind: 1
+  content: "{form.message}"
+  tags: [["client", "hypernote-test"]]
+style:
+  "#title":
+    text-color: primary
+  button:
+    bg-color: blue-500
+---
+
+{#title}
+# Post a Message
+
+[form @post_message]
+  [input name="message" placeholder="Enter message..."]
+  [button "Post"]
+`
+} as const;
+
+type TemplateKey = keyof typeof TEMPLATES;
 
 export function App() {
-  return (
-    <div className="container mx-auto p-8 text-center relative z-10">
-      <div className="flex justify-center items-center gap-8 mb-8">
-        <img
-          src={logo}
-          alt="Bun Logo"
-          className="h-36 p-6 transition-all duration-300 hover:drop-shadow-[0_0_2em_#646cffaa] scale-120"
-        />
-        <img
-          src={reactLogo}
-          alt="React Logo"
-          className="h-36 p-6 transition-all duration-300 hover:drop-shadow-[0_0_2em_#61dafbaa] [animation:spin_20s_linear_infinite]"
-        />
-      </div>
+  const [markdownStates, setMarkdownStates] = useState<Record<TemplateKey, string>>(() => ({
+    blank: TEMPLATES.blank,
+    form: TEMPLATES.form
+  }));
+  const [template, setTemplate] = useState<TemplateKey>("blank");
+  
+  const { relayHandler, initialize, cleanup, logs } = useNostrStore();
 
-      <Card className="bg-card/50 backdrop-blur-sm border-muted">
-        <CardContent className="pt-6">
-          <h1 className="text-5xl font-bold my-4 leading-tight">Bun + React</h1>
-          <p>
-            Edit{" "}
-            <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm">
-              src/App.tsx
-            </code>{" "}
-            and save to test HMR
-          </p>
-          <APITester />
-        </CardContent>
-      </Card>
+  useEffect(() => {
+    initialize();
+    return () => {
+      cleanup();
+    };
+  }, []);
+
+  return (
+    <div className="h-screen p-4 flex flex-col">
+      <div className="mb-4">
+        <Select
+          value={template}
+          onValueChange={(value: TemplateKey) => {
+            setTemplate(value);
+          }}
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Select a template" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="blank">Blank</SelectItem>
+            <SelectItem value="counter">Counter</SelectItem>
+            <SelectItem value="form">Form</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <ResizablePanelGroup direction="vertical" className="flex-1 rounded-lg border">
+        <ResizablePanel defaultSize={75}>
+          <ResizablePanelGroup direction="horizontal">
+            <ResizablePanel defaultSize={50}>
+              <div className="h-full">
+                <textarea
+                  className="w-full h-full p-4 resize-none bg-transparent border-none focus:outline-none font-mono"
+                  placeholder="Enter your markdown here..."
+                  value={markdownStates[template]}
+                  onChange={(e) => setMarkdownStates(prev => ({
+                    ...prev,
+                    [template]: e.target.value
+                  }))}
+                />
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={50}>
+              <div className="h-full p-4 overflow-auto">
+                <div className="prose prose-slate max-w-none dark:prose-invert">
+                  {relayHandler && (
+                    <HypernoteRenderer 
+                      markdown={markdownStates[template]} 
+                      relayHandler={relayHandler} 
+                    />
+                  )}
+                </div>
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize={25}>
+          <div className="h-full bg-black text-white font-mono text-sm p-4 overflow-auto">
+            {logs.map((log, index) => (
+              <div key={index} className="py-1">
+                {log}
+              </div>
+            ))}
+          </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
+      <Toaster />
     </div>
   );
 }

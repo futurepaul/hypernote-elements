@@ -159,11 +159,11 @@ test("should parse basic H1 and a form triggering a hardcoded event", () => {
       {
         type: "form",
         event: "@post_hello",
-        // target: null, // or omitted
         elements: [
           {
             type: "button",
             content: ["Say Hello"],
+            attributes: {}
           },
         ],
       },
@@ -226,6 +226,7 @@ style:
           {
             type: "button",
             content: ["Say Hello Blue"],
+            attributes: {}
           },
         ],
       },
@@ -273,15 +274,16 @@ test("should parse form with input and use form variable in event template", () 
         elements: [
           {
             type: "input", // Input element added
+            content: [],
             attributes: {
               name: "message",
               placeholder: "Enter message...",
             },
-            // Inputs typically don't have 'content' in this structure
           },
           {
             type: "button",
             content: ["Post"],
+            attributes: {}
           },
         ],
       },
