@@ -1,5 +1,7 @@
 import type { Event, Filter } from 'nostr-tools';
 import { getEventHash, SimplePool } from 'nostr-tools';
+import { finalizeEvent, getPublicKey, generateSecretKey } from 'nostr-tools/pure';
+import { verifyEvent } from 'nostr-tools';
 
 export class RelayHandler {
   private pool: SimplePool;
@@ -26,30 +28,39 @@ export class RelayHandler {
   }
 
   public async publishEvent(kind: number, content: string, tags: string[][] = []): Promise<string | null> {
-    const event: any = {
-      kind,
-      created_at: Math.floor(Date.now() / 1000),
-      tags,
-      content,
-      pubkey: "",
-    };
-    
-    event.id = getEventHash(event);
-    
     try {
-      // Use signEvent from node crypto or a compatible library
-      // For simplicity, we'll mock it here
-      event.sig = "mocked_signature";
+      const pubkey = getPublicKey(this.privateKey);
       
-      const pubs = this.pool.publish(this.relays, event);
+      const event: any = {
+        kind,
+        created_at: Math.floor(Date.now() / 1000),
+        tags,
+        content,
+        pubkey,
+      };
+      
+      // Use finalizeEvent to compute the ID and generate a signature
+      const signedEvent = finalizeEvent(event, this.privateKey);
+      
+      const pubs = this.pool.publish(this.relays, signedEvent);
       this.logger(`Publishing event to ${this.relays.length} relays`);
       
       await Promise.allSettled(pubs);
       
-      return event.id;
+      return signedEvent.id;
     } catch (error) {
       this.logger(`Error publishing event: ${error}`);
       return null;
+    }
+  }
+
+  public validateEvent(event: Event): boolean {
+    try {
+      // Use the standard verifyEvent function from nostr-tools
+      return verifyEvent(event);
+    } catch (error) {
+      this.logger(`Error validating event: ${error}`);
+      return false;
     }
   }
 
@@ -66,7 +77,12 @@ export class RelayHandler {
         {
           onevent: (event) => {
             this.logger(`Received event`);
-            onEvent(event);
+            // Verify the event before passing it to the callback
+            if (this.validateEvent(event)) {
+              onEvent(event);
+            } else {
+              this.logger(`Received invalid event, ignoring`);
+            }
           },
           oneose: () => {
             this.logger(`End of stored events`);

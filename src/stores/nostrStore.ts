@@ -10,19 +10,10 @@ interface NostrStore {
   addLog: (message: string) => void;
   initialize: () => void;
   cleanup: () => void;
-  queryResponses: Record<string, any>;
-  setQueryResponse: (id: string, response: any) => void;
-  slots: Record<string, { queryId: string; field: string; value: any }>;
-  registerSlot: (slotId: string, queryId: string, field: string) => void;
-  getSlotValue: (slotId: string) => any;
 }
 
 const RELAY_URLS = [
-  'ws://localhost:10547' // IT'S NAK
-  // 'wss://relay.nostr.net',
-  // 'wss://relay.damus.io',
-  // 'wss://relay.snort.social',
-  // 'wss://relay.nostr.band'
+  'ws://localhost:10547', // Local relay (NAK)
 ]
 
 export const useNostrStore = create<NostrStore>((set, get) => ({
@@ -30,49 +21,6 @@ export const useNostrStore = create<NostrStore>((set, get) => ({
   privateKey: null,
   publicKey: null,
   logs: [],
-  queryResponses: {},
-  slots: {},
-  setQueryResponse: (id: string, response: any) => {
-    set((state) => {
-      const newQueryResponses = {
-        ...state.queryResponses,
-        [id]: response,
-      };
-
-      const newSlots = { ...state.slots };
-      Object.entries(newSlots).forEach(([slotId, slot]) => {
-        if (slot.queryId === id) {
-          newSlots[slotId] = {
-            ...slot,
-            value: response[slot.field],
-          };
-        }
-      });
-
-      return {
-        queryResponses: newQueryResponses,
-        slots: newSlots,
-      };
-    });
-  },
-  registerSlot: (slotId: string, queryId: string, field: string) => {
-    set((state) => {
-      const queryResponse = state.queryResponses[queryId];
-      return {
-        slots: {
-          ...state.slots,
-          [slotId]: {
-            queryId,
-            field,
-            value: queryResponse?.[field],
-          },
-        },
-      };
-    });
-  },
-  getSlotValue: (slotId: string) => {
-    return get().slots[slotId]?.value;
-  },
   addLog: (message: string) => {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] ${message}`);

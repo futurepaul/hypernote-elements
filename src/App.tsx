@@ -72,7 +72,6 @@ export function App() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="blank">Blank</SelectItem>
-            <SelectItem value="counter">Counter</SelectItem>
             <SelectItem value="form">Form</SelectItem>
           </SelectContent>
         </Select>
