@@ -11,6 +11,9 @@ export enum TokenType {
   ATTRIBUTE,
   ID_MARKER,
   NEWLINE,
+  EACH_START,
+  EACH_END,
+  VARIABLE_REFERENCE,
   EOF
 }
 
@@ -87,6 +90,23 @@ export function tokenize(content: string): Token[] {
       continue;
     }
     
+    // Handle variable reference (e.g., {$variable})
+    if (char === '{' && content[pos + 1] === '$') {
+      pos += 2; // Skip '{'
+      let variableName = '$';
+      while (pos < content.length && content[pos] !== '}') {
+        variableName += content[pos];
+        pos++;
+      }
+      pos++; // Skip '}'
+      
+      tokens.push({ 
+        type: TokenType.VARIABLE_REFERENCE, 
+        value: variableName
+      });
+      continue;
+    }
+    
     // Handle form or element start (e.g., [form @event])
     if (char === '[') {
       pos++; // Skip '['
@@ -119,6 +139,37 @@ export function tokenize(content: string): Token[] {
           type: TokenType.FORM_START, 
           value: elementType,
           attributes: { event }
+        });
+        continue;
+      } else if (elementType === 'each') {
+        // Handle [each $source as $variable]
+        if (content[pos] === ' ') pos++; // Skip space
+        
+        // Get source variable
+        let source = '';
+        while (pos < content.length && content[pos] !== ' ') {
+          source += content[pos];
+          pos++;
+        }
+        
+        // Skip past " as "
+        if (content.slice(pos, pos + 4) === ' as ') {
+          pos += 4;
+        }
+        
+        // Get iteration variable
+        let variable = '';
+        while (pos < content.length && content[pos] !== ']') {
+          variable += content[pos];
+          pos++;
+        }
+        
+        if (content[pos] === ']') pos++; // Skip ']'
+        
+        tokens.push({ 
+          type: TokenType.EACH_START, 
+          value: elementType,
+          attributes: { source, variable }
         });
         continue;
       } else {
@@ -308,11 +359,96 @@ export function parseTokens(tokens: Token[]): any[] {
       continue;
     }
     
+    // Handle each loop
+    if (token.type === TokenType.EACH_START) {
+      const loopElements: any[] = [];
+      currentIndex++;
+      
+      // Process all elements until we're done with the loop's children
+      while (currentIndex < tokens.length && 
+             tokens[currentIndex].type !== TokenType.EOF &&
+             tokens[currentIndex].type !== TokenType.EACH_END) {
+        // Skip newlines
+        if (tokens[currentIndex].type === TokenType.NEWLINE) {
+          currentIndex++;
+          continue;
+        }
+        
+        // Handle variable references
+        if (tokens[currentIndex].type === TokenType.VARIABLE_REFERENCE) {
+          loopElements.push({
+            type: 'variable',
+            name: tokens[currentIndex].value
+          });
+          currentIndex++;
+          continue;
+        }
+        
+        // Process text inside loop
+        if (tokens[currentIndex].type === TokenType.TEXT) {
+          loopElements.push({
+            type: 'p',
+            content: [tokens[currentIndex].value]
+          });
+          currentIndex++;
+          continue;
+        }
+        
+        // If we encounter another major element, break out
+        if (tokens[currentIndex].type === TokenType.HEADING ||
+            tokens[currentIndex].type === TokenType.FORM_START ||
+            tokens[currentIndex].type === TokenType.EACH_START) {
+          break;
+        }
+        
+        currentIndex++;
+      }
+      
+      const loopElement = {
+        type: 'loop',
+        source: token.attributes?.source,
+        variable: token.attributes?.variable,
+        elements: loopElements
+      };
+      
+      // Apply ID if present
+      if (currentId) {
+        loopElement['id'] = currentId;
+        currentId = null;
+      }
+      
+      elements.push(loopElement);
+      continue;
+    }
+    
     // Handle text
     if (token.type === TokenType.TEXT) {
       const paragraph = {
         type: 'p',
         content: [token.value]
+      };
+      
+      // Apply ID if present
+      if (currentId) {
+        paragraph['id'] = currentId;
+        currentId = null;
+      }
+      
+      elements.push(paragraph);
+      currentIndex++;
+      continue;
+    }
+    
+    // Handle variable references outside loops
+    if (token.type === TokenType.VARIABLE_REFERENCE) {
+      const paragraph = {
+        type: 'p',
+        content: [
+          {
+            type: 'variable',
+            name: token.value
+          }
+        ]
       };
       
       // Apply ID if present

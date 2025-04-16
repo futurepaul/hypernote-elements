@@ -106,4 +106,35 @@ test("should parse form with input and use form variable in event template", () 
   const button = form.elements?.[1];
   expect(button?.type).toBe("button");
   expect(button?.content?.[0]).toBe("Post");
+});
+
+test("should parse query in frontmatter and loop in content", () => {
+  const inputHnmd = `
+---
+"$my_feed":
+  authors: [user.pubkey]
+  limit: 20
+---
+
+[each $my_feed as $note]
+  {$note.content}
+`.trim();
+
+  const result = compileHypernoteToContent(inputHnmd);
+  
+  // Check the query in frontmatter
+  expect(result.queries).toBeDefined();
+  expect(result.queries?.["$my_feed"]).toBeDefined();
+  expect(result.queries?.["$my_feed"].authors).toEqual(["user.pubkey"]);
+  expect(result.queries?.["$my_feed"].limit).toBe(20);
+  
+  // Check the loop structure
+  expect(result.elements).toBeArray();
+  expect(result.elements[0].type).toBe("loop");
+  expect(result.elements[0].source).toBe("$my_feed");
+  expect(result.elements[0].variable).toBe("$note");
+  
+  // Check the variable reference inside the loop
+  expect(result.elements[0].elements?.[0].type).toBe("variable");
+  expect(result.elements[0].elements?.[0].name).toBe("$note.content");
 }); 

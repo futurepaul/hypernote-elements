@@ -1,6 +1,17 @@
 import { create } from "zustand";
 import { getPublicKey } from "nostr-tools/pure";
 import { RelayHandler } from "../lib/relayHandler";
+import { QueryClient } from "@tanstack/react-query";
+
+// Create a QueryClient instance to be used throughout the app
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      retry: false,
+    },
+  },
+});
 
 interface NostrStore {
   relayHandler: RelayHandler | null;
@@ -47,6 +58,10 @@ export const useNostrStore = create<NostrStore>((set, get) => ({
         privkey.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16))
       );
       const pubkey = getPublicKey(privkeyBytes);
+      
+      // Store the public key in localStorage so it can be accessed by components
+      localStorage.setItem("pubkey", pubkey);
+      
       const handler = new RelayHandler(RELAY_URLS, privkeyBytes, store.addLog);
       
       RELAY_URLS.forEach(url => {
@@ -61,6 +76,7 @@ export const useNostrStore = create<NostrStore>((set, get) => ({
     set((state) => {
       state.addLog("Cleaning up Nostr store...");
       state.relayHandler?.cleanup();
+      queryClient.clear(); // Clear the query cache when cleaning up
       return { relayHandler: null };
     });
   },

@@ -38,6 +38,12 @@ export function compileHypernoteToContent(hnmd: string): any {
           if (frontmatter.style && Object.keys(frontmatter.style).length > 0) {
             result.styles = frontmatter.style;
           }
+        } else if (key.startsWith('$')) {
+          // Handle queries - create queries object if it doesn't exist
+          if (!result.queries) {
+            result.queries = {};
+          }
+          result.queries[key] = frontmatter[key];
         }
         // We can add more frontmatter sections here as needed
       }

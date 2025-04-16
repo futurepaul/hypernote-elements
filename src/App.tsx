@@ -19,6 +19,14 @@ import { Toaster } from "sonner";
 
 const TEMPLATES = {
   blank: "",
+  feed: `---
+"$my_feed":
+  kinds: [1]
+  limit: 20
+---
+[each $my_feed as $note]
+  {$note.content}
+`,
   form: `---
 "@post_message":
   kind: 1
@@ -44,10 +52,11 @@ type TemplateKey = keyof typeof TEMPLATES;
 
 export function App() {
   const [markdownStates, setMarkdownStates] = useState<Record<TemplateKey, string>>(() => ({
+    feed: TEMPLATES.feed,
     blank: TEMPLATES.blank,
     form: TEMPLATES.form
   }));
-  const [template, setTemplate] = useState<TemplateKey>("blank");
+  const [template, setTemplate] = useState<TemplateKey>("feed");
   
   const { relayHandler, initialize, cleanup, logs } = useNostrStore();
 
@@ -71,6 +80,7 @@ export function App() {
             <SelectValue placeholder="Select a template" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="feed">Feed</SelectItem>
             <SelectItem value="blank">Blank</SelectItem>
             <SelectItem value="form">Form</SelectItem>
           </SelectContent>

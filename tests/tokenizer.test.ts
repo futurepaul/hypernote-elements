@@ -83,4 +83,20 @@ test("should parse form with button", () => {
   expect(elements[0].elements.length).toBe(1);
   expect(elements[0].elements[0].type).toBe("button");
   expect(elements[0].elements[0].content).toEqual(["Say Hello"]);
+});
+
+test("should tokenize each loop with variable references", async () => {
+  const input = "[each $my_feed as $note]\n  {$note.content}";
+  const tokens = tokenize(input);
+  
+  // Find the EACH_START token
+  const eachToken = tokens.find(t => t.type === TokenType.EACH_START);
+  expect(eachToken).toBeDefined();
+  expect(eachToken?.attributes?.source).toBe("$my_feed");
+  expect(eachToken?.attributes?.variable).toBe("$note");
+  
+  // Find the VARIABLE_REFERENCE token
+  const varToken = tokens.find(t => t.type === TokenType.VARIABLE_REFERENCE);
+  expect(varToken).toBeDefined();
+  expect(varToken?.value).toBe("$note.content");
 }); 

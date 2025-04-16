@@ -56,5 +56,52 @@ test("compiles a form with inputs and button", async () => {
   // but that would require mocking that function
 });
 
+test("compiles markdown with query and loop", async () => {
+  const markdown = `
+---
+"$my_feed":
+  authors: [user.pubkey]
+  limit: 20
+---
+
+[each $my_feed as $note]
+  {$note.content}
+`.trim();
+  
+  // Mock the subscribe method to return sample data
+  mockRelayHandler.subscribe = mock(async () => [
+    { 
+      id: "note1", 
+      content: "Test note 1", 
+      pubkey: "pubkey1",
+      kind: 1,
+      created_at: 1234567890,
+      tags: [],
+      sig: "sig1"
+    },
+    { 
+      id: "note2", 
+      content: "Test note 2", 
+      pubkey: "pubkey2",
+      kind: 1,
+      created_at: 1234567891,
+      tags: [],
+      sig: "sig2"
+    }
+  ]);
+  
+  // Create the element without rendering to DOM
+  const element = createElement(HypernoteRenderer, {
+    markdown,
+    relayHandler: mockRelayHandler
+  });
+  
+  // Verify it has the expected structure
+  expect(element.props.markdown).toBe(markdown);
+  
+  // We could spy on compileHypernoteToContent to verify the compiled structure
+  // but that would require mocking that function
+});
+
 // For testing with Bun directly, we'd want to test the compiler separately 
 // from the React rendering, since Bun's test environment doesn't include a DOM 

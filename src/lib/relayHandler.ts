@@ -64,19 +64,53 @@ export class RelayHandler {
     }
   }
 
-  public async subscribe(filters: Filter[], onEvent: (event: Event) => void): Promise<string> {
+  public async subscribe(filters: Filter[], onEvent?: (event: Event) => void): Promise<string | Event[]> {
     const subscriptionId = Math.random().toString(36).substring(2, 15);
     
     try {
       this.logger(`Subscribing to events with filters: ${JSON.stringify(filters)}`);
       
-      // According to nostr-tools docs, we need to handle events through the callback
+      // If no callback is provided, collect events and return them
+      if (!onEvent) {
+        const events: Event[] = [];
+        
+        await new Promise<void>((resolve) => {
+          const sub = this.pool.subscribeMany(
+            this.relays,
+            filters,
+            {
+              onevent: (event) => {
+                this.logger(`Received event: ${event.id}`);
+                  events.push(event);
+              },
+              oneose: () => {
+                this.logger(`End of stored events. Collected ${events.length} events.`);
+                resolve();
+              }
+            }
+          );
+          
+          // Store the subscription for cleanup
+          this.subscriptions.set(subscriptionId, sub);
+          
+          // Set a timeout in case EOSE never comes
+          setTimeout(() => {
+            this.logger(`Timeout reached. Collected ${events.length} events.`);
+            resolve();
+          }, 5000);
+        });
+        
+        // Return the collected events
+        return events;
+      }
+      
+      // Original behavior with callback
       const unsub = this.pool.subscribeMany(
         this.relays,
         filters,
         {
           onevent: (event) => {
-            this.logger(`Received event`);
+            this.logger(`Received event: ${event.id}`);
             // Verify the event before passing it to the callback
             if (this.validateEvent(event)) {
               onEvent(event);
@@ -96,7 +130,11 @@ export class RelayHandler {
       return subscriptionId;
     } catch (error) {
       this.logger(`Error subscribing: ${error}`);
-      return subscriptionId;
+      if (onEvent) {
+        return subscriptionId;
+      } else {
+        return [];
+      }
     }
   }
 
@@ -114,7 +152,10 @@ export class RelayHandler {
       // First unsubscribe from all subscriptions
       const subEntries = Array.from(this.subscriptions.values());
       for (const unsub of subEntries) {
-        unsub();
+        // Make sure unsub is a function before calling it
+        if (typeof unsub === 'function') {
+          unsub();
+        }
       }
       this.subscriptions.clear();
       
