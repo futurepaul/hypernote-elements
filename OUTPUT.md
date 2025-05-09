@@ -16,7 +16,7 @@ A Hypernote is published as a standard Nostr event with the following characteri
     * `["hypernote", "<spec_version>"]` (Required): Indicates the version of the *JSON structure specification* this event conforms to (e.g., `"1.1.0"`). Clients should check this.
     * *For Component Definitions*: `["hypernote-component-kind", "<kind_0_or_1>"]` (Required): Specifies if the component expects an `npub` (`0`) or `nevent` (`1`) as input.
     * Other relevant tags (e.g., `["title", "My Hypernote Title"]`, language tags `["L", "en"]`, etc.) can be included as needed.
-* **`content`**: A JSON string conforming to the specification detailed below.
+* **`content`**: A JSON string conforming to the specification detailed below. This contains the structured Hypernote document.
 * `created_at`, `pubkey`, `id`, `sig`: Standard Nostr fields.
 
 ## JSON Content Payload (`content` field)
@@ -26,9 +26,10 @@ The `content` field contains a JSON string which, when parsed, results in the fo
 ```json
 {
   "version": "1.1.0", // Corresponds to the ["hypernote", "..."] tag value
-  "component_kind": null, // Or 0 (npub input), 1 (nevent input). Only present for component definitions.
+  "component_kind": null, // null if not a component, 0 if component expects npub input, 1 if component expects nevent input
 
   // Maps aliases used in HNMD to their Nostr identifiers (naddr, nevent, etc.)
+  // This defines what external components can be referenced by this Hypernote
   "imports": {
     "profile_card": "naddr1...", // Alias from HNMD frontmatter -> Nostr ID
     "note_display": "nevent1..."
@@ -49,6 +50,7 @@ The `content` field contains a JSON string which, when parsed, results in the fo
     "$following_feed": {
       // The full query definition, potentially using variables like {user.pubkey} or {target.*}
       // Note: Variables need context injection by the client during evaluation.
+      // Queries can be either a simple filter object or a pipeline with multiple steps
       "pipe": [
         {
           "kinds": [3],
@@ -97,6 +99,7 @@ The `content` field contains a JSON string which, when parsed, results in the fo
       "type": "h1", // HTML element type or special Hypernote type
       "id": "header-title", // Optional: Element ID from HNMD `{#id}` syntax
       // Content represented as an array for mixed content (strings or nested elements)
+      // content is always an array that can contain strings and/or element objects
       "content": [ "This is a header" ]
     },
     {
@@ -106,12 +109,14 @@ The `content` field contains a JSON string which, when parsed, results in the fo
     {
       "type": "p",
       // Example of mixed content with inline formatting/ID
+      // Mixed content with inline formatting/ID
+      // Note that content is ALWAYS an array, even when it contains a single string or element
       "content": [
           "Some paragraph with an explicitly ID'd span: ",
           {
               "type": "em", // Represents <em> or similar inline tag
               "id": "special-text", // ID applied to this span/em
-              "content": [ "important" ]
+              "content": [ "important" ] // Nested elements also have content as an array
           },
           "."
       ]
@@ -197,8 +202,8 @@ The `content` field contains a JSON string which, when parsed, results in the fo
     * `target.*`: Data related to the input argument of the current component scope.
     * `form.*`: Data submitted from the current form scope.
     * Loop variables (e.g., `note.*` in the example above).
-* **Variable Substitution:** The `{variable.path}` syntax requires the client to look up the variable in the current context and substitute its value. Accessing nested properties (e.g., `note.content`, `target.tags`) should be supported.
-* **Query Execution:** Clients need to parse the query definitions, substitute context variables, execute the Nostr query (potentially involving multiple steps for `pipe`), and make the results available for loops or variable access.
+* **Variable Substitution:** The `{variable.path}` syntax requires the client to look up the variable in the current context and substitute its value. Accessing nested properties (e.g., `note.content`, `target.tags`) should be supported. Variables are used in conditions, content strings, attributes, query parameters, and event templates.
+* **Query Execution:** Clients need to parse the query definitions, substitute context variables, execute the Nostr query (potentially involving multiple steps for `pipe`), and make the results available for loops or variable access. Pipe steps can include standard Nostr filters or operations like `extract` which pull data from previous results.
 * **Event Publishing:** When a form referencing an event template is submitted, the client must:
     1.  Collect form data into the `form.*` context.
     2.  Substitute variables (`form.*`, `target.*`, `user.*`, etc.) into the referenced event template from the `events` map.
