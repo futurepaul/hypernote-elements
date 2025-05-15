@@ -3,6 +3,7 @@ import { useQuery, QueryClientProvider } from '@tanstack/react-query';
 import { RelayHandler } from './lib/relayHandler';
 import { compileHypernoteToContent } from './lib/compiler';
 import { queryClient } from './stores/nostrStore';
+import { fetchNostrEvents } from './lib/nostrFetch';
 
 // Define the structure of elements based on compiler output
 interface HypernoteElement {
@@ -37,41 +38,15 @@ interface RendererProps {
   userContext: {
     pubkey: string | null;
   };
-  queryResults?: Record<string, any[]>;
   loopVariables?: Record<string, any>;
 }
 
-// Custom hook to fetch data for a specific query
-function useHypernoteQuery(queryName: string, queryConfig: any, relayHandler: RelayHandler, pubkey: string | null) {
+// Custom hook to fetch data for a specific query using React Query
+function useNostrEventsQuery(relayHandler: RelayHandler, filter: any) {
   return useQuery({
-    queryKey: ['hypernote', queryName, queryConfig],
-    queryFn: async () => {
-      console.log(`Executing query ${queryName} with user pubkey:`, pubkey);
-      
-      // Replace user.pubkey with actual pubkey if used in authors array
-      let modifiedConfig = { ...queryConfig };
-      if (modifiedConfig.authors && Array.isArray(modifiedConfig.authors)) {
-        modifiedConfig.authors = modifiedConfig.authors.map((author: string) => {
-          const newValue = author === 'user.pubkey' ? pubkey : author;
-          console.log(`Replacing ${author} with ${newValue}`);
-          return newValue;
-        });
-      }
-      
-      console.log(`Final query config:`, modifiedConfig);
-      
-      // Fetch events matching the query
-      const filters = [modifiedConfig];
-      const events = await relayHandler.subscribe(filters, () => {});
-      return Array.isArray(events) ? events : [];
-    },
-    // Only run the query if we have a relay handler and a query name
-    // If authors includes user.pubkey, we need a real pubkey, but kinds-only queries can run without a pubkey
-    enabled: !!relayHandler && !!queryName && (
-      !queryConfig.authors || // If no authors specified, query can run
-      !(queryConfig.authors?.includes('user.pubkey')) || // If authors doesn't include user.pubkey, query can run
-      !!pubkey // If authors includes user.pubkey, we need a real pubkey
-    ),
+    queryKey: ['nostrEvents', JSON.stringify(filter)],
+    queryFn: () => fetchNostrEvents(relayHandler, filter),
+    enabled: !!relayHandler && !!filter,
   });
 }
 
@@ -85,16 +60,16 @@ function ElementRenderer({
   styles = {}, 
   queries = {},
   userContext,
-  queryResults = {},
   loopVariables = {}
 }: RendererProps) {
-  // If this is a loop element, fetch the data for its source using TanStack Query
+  // If this is a loop element, fetch the data for its source using React Query
   const querySourceName = element.type === 'loop' ? element.source : undefined;
   const queryConfig = querySourceName ? queries[querySourceName] : undefined;
-  
-  const { data: loopData, isLoading, isError } = 
-    querySourceName && queryConfig 
-      ? useHypernoteQuery(querySourceName, queryConfig, relayHandler, userContext.pubkey)
+
+  // Use the new React Query hook for fetching events
+  const { data: loopData, isLoading, isError } =
+    querySourceName && queryConfig
+      ? useNostrEventsQuery(relayHandler, queryConfig)
       : { data: undefined, isLoading: false, isError: false };
 
   // Helper to apply styles based on element type or ID
@@ -221,7 +196,6 @@ function ElementRenderer({
                 styles={styles}
                 queries={queries}
                 userContext={userContext}
-                queryResults={queryResults}
                 loopVariables={loopVariables}
               />
         )
@@ -245,7 +219,6 @@ function ElementRenderer({
               styles={styles}
               queries={queries}
               userContext={userContext}
-              queryResults={queryResults}
               loopVariables={loopVariables}
             />
           ))}
@@ -288,7 +261,7 @@ function ElementRenderer({
       }
       
       // Get the data from query results
-      const sourceData = loopData || queryResults[element.source || ''] || [];
+      const sourceData = loopData || [];
       console.log(`Loop data for ${element.source}:`, sourceData);
       const variableName = element.variable || '$item';
       
@@ -320,7 +293,6 @@ function ElementRenderer({
                       styles={styles}
                       queries={queries}
                       userContext={userContext}
-                      queryResults={queryResults}
                       loopVariables={newLoopVariables}
                     />
                   ))}
@@ -351,7 +323,6 @@ function ElementRenderer({
                   styles={styles}
                   queries={queries}
                   userContext={userContext}
-                  queryResults={queryResults}
                   loopVariables={loopVariables}
                 />
           )}
@@ -366,7 +337,6 @@ function ElementRenderer({
               styles={styles}
               queries={queries}
               userContext={userContext}
-              queryResults={queryResults}
               loopVariables={loopVariables}
             />
           ))}
@@ -416,7 +386,7 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
             styles={content.styles}
             queries={content.queries}
             userContext={userContext}
-            queryResults={{}}
+            loopVariables={{}}
           />
         ))}
       </div>
