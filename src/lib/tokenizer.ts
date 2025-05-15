@@ -247,8 +247,8 @@ export function tokenize(content: string): Token[] {
       pos++;
     }
     
-    if (text.trim()) {
-      tokens.push({ type: TokenType.TEXT, value: text.trim() });
+    if (text.length > 0) {
+      tokens.push({ type: TokenType.TEXT, value: text });
     }
     
     // If we didn't make progress, move to the next character
@@ -270,201 +270,189 @@ export function parseTokens(tokens: Token[]): any[] {
   const elements: any[] = [];
   let currentIndex = 0;
   let currentId: string | null = null;
-  
+
+  // Buffer for inline content (for paragraphs)
+  let inlineBuffer: any[] = [];
+  let lastTokenWasNewline = false;
+
+  function flushParagraph() {
+    if (inlineBuffer.length > 0) {
+      const paragraph = {
+        type: 'p',
+        content: [...inlineBuffer],
+      };
+      if (currentId) {
+        paragraph['id'] = currentId;
+        currentId = null;
+      }
+      elements.push(paragraph);
+      inlineBuffer = [];
+    }
+  }
+
+  // Helper for loop paragraph flushing
+  let loopInlineBuffer: any[] = [];
+  let loopLastTokenWasNewline = false;
+  function flushLoopParagraph(loopElements: any[]) {
+    if (loopInlineBuffer.length > 0) {
+      loopElements.push({ type: 'p', content: [...loopInlineBuffer] });
+      loopInlineBuffer = [];
+    }
+  }
+
   while (currentIndex < tokens.length && tokens[currentIndex].type !== TokenType.EOF) {
     const token = tokens[currentIndex];
-    
+
     // Handle ID marker - applies to the next element
     if (token.type === TokenType.ID_MARKER) {
       currentId = token.id;
       currentIndex++;
       continue;
     }
-    
+
+    // Block-level tokens: flush paragraph before handling
+    if (
+      token.type === TokenType.HEADING ||
+      token.type === TokenType.FORM_START ||
+      token.type === TokenType.EACH_START
+    ) {
+      flushParagraph();
+    }
+
     // Handle heading
     if (token.type === TokenType.HEADING) {
       const heading = {
         type: `h${token.level}`,
         content: [token.value]
       };
-      
-      // Apply ID if present
       if (currentId) {
         heading['id'] = currentId;
         currentId = null;
       }
-      
       elements.push(heading);
       currentIndex++;
       continue;
     }
-    
+
     // Handle form
     if (token.type === TokenType.FORM_START) {
       const formElements: any[] = [];
       currentIndex++;
-      
-      // Process all elements until we're done with the form's children
-      // Forms don't have an explicit end token in our simplified syntax
-      // so we'll process until the next token at the same level
-      while (currentIndex < tokens.length && 
-             tokens[currentIndex].type !== TokenType.EOF &&
-             tokens[currentIndex].type !== TokenType.FORM_END) {
-        // Skip newlines
+      while (currentIndex < tokens.length && tokens[currentIndex].type !== TokenType.EOF && tokens[currentIndex].type !== TokenType.FORM_END) {
         if (tokens[currentIndex].type === TokenType.NEWLINE) {
           currentIndex++;
           continue;
         }
-        
-        // Process form child elements (indented)
         if (tokens[currentIndex].type === TokenType.ELEMENT_START) {
           const childElement = {
             type: tokens[currentIndex].value,
             content: tokens[currentIndex].attributes?.content ? [tokens[currentIndex].attributes.content] : [],
             attributes: { ...tokens[currentIndex].attributes }
           };
-          
-          // Remove content from attributes since we've moved it to the content array
           if (childElement.attributes && 'content' in childElement.attributes) {
             delete childElement.attributes.content;
           }
-          
           formElements.push(childElement);
           currentIndex++;
           continue;
         }
-        
-        // If we encounter another major element (not indented), break out
-        if (tokens[currentIndex].type === TokenType.HEADING ||
-            tokens[currentIndex].type === TokenType.FORM_START) {
+        if (tokens[currentIndex].type === TokenType.HEADING || tokens[currentIndex].type === TokenType.FORM_START) {
           break;
         }
-        
         currentIndex++;
       }
-      
       const formElement = {
         type: 'form',
         event: token.attributes?.event,
         elements: formElements
       };
-      
-      // Apply ID if present
       if (currentId) {
         formElement['id'] = currentId;
         currentId = null;
       }
-      
       elements.push(formElement);
       continue;
     }
-    
+
     // Handle each loop
     if (token.type === TokenType.EACH_START) {
       const loopElements: any[] = [];
       currentIndex++;
-      
-      // Process all elements until we're done with the loop's children
-      while (currentIndex < tokens.length && 
-             tokens[currentIndex].type !== TokenType.EOF &&
-             tokens[currentIndex].type !== TokenType.EACH_END) {
-        // Skip newlines
-        if (tokens[currentIndex].type === TokenType.NEWLINE) {
+      loopInlineBuffer = [];
+      loopLastTokenWasNewline = false;
+      while (currentIndex < tokens.length && tokens[currentIndex].type !== TokenType.EOF && tokens[currentIndex].type !== TokenType.EACH_END) {
+        const t = tokens[currentIndex];
+        if (t.type === TokenType.NEWLINE) {
+          if (loopLastTokenWasNewline) {
+            flushLoopParagraph(loopElements);
+            loopLastTokenWasNewline = false;
+          } else {
+            loopLastTokenWasNewline = true;
+          }
           currentIndex++;
           continue;
         }
-        
-        // Handle variable references
-        if (tokens[currentIndex].type === TokenType.VARIABLE_REFERENCE) {
-          loopElements.push({
-            type: 'variable',
-            name: tokens[currentIndex].value
-          });
+        if (t.type === TokenType.VARIABLE_REFERENCE) {
+          loopInlineBuffer.push({ type: 'variable', name: t.value });
+          loopLastTokenWasNewline = false;
           currentIndex++;
           continue;
         }
-        
-        // Process text inside loop
-        if (tokens[currentIndex].type === TokenType.TEXT) {
-          loopElements.push({
-            type: 'p',
-            content: [tokens[currentIndex].value]
-          });
+        if (t.type === TokenType.TEXT) {
+          loopInlineBuffer.push(t.value);
+          loopLastTokenWasNewline = false;
           currentIndex++;
           continue;
         }
-        
-        // If we encounter another major element, break out
-        if (tokens[currentIndex].type === TokenType.HEADING ||
-            tokens[currentIndex].type === TokenType.FORM_START ||
-            tokens[currentIndex].type === TokenType.EACH_START) {
+        if (t.type === TokenType.HEADING || t.type === TokenType.FORM_START || t.type === TokenType.EACH_START) {
+          flushLoopParagraph(loopElements);
           break;
         }
-        
         currentIndex++;
       }
-      
+      flushLoopParagraph(loopElements);
       const loopElement = {
         type: 'loop',
         source: token.attributes?.source,
         variable: token.attributes?.variable,
         elements: loopElements
       };
-      
-      // Apply ID if present
       if (currentId) {
         loopElement['id'] = currentId;
         currentId = null;
       }
-      
       elements.push(loopElement);
       continue;
     }
-    
-    // Handle text
+
+    // Inline content handling (outside loops/forms)
+    if (token.type === TokenType.NEWLINE) {
+      if (lastTokenWasNewline) {
+        flushParagraph();
+        lastTokenWasNewline = false;
+      } else {
+        lastTokenWasNewline = true;
+      }
+      currentIndex++;
+      continue;
+    }
     if (token.type === TokenType.TEXT) {
-      const paragraph = {
-        type: 'p',
-        content: [token.value]
-      };
-      
-      // Apply ID if present
-      if (currentId) {
-        paragraph['id'] = currentId;
-        currentId = null;
-      }
-      
-      elements.push(paragraph);
+      inlineBuffer.push(token.value);
+      lastTokenWasNewline = false;
       currentIndex++;
       continue;
     }
-    
-    // Handle variable references outside loops
     if (token.type === TokenType.VARIABLE_REFERENCE) {
-      const paragraph = {
-        type: 'p',
-        content: [
-          {
-            type: 'variable',
-            name: token.value
-          }
-        ]
-      };
-      
-      // Apply ID if present
-      if (currentId) {
-        paragraph['id'] = currentId;
-        currentId = null;
-      }
-      
-      elements.push(paragraph);
+      inlineBuffer.push({ type: 'variable', name: token.value });
+      lastTokenWasNewline = false;
       currentIndex++;
       continue;
     }
-    
-    // Skip newlines and other tokens we don't handle
+    // Handle variable references outside loops
+    // (already handled above)
+    // Skip any other tokens
     currentIndex++;
   }
-  
+  flushParagraph();
   return elements;
 } 
