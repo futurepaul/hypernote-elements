@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/resizable";
 import { useNostrStore } from "./stores/nostrStore";
 import { HypernoteRenderer } from "./renderer";
+import { HypernoteJsonOutput } from "./renderer";
 import {
   Select,
   SelectContent,
@@ -89,7 +90,7 @@ export function App() {
       <ResizablePanelGroup direction="vertical" className="flex-1 rounded-lg border">
         <ResizablePanel defaultSize={75}>
           <ResizablePanelGroup direction="horizontal">
-            <ResizablePanel defaultSize={50}>
+            <ResizablePanel defaultSize={33}>
               <div className="h-full">
                 <textarea
                   className="w-full h-full p-4 resize-none bg-transparent border-none focus:outline-none font-mono"
@@ -103,7 +104,13 @@ export function App() {
               </div>
             </ResizablePanel>
             <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={50}>
+            <ResizablePanel defaultSize={34}>
+              <div className="h-full p-4 overflow-auto">
+                <HypernoteJsonOutput markdown={markdownStates[template]} />
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={33}>
               <div className="h-full p-4 overflow-auto">
                 <div className="prose prose-slate max-w-none dark:prose-invert">
                   {relayHandler && (

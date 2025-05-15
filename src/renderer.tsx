@@ -392,4 +392,14 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
       </div>
     </QueryClientProvider>
   );
+}
+
+// Component to output the compiled JSON from markdown
+export function HypernoteJsonOutput({ markdown }: { markdown: string }) {
+  const content: HypernoteContent = compileHypernoteToContent(markdown);
+  return (
+    <pre className="bg-slate-100 text-green-900 text-xs p-4 rounded overflow-auto">
+      {JSON.stringify(content, null, 2)}
+    </pre>
+  );
 } 
