@@ -74,20 +74,21 @@ function buildCaddyConfig(domain: string, subdomain: string, proxyPort: number, 
       automation: {
         policies: [
           {
-            // Request a certificate for the base domain and a wildcard for all subdomains
             subjects: [domain, `*.${domain}`],
-            issuer: {
-              module: "acme",
-              challenges: {
-                dns: {
-                  provider: {
-                    name: "porkbun",
-                    api_key: porkbunKeys.apiKey,
-                    api_secret_key: porkbunKeys.apiSecretKey
+            issuers: [
+              {
+                module: "acme",
+                challenges: {
+                  dns: {
+                    provider: {
+                      name: "porkbun",
+                      api_key: porkbunKeys.apiKey,
+                      api_secret_key: porkbunKeys.apiSecretKey
+                    }
                   }
                 }
               }
-            }
+            ]
           }
         ]
       }
