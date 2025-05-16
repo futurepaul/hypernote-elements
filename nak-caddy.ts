@@ -23,51 +23,67 @@ async function backupCaddyConfig() {
   const backupFile = `caddy-backup-${Date.now()}.json`;
   writeFileSync(backupFile, JSON.stringify(config, null, 2));
   console.log(`✅ Backed up current Caddy config to ${backupFile}`);
+  return config;
 }
 
-function buildCaddyConfig(domain: string, subdomain: string, wsPort: number) {
+function createNakRelayConfig(domain: string, subdomain: string, wsPort: number) {
   const fullDomain = `${subdomain}.${domain}`;
   
-  // Initialize the config with a server that responds to the specific subdomain
-  // with special configuration for WebSocket connections
-  const config: any = {
-    apps: {
-      http: {
-        servers: {
-          nak_relay: {
-            listen: [":443", ":80"],
-            routes: [
-              {
-                // Match only the specific subdomain
-                match: [{ host: [fullDomain] }],
-                handle: [
-                  {
-                    handler: "reverse_proxy",
-                    upstreams: [{ dial: `localhost:${wsPort}` }],
-                    // WebSocket-specific configuration
-                    transport: {
-                      protocol: "http",
-                      versions: ["1.1", "2"]
-                    },
-                    headers: {
-                      request: {
-                        add: {
-                          "Host": ["{http.reverse_proxy.upstream.host}"],
-                          "X-Forwarded-Host": ["{http.request.host}"]
-                        }
-                      }
-                    }
-                  },
-                ],
-              },
-            ],
-          },
+  // Create only the route configuration for the NAK relay
+  return {
+    match: [{ host: [fullDomain] }],
+    handle: [
+      {
+        handler: "reverse_proxy",
+        upstreams: [{ dial: `localhost:${wsPort}` }],
+        // WebSocket-specific configuration
+        transport: {
+          protocol: "http",
+          versions: ["1.1", "2"]
         },
+        headers: {
+          request: {
+            add: {
+              "Host": ["{http.reverse_proxy.upstream.host}"],
+              "X-Forwarded-Host": ["{http.request.host}"]
+            }
+          }
+        }
       },
-    },
+    ],
   };
+}
 
-  return config;
+async function mergeWithExistingConfig(nakRelayRoute: any) {
+  // Fetch the current Caddy config
+  const res = await fetch(`${CADDY_API_URL}/config/`);
+  if (!res.ok) throw new Error('Failed to fetch current Caddy config');
+  const currentConfig = await res.json();
+
+  // Make sure we have the HTTP app
+  if (!currentConfig.apps || !currentConfig.apps.http || !currentConfig.apps.http.servers) {
+    throw new Error('Current Caddy config does not have the expected structure');
+  }
+
+  // Find the first server (usually named 'srv0' or similar)
+  const serverNames = Object.keys(currentConfig.apps.http.servers);
+  if (serverNames.length === 0) {
+    throw new Error('No HTTP servers found in current Caddy config');
+  }
+
+  // Use the first server to add our route, or create a new one
+  const serverName = serverNames[0];
+  const server = currentConfig.apps.http.servers[serverName];
+
+  // Ensure the server has a routes array
+  if (!server.routes) {
+    server.routes = [];
+  }
+
+  // Add our new route to the beginning of the routes array
+  server.routes.unshift(nakRelayRoute);
+
+  return currentConfig;
 }
 
 async function postCaddyConfig(config: any) {
@@ -112,8 +128,9 @@ function printInstructions(domain: string, subdomain: string, wsPort: number) {
 
 async function main() {
   console.log('--- NAK WebSocket Relay Caddy Setup ---\n');
-  console.log(`This script will configure Caddy to reverse proxy wss://${FULL_DOMAIN} to ws://localhost:${NAK_WS_PORT}`);
+  console.log(`This script will add a Caddy route to proxy wss://${FULL_DOMAIN} to ws://localhost:${NAK_WS_PORT}`);
   console.log('A backup of your current Caddy config will be created before making changes.');
+  console.log('⚠️ This will preserve your existing routes, including elements.hypernote.dev');
 
   const proceed = (await prompt('Continue? (y/N): ')).trim().toLowerCase();
   if (proceed !== 'y') {
@@ -122,13 +139,23 @@ async function main() {
   }
 
   try {
+    // Backup the config first
     await backupCaddyConfig();
-    const config = buildCaddyConfig(DOMAIN, SUBDOMAIN, NAK_WS_PORT);
-    await postCaddyConfig(config);
+    
+    // Create the NAK relay route configuration
+    const nakRelayRoute = createNakRelayConfig(DOMAIN, SUBDOMAIN, NAK_WS_PORT);
+    
+    // Merge with the existing configuration
+    const mergedConfig = await mergeWithExistingConfig(nakRelayRoute);
+    
+    // Post the updated config
+    await postCaddyConfig(mergedConfig);
+    
     printInstructions(DOMAIN, SUBDOMAIN, NAK_WS_PORT);
     
     console.log(`\n🎉 NAK WebSocket relay is now configured at wss://${FULL_DOMAIN}`);
     console.log('Make sure the NAK service is running: `systemctl status nak`');
+    console.log('✅ Your existing Caddy routes have been preserved');
   } catch (err: any) {
     console.error('❌ Error:', err.message);
     process.exit(1);
