@@ -3,7 +3,7 @@
 
 import { writeFileSync } from 'fs';
 import readline from 'readline';
-import { DOMAIN, PORT } from './src/lib/utils';
+import { DOMAIN, SUBDOMAIN, FULL_DOMAIN, PORT } from './src/lib/utils';
 
 const CADDY_API_URL = 'http://localhost:2019';
 
@@ -21,33 +21,29 @@ async function backupCaddyConfig() {
   console.log(`✅ Backed up current Caddy config to ${backupFile}`);
 }
 
-async function promptDnsProvider(): Promise<{ provider: string; apiKey: string } | null> {
-  const provider = (await prompt('Enter your DNS provider for wildcard certs (e.g., cloudflare), or leave blank to skip: ')).trim();
-  if (!provider) return null;
-  const apiKey = (await prompt(`Enter your API key/token for ${provider}: `)).trim();
+async function promptPorkbunKeys(): Promise<{ apiKey: string; apiSecretKey: string } | null> {
+  console.log(`📌 Porkbun DNS is required for wildcard certificates (*.${DOMAIN})`);
+  console.log('   This will allow you to add more apps under different subdomains later');
+  const apiKey = (await prompt('Enter your Porkbun API key: ')).trim();
   if (!apiKey) {
     console.log('No API key provided. Skipping DNS challenge config.');
     return null;
   }
-  return { provider, apiKey };
+  
+  const apiSecretKey = (await prompt('Enter your Porkbun API Secret key: ')).trim();
+  if (!apiSecretKey) {
+    console.log('No API Secret key provided. Skipping DNS challenge config.');
+    return null;
+  }
+  
+  return { apiKey, apiSecretKey };
 }
 
-function buildCaddyConfig(domain: string, proxyPort: number, dnsProviderConfig?: { provider: string; apiKey: string }) {
-  const tlsConnectionPolicy: any = {};
-  if (dnsProviderConfig) {
-    tlsConnectionPolicy.issuer = {
-      module: "acme",
-      challenges: {
-        dns: {
-          provider: {
-            name: dnsProviderConfig.provider,
-            api_token: dnsProviderConfig.apiKey,
-          },
-        },
-      },
-    };
-  }
-  return {
+function buildCaddyConfig(domain: string, subdomain: string, proxyPort: number, porkbunKeys?: { apiKey: string; apiSecretKey: string }) {
+  const fullDomain = `${subdomain}.${domain}`;
+  
+  // Initialize the config with a server that responds to the specific subdomain
+  const config: any = {
     apps: {
       http: {
         servers: {
@@ -55,7 +51,8 @@ function buildCaddyConfig(domain: string, proxyPort: number, dnsProviderConfig?:
             listen: [":443", ":80"],
             routes: [
               {
-                match: [{ host: [domain] }],
+                // Match only the specific subdomain, not all subdomains
+                match: [{ host: [fullDomain] }],
                 handle: [
                   {
                     handler: "reverse_proxy",
@@ -64,12 +61,40 @@ function buildCaddyConfig(domain: string, proxyPort: number, dnsProviderConfig?:
                 ],
               },
             ],
-            tls_connection_policies: [tlsConnectionPolicy],
           },
         },
       },
     },
   };
+
+  // Add Porkbun DNS challenge if keys are provided
+  if (porkbunKeys) {
+    // Add top-level DNS app config for Porkbun
+    config.apps.tls = {
+      automation: {
+        policies: [
+          {
+            // Request a certificate for the base domain and a wildcard for all subdomains
+            subjects: [domain, `*.${domain}`],
+            issuer: {
+              module: "acme",
+              challenges: {
+                dns: {
+                  provider: {
+                    name: "porkbun",
+                    api_key: porkbunKeys.apiKey,
+                    api_secret_key: porkbunKeys.apiSecretKey
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    };
+  }
+
+  return config;
 }
 
 async function postCaddyConfig(config: any) {
@@ -85,22 +110,28 @@ async function postCaddyConfig(config: any) {
   console.log('✅ Successfully posted new Caddy config!');
 }
 
-function printInstructions(domain: string, dnsProviderConfig?: { provider: string; apiKey: string } | null) {
+function printInstructions(domain: string, subdomain: string, porkbunConfigured: boolean) {
+  const fullDomain = `${subdomain}.${domain}`;
+  
   console.log('\n================ HYPERNOTE ELEMENTS SETUP GUIDE ================\n');
   
   // DNS Configuration
   console.log('📋 DNS CONFIGURATION:');
-  console.log(`1. Point your domain (${domain}) to this server's public IP address.`);
-  console.log('   - Set an A record for the main domain (e.g., elements.hypernote.dev → your-server-ip).');
-  if (dnsProviderConfig) {
-    console.log(`   - Wildcard certificates are enabled using the ${dnsProviderConfig.provider} DNS provider.`);
+  console.log(`1. Point your domain to this server's public IP address.`);
+  console.log(`   - Set an A record for ${fullDomain} → your-server-ip`);
+  
+  if (porkbunConfigured) {
+    console.log(`   - Wildcard certificates are enabled using Porkbun DNS for *.${domain}`);
     console.log('   - Caddy will automatically obtain and renew certificates for all subdomains.');
+    console.log(`   - Future subdomains like another.${domain} will use the same certificate.`);
+    console.log(`   - For each new subdomain, you'll need to:`);
+    console.log(`     a) Set an A record for the subdomain -> your-server-ip`);
+    console.log(`     b) Configure Caddy to route that subdomain to the appropriate application`);
   } else {
-    console.log('   - If you want wildcard certificates (*.example.com):');
-    console.log('     > Set an A record for the wildcard subdomain (e.g., *.elements.hypernote.dev → your-server-ip).');
-    console.log('     > Re-run this script and provide your DNS provider and API key.');
-    console.log('     > Ensure Caddy has the appropriate DNS provider module installed:');
-    console.log('       `xcaddy build --with github.com/caddy-dns/[provider]`');
+    console.log(`   - ⚠️ Porkbun DNS configuration is missing. Wildcard certificates for *.${domain} will not work.`);
+    console.log('   - Re-run this script and provide your Porkbun API keys to enable wildcards.');
+    console.log('   - Ensure Caddy is built with the Porkbun module:');
+    console.log('     `xcaddy build --with github.com/caddy-dns/porkbun`');
   }
   console.log('   - DNS propagation may take up to 24-48 hours, but typically happens within minutes.');
   
@@ -123,7 +154,7 @@ function printInstructions(domain: string, dnsProviderConfig?: { provider: strin
   
   // Verification
   console.log('\n📋 VERIFICATION:');
-  console.log(`1. Once DNS propagates, visit https://${domain} in your browser.`);
+  console.log(`1. Once DNS propagates, visit https://${fullDomain} in your browser.`);
   console.log('2. Check Caddy logs if you encounter any issues:');
   console.log('   `sudo journalctl -u caddy` (if using systemd)');
   console.log('   or wherever Caddy logs are stored on your system.');
@@ -135,13 +166,23 @@ function printInstructions(domain: string, dnsProviderConfig?: { provider: strin
   console.log('   - Use the Caddy API to reload it:');
   console.log('     `curl -X POST -H "Content-Type: application/json" -d @caddy-backup-[timestamp].json http://localhost:2019/load`');
   
+  // Adding additional subdomains
+  if (porkbunConfigured) {
+    console.log('\n📋 ADDING MORE SUBDOMAINS LATER:');
+    console.log(`1. Each new app should have its own subdomain, like another.${domain}`);
+    console.log('2. Set DNS A records for each new subdomain.');
+    console.log('3. Update your Caddy config to route the new subdomain to the right port.');
+    console.log('   - You can use the Caddy API to add a new route without disrupting existing ones.');
+  }
+  
   console.log('\n================================================================\n');
 }
 
 async function main() {
   console.log('--- Hypernote Elements Caddy Setup ---\n');
-  console.log(`This script will configure Caddy to reverse proxy https://${DOMAIN} to localhost:${PORT}`);
-  console.log('It will backup your current Caddy config before making changes.');
+  console.log(`This script will configure Caddy to reverse proxy https://${FULL_DOMAIN} to localhost:${PORT}`);
+  console.log(`It will also attempt to set up wildcard certificates for *.${DOMAIN} if Porkbun credentials are provided.`);
+  console.log('A backup of your current Caddy config will be created before making changes.');
 
   const proceed = (await prompt('Continue? (y/N): ')).trim().toLowerCase();
   if (proceed !== 'y') {
@@ -149,17 +190,19 @@ async function main() {
     process.exit(0);
   }
 
-  let dnsProviderConfig: { provider: string; apiKey: string } | null = null;
-  dnsProviderConfig = await promptDnsProvider();
-  if (!dnsProviderConfig) {
-    console.log('⚠️  Skipping DNS challenge config. Wildcard certificates may not work unless your DNS provider is configured in Caddy.');
+  // Get Porkbun credentials
+  let porkbunKeys = await promptPorkbunKeys();
+  const porkbunConfigured = !!porkbunKeys;
+  
+  if (!porkbunConfigured) {
+    console.log(`⚠️ Skipping Porkbun DNS setup. Wildcard certificates for *.${DOMAIN} will not work.`);
   }
 
   try {
     await backupCaddyConfig();
-    const config = buildCaddyConfig(DOMAIN, PORT, dnsProviderConfig || undefined);
+    const config = buildCaddyConfig(DOMAIN, SUBDOMAIN, PORT, porkbunKeys || undefined);
     await postCaddyConfig(config);
-    printInstructions(DOMAIN, dnsProviderConfig);
+    printInstructions(DOMAIN, SUBDOMAIN, porkbunConfigured);
   } catch (err: any) {
     console.error('❌ Error:', err.message);
     process.exit(1);

@@ -1,6 +1,6 @@
 import { serve } from "bun";
 import index from "./index.html";
-import { DOMAIN, PORT } from "./lib/utils";
+import { FULL_DOMAIN, PORT } from "./lib/utils";
 
 const server = serve({
   port: PORT,

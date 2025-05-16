@@ -6,5 +6,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // Shared constants for server configuration
-export const DOMAIN = 'elements.hypernote.dev';
+export const DOMAIN = 'hypernote.dev';
+export const SUBDOMAIN = 'elements';
+export const FULL_DOMAIN = `${SUBDOMAIN}.${DOMAIN}`;
 export const PORT = 31234;
