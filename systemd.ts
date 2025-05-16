@@ -9,6 +9,7 @@ import path from 'path';
 import os from 'os';
 
 const SERVICE_NAME = 'hypernote-elements';
+const SYSTEMD_DIR = '/etc/systemd/system';
 
 async function prompt(question: string): Promise<string> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -65,11 +66,54 @@ function writeServiceFile(serviceName: string, config: string): string {
   return filename;
 }
 
+function checkSudo(): boolean {
+  try {
+    execSync('sudo -n true', { stdio: 'ignore' });
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function installService(serviceFilePath: string, serviceName: string): boolean {
+  try {
+    console.log(`📋 Installing service to ${SYSTEMD_DIR}...`);
+    execSync(`sudo cp ${serviceFilePath} ${SYSTEMD_DIR}/`, { stdio: 'inherit' });
+    console.log('✅ Service file copied successfully');
+    
+    console.log('📋 Reloading systemd daemon...');
+    execSync('sudo systemctl daemon-reload', { stdio: 'inherit' });
+    console.log('✅ Systemd daemon reloaded');
+    
+    console.log(`📋 Enabling ${serviceName} service...`);
+    execSync(`sudo systemctl enable ${serviceName}`, { stdio: 'inherit' });
+    console.log(`✅ Service ${serviceName} enabled`);
+    
+    console.log(`📋 Starting ${serviceName} service...`);
+    execSync(`sudo systemctl start ${serviceName}`, { stdio: 'inherit' });
+    console.log(`✅ Service ${serviceName} started`);
+    
+    // Check if service is running successfully
+    const status = execSync(`systemctl is-active ${serviceName} || echo 'inactive'`).toString().trim();
+    
+    if (status === 'active') {
+      console.log(`✅ Service ${serviceName} is running successfully!`);
+      return true;
+    } else {
+      console.warn(`⚠️ Service ${serviceName} may not be running correctly. Check status for details.`);
+      return false;
+    }
+  } catch (error: any) {
+    console.error('❌ Error during service installation:', error.message);
+    return false;
+  }
+}
+
 function printInstructions(serviceName: string, serviceFilePath: string) {
   console.log('\n================ SYSTEMD SERVICE SETUP GUIDE ================\n');
   
   // Installation instructions
-  console.log('📋 INSTALLATION:');
+  console.log('📋 MANUAL INSTALLATION (if automatic install failed):');
   console.log(`1. Copy the service file to the systemd directory:`);
   console.log(`   sudo cp ${serviceFilePath} /etc/systemd/system/`);
   console.log('2. Reload systemd to recognize the new service:');
@@ -132,6 +176,40 @@ async function main() {
   try {
     const config = buildSystemdConfig(appName, user, workingDir, bunPath);
     const serviceFilePath = writeServiceFile(customServiceName, config);
+    
+    // Check if we should attempt automatic installation
+    const hasSudo = checkSudo();
+    
+    if (hasSudo) {
+      const shouldInstall = (await prompt('Do you want to automatically install and start the service? (y/N): ')).trim().toLowerCase() === 'y';
+      
+      if (shouldInstall) {
+        const success = installService(serviceFilePath, customServiceName);
+        if (success) {
+          console.log(`\n🎉 Service ${customServiceName} has been successfully installed and started!`);
+        } else {
+          console.log('\n⚠️ Automatic installation encountered issues. Please refer to the manual instructions below.');
+        }
+      } else {
+        console.log('\n📋 Skipping automatic installation. Please refer to the manual instructions below.');
+      }
+    } else {
+      console.log('\n⚠️ Sudo access is required for automatic installation. Please enter your password when prompted or follow manual instructions.');
+      
+      const shouldInstall = (await prompt('Do you want to attempt installation with sudo? (y/N): ')).trim().toLowerCase() === 'y';
+      
+      if (shouldInstall) {
+        const success = installService(serviceFilePath, customServiceName);
+        if (success) {
+          console.log(`\n🎉 Service ${customServiceName} has been successfully installed and started!`);
+        } else {
+          console.log('\n⚠️ Automatic installation encountered issues. Please refer to the manual instructions below.');
+        }
+      } else {
+        console.log('\n📋 Skipping automatic installation. Please refer to the manual instructions below.');
+      }
+    }
+    
     printInstructions(customServiceName, serviceFilePath);
   } catch (err: any) {
     console.error('❌ Error:', err.message);
