@@ -24,7 +24,8 @@ interface NostrStore {
 }
 
 const RELAY_URLS = [
-  'ws://localhost:10547', // Local relay (NAK)
+  // 'ws://localhost:10547', // Local relay (NAK)
+  'wss://relay.hypernote.dev'
 ]
 
 export const useNostrStore = create<NostrStore>((set, get) => ({
