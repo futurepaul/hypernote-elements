@@ -41,6 +41,7 @@
     "@types/bun": "latest",
     "@types/js-yaml": "^4.0.9",
     "@types/react": "^19",
-    "@types/react-dom": "^19"
+    "@types/react-dom": "^19",
+    "ts-node": "^10.9.2"
   }
 }
