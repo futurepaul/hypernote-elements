@@ -213,3 +213,220 @@ export function validateHypernote(data: unknown): Hypernote {
 export function safeValidateHypernote(data: unknown) {
   return hypernoteSchema.safeParse(data);
 }
+
+/**
+ * Generates a JSON Schema from the Zod schema
+ * This function uses Zod's schema definition to generate a JSON Schema format
+ * @returns The JSON Schema representation of the Hypernote schema
+ */
+export function generateJsonSchema() {
+  // Custom implementation to generate JSON schema from our Zod schema
+  // This is based on the structure of our hypernoteSchema
+  
+  return {
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    type: "object",
+    properties: {
+      version: { type: "string" },
+      component_kind: { 
+        oneOf: [
+          { type: "null" },
+          { enum: [0, 1] }
+        ]
+      },
+      imports: {
+        type: "object",
+        additionalProperties: { type: "string" }
+      },
+      styles: {
+        type: "object",
+        additionalProperties: {
+          type: "object",
+          additionalProperties: { type: "string" }
+        }
+      },
+      queries: {
+        type: "object",
+        additionalProperties: {
+          oneOf: [
+            {
+              type: "object",
+              properties: {
+                kinds: { type: "array", items: { type: "number" } },
+                authors: {
+                  oneOf: [
+                    { type: "string" },
+                    { type: "array", items: { type: "string" } }
+                  ]
+                },
+                limit: { type: "number" },
+                since: { 
+                  oneOf: [
+                    { type: "number" },
+                    { type: "string" }
+                  ]
+                },
+                until: {
+                  oneOf: [
+                    { type: "number" },
+                    { type: "string" }
+                  ]
+                },
+                ids: { type: "array", items: { type: "string" } },
+                tags: {
+                  type: "object",
+                  additionalProperties: { type: "array", items: { type: "string" } }
+                }
+              }
+            },
+            {
+              type: "object",
+              required: ["pipe"],
+              properties: {
+                pipe: {
+                  type: "array",
+                  items: {
+                    oneOf: [
+                      {
+                        type: "object",
+                        properties: {
+                          kinds: { type: "array", items: { type: "number" } },
+                          authors: {
+                            oneOf: [
+                              { type: "string" },
+                              { type: "array", items: { type: "string" } }
+                            ]
+                          },
+                          limit: { type: "number" },
+                          since: { 
+                            oneOf: [
+                              { type: "number" },
+                              { type: "string" }
+                            ]
+                          },
+                          until: {
+                            oneOf: [
+                              { type: "number" },
+                              { type: "string" }
+                            ]
+                          },
+                          ids: { type: "array", items: { type: "string" } },
+                          tags: {
+                            type: "object",
+                            additionalProperties: { type: "array", items: { type: "string" } }
+                          }
+                        }
+                      },
+                      {
+                        type: "object",
+                        required: ["extract", "as"],
+                        properties: {
+                          extract: { type: "string" },
+                          as: { type: "string" }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      events: {
+        type: "object",
+        additionalProperties: {
+          type: "object",
+          required: ["kind", "content"],
+          properties: {
+            kind: { type: "number" },
+            content: { type: "string" },
+            tags: { 
+              type: "array", 
+              items: { 
+                type: "array", 
+                items: { type: "string" } 
+              } 
+            }
+          }
+        }
+      },
+      elements: {
+        type: "array",
+        items: {
+          oneOf: [
+            // Basic element
+            {
+              type: "object",
+              required: ["type"],
+              properties: {
+                type: { type: "string" },
+                id: { type: "string" },
+                content: {
+                  type: "array",
+                  items: {
+                    oneOf: [
+                      { type: "string" },
+                      { $ref: "#/properties/elements/items/oneOf/0" } // Reference to element schema
+                    ]
+                  }
+                },
+                attributes: {
+                  type: "object",
+                  additionalProperties: { type: "string" }
+                }
+              }
+            },
+            // Component element
+            {
+              type: "object",
+              required: ["type", "alias", "argument"],
+              properties: {
+                type: { enum: ["component"] },
+                id: { type: "string" },
+                alias: { type: "string" },
+                argument: { type: "string" }
+              }
+            },
+            // If element
+            {
+              type: "object",
+              required: ["type", "condition", "elements"],
+              properties: {
+                type: { enum: ["if"] },
+                id: { type: "string" },
+                condition: { type: "string" },
+                elements: { $ref: "#/properties/elements" }
+              }
+            },
+            // Loop element
+            {
+              type: "object",
+              required: ["type", "source", "variable", "elements"],
+              properties: {
+                type: { enum: ["loop"] },
+                id: { type: "string" },
+                source: { type: "string" },
+                variable: { type: "string" },
+                elements: { $ref: "#/properties/elements" }
+              }
+            },
+            // Form element
+            {
+              type: "object",
+              required: ["type", "event", "elements"],
+              properties: {
+                type: { enum: ["form"] },
+                id: { type: "string" },
+                event: { type: "string" },
+                target: { type: "string" },
+                elements: { $ref: "#/properties/elements" }
+              }
+            }
+          ]
+        }
+      }
+    },
+    required: ["version", "elements"]
+  };
+}

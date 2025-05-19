@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { validateHypernote, safeValidateHypernote } from '../src/lib/schema';
+import { validateHypernote, safeValidateHypernote, generateJsonSchema } from '../src/lib/schema';
 
 // Example Hypernote document based on OUTPUT.md example
 const validHypernoteExample = {
@@ -317,4 +317,25 @@ test("should validate event template structure", () => {
   expect(() => validateHypernote(eventsExample)).not.toThrow();
   const result = safeValidateHypernote(eventsExample);
   expect(result.success).toBe(true);
+});
+
+test("should generate valid JSON Schema", () => {
+  // Generate the JSON schema
+  const jsonSchema = generateJsonSchema();
+  
+  // Basic checks to verify the schema structure
+  expect(jsonSchema).toBeDefined();
+  expect(typeof jsonSchema).toBe("object");
+  expect(jsonSchema).not.toBeNull();
+  
+  // Check for required properties in the schema
+  expect(jsonSchema).toHaveProperty("type", "object");
+  expect(jsonSchema).toHaveProperty("properties");
+  expect(jsonSchema.properties).toHaveProperty("version");
+  expect(jsonSchema.properties).toHaveProperty("elements");
+  
+  // Check that the required fields are marked as such
+  expect(jsonSchema).toHaveProperty("required");
+  expect(jsonSchema.required).toContain("version");
+  expect(jsonSchema.required).toContain("elements");
 });
