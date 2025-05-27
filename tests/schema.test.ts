@@ -318,3 +318,37 @@ test("should validate event template structure", () => {
   const result = safeValidateHypernote(eventsExample);
   expect(result.success).toBe(true);
 });
+
+test("should reject unsupported HTML element types with helpful error message", () => {
+  // Test with an unsupported HTML element
+  const unsupportedElementExample = {
+    version: "1.1.0",
+    elements: [
+      {
+        type: "video", // This should be rejected
+        content: ["Test content"],
+        attributes: {
+          src: "test.mp4"
+        }
+      }
+    ]
+  };
+  
+  // Test the safe validation method to get the error details
+  const result = safeValidateHypernote(unsupportedElementExample);
+  expect(result.success).toBe(false);
+  
+  if (!result.success) {
+    // The error structure is nested, so we need to find the right error message
+    // Look through all issues to find our custom error message
+    const allErrorMessages = JSON.stringify(result.error.issues);
+    expect(allErrorMessages).toContain("Unsupported element type");
+    expect(allErrorMessages).toContain("video");
+    expect(allErrorMessages).toContain("Supported types are:");
+    expect(allErrorMessages).toContain("h1, h2, h3");
+    expect(allErrorMessages).toContain("button, form, input, textarea, div");
+  }
+  
+  // Test the direct validation method also throws
+  expect(() => validateHypernote(unsupportedElementExample)).toThrow();
+});
