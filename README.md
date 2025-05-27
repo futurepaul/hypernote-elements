@@ -35,9 +35,35 @@ kind: 1  # 0 for npub input, 1 for nevent input
 # Styling
 style:
   "#main-title":
-    text-color: primary
+    color: "#3b82f6"
+    font-weight: "bold"
   button:
-    bg-color: blue-500
+    background-color: "#3b82f6"
+    color: "#ffffff"
+    border:
+      radius: 8
+      width: 1
+      style: "solid"
+      color: "#2563eb"
+    padding: 12
+  input:
+    border:
+      color: "#e5e7eb"
+      width: 1
+      style: "solid"
+      radius: 4
+    padding: 8
+
+  # Target elements by class name
+  ".card":
+    background-color: "#ffffff"
+    border:
+      radius: 12
+      width: 1
+      style: "solid"
+      color: "#e5e7eb"
+    elevation: 2
+    padding: 16
 ---
 
 # Markdown content follows...
@@ -356,7 +382,7 @@ This provides a direct, unambiguous link between a form's output and a specific 
 
 ## Hypernote Styling
 
-Define styles in the `style:` block of the frontmatter using a YAML-based, non-cascading subset of CSS properties, inspired by Tailwind utility classes.
+Define styles in the `style:` block of the frontmatter using a YAML-based, non-cascading subset of CSS properties designed for cross-platform compatibility.
 
 ### Syntax
 
@@ -365,47 +391,145 @@ Define styles in the `style:` block of the frontmatter using a YAML-based, non-c
 style:
   # Target elements by ID (using Markdown {#id} or auto-generated header IDs)
   "#header-title":
-    text-size: lg
-    text-color: primary
-    font-weight: bold
+    font-size: 24
+    color: "#3b82f6"
+    font-weight: "bold"
+    text-align: "center"
 
   # Target elements by HTML tag name
   h1:
-    text-size: 2xl
+    font-size: 32
+    font-weight: "bold"
+    color: "#1f2937"
   p:
-    text-color: neutral-700
+    color: "#374151"
+    line-height: 1.5
   button:
-    bg-color: primary
-    text-color: white
-    rounded: md
+    background-color: "#3b82f6"
+    color: "#ffffff"
+    border:
+      radius: 8
+      width: 1
+      style: "solid"
+      color: "#2563eb"
+    padding: 12
   input:
-    border-color: neutral-300
-    rounded: sm
+    border:
+      color: "#e5e7eb"
+      width: 1
+      style: "solid"
+      radius: 4
+    padding: 8
+
+  # Target elements by class name
+  ".card":
+    background-color: "#ffffff"
+    border:
+      radius: 12
+      width: 1
+      style: "solid"
+      color: "#e5e7eb"
+    elevation: 2
+    padding: 16
 
   # Target the root container (applies default styles)
   ":root":
-    bg-color: neutral-100
-    text-color: neutral-800
+    background-color: "#f9fafb"
+    font-family: "system-ui, sans-serif"
 ---
 ```
 
 ### Key Features:
 
-* **Selectors:** Target elements by ID (`#my-id`), HTML tag name (`h1`, `p`, `button`, `input`, `textarea`, etc.), or the root container (`:root`).
+* **Selectors:** Target elements by ID (`#my-id`), HTML tag name (`h1`, `p`, `button`, `input`, `textarea`, etc.), class name (`.my-class`), or the root container (`:root`).
 * **Non-Cascading:** Styles apply *only* to the targeted element. Child elements do *not* inherit styles and must be targeted explicitly if styling is needed.
 * **No Overrides:** Inline style overrides (`style="..."`) on component calls (`[#component ...]`) are **not** supported. Styling is controlled solely by the `style:` block.
-* **Minimal Properties:** Uses a limited set of predefined properties inspired by Tailwind. (The exact list and values need to be specified by the implementation).
-    ```yaml
-    # Example Properties (Implementation Defined)
-    # text-size: [xs, sm, base, lg, xl, ...]
-    # text-color: [primary, secondary, neutral-500, blue-500, ...]
-    # font-weight: [normal, medium, bold]
-    # bg-color: [primary, secondary, neutral-100, ...]
-    # border-color: [primary, neutral-300, ...]
-    # rounded: [none, sm, md, lg, full]
-    # padding, margin: [0, 1, 2, 4, 6, 8, ...]
-    # width, height: [px values, percentages, screen units (TBD)]
-    ```
+* **Cross-Platform Compatibility:** Uses a carefully designed subset of CSS properties that can be reliably implemented across web browsers, mobile platforms (React Native), and native UI frameworks (SwiftUI, Flutter, Jetpack Compose).
+
+### Supported Properties
+
+#### Layout & Box Model
+* **`display`**: `"flex"` | `"none"` (Note: `"block"` removed for cross-platform compatibility)
+* **`width`, `height`**: Numbers (platform units), percentages (`"50%"`), or `"auto"`
+* **`padding`**: Number or percentage (shorthand for uniform padding on all sides)
+* **`padding-top`, `padding-right`, `padding-bottom`, `padding-left`**: Numbers or percentages
+* **`margin-top`, `margin-right`, `margin-bottom`, `margin-left`**: Numbers or percentages
+* **`border`**: Object with `width`, `style`, `color`, `radius` properties
+
+#### Flexbox (when `display: "flex"`)
+* **`flex-direction`**: `"row"` | `"row-reverse"` | `"column"` | `"column-reverse"`
+* **`justify-content`**: `"flex-start"` | `"flex-end"` | `"center"` | `"space-between"` | `"space-around"`
+* **`align-items`**: `"stretch"` | `"flex-start"` | `"flex-end"` | `"center"` | `"baseline"`
+* **`spacing`**: Number (replaces CSS `gap` for better cross-platform support)
+* **`flex-grow`, `flex-shrink`**: Numbers
+* **`flex-basis`**: Number, percentage, or `"auto"`
+* **`flex-wrap`**: `"nowrap"` | `"wrap"`
+
+#### Positioning
+* **`position`**: `"relative"` only (absolute positioning uses `overlay`)
+* **`overlay`**: Object with `anchor` and `offset` for cross-platform absolute positioning
+  ```yaml
+  overlay:
+    anchor: "center"  # "top-left", "top-right", "center", etc.
+    offset:
+      x: 0
+      y: -50
+  ```
+* **`top`, `right`, `bottom`, `left`**: Numbers or percentages (for relative positioning only)
+* **`z-index`**: Integer
+
+#### Typography
+* **`color`**: Hex colors (`#RRGGBB`, `#RRGGBBAA`), RGB/RGBA (`rgb()`, `rgba()`), or `"transparent"`
+* **`font-family`**: String
+* **`font-size`**: Number
+* **`font-weight`**: `"normal"` | `"bold"` | 100-900 (multiples of 100)
+* **`line-height`**: Number (unitless multiplier)
+* **`text-align`**: `"left"` | `"right"` | `"center"` | `"justify"`
+* **`text-decoration`**: `"none"` | `"underline"`
+* **`text-transform`**: `"none"` | `"capitalize"` | `"uppercase"` | `"lowercase"`
+
+#### Background & Effects
+* **`background-color`**: Same color formats as `color`
+* **`elevation`**: Number 0-24 (Material Design elevation for cross-platform shadows)
+* **`opacity`**: Number 0.0-1.0
+* **`overflow`**: `"visible"` | `"hidden"`
+
+### Border Syntax
+
+Borders use a simplified object syntax for cross-platform compatibility:
+
+```yaml
+border:
+  width: 1           # Border width in platform units
+  style: "solid"     # "solid", "dashed", or "dotted"
+  color: "#e5e7eb"   # Border color
+  radius: 8          # Border radius in platform units
+```
+
+### Color Values
+
+Colors support multiple formats for maximum compatibility:
+
+```yaml
+# Hex colors (recommended)
+color: "#3b82f6"        # 6-digit hex
+color: "#3b82f6ff"      # 8-digit hex with alpha
+
+# RGB/RGBA functions
+color: "rgb(59, 130, 246)"
+color: "rgba(59, 130, 246, 0.8)"
+
+# Named colors (limited set)
+color: "transparent"
+```
+
+### Cross-Platform Notes
+
+* **Elevation vs Box Shadow**: Use `elevation` instead of `box-shadow` for consistent shadow rendering across platforms
+* **Spacing vs Gap**: Use `spacing` instead of CSS `gap` for flexbox spacing
+* **Overlay vs Absolute**: Use `overlay` instead of `position: absolute` for cross-platform absolute positioning
+* **Border Object**: Borders use a single object instead of individual `border-*` properties for better platform support
+* **Padding Shorthand**: Use `padding: 16` as a shorthand for uniform padding on all sides, equivalent to setting `padding-top`, `padding-right`, `padding-bottom`, and `padding-left` to the same value
 
 ## Error Handling
 
