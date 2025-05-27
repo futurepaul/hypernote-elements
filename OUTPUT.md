@@ -35,14 +35,58 @@ The `content` field contains a JSON string which, when parsed, results in the fo
     "note_display": "nevent1..."
   },
 
-  // Central style definitions. Selectors are keys. Non-cascading.
+  // Cross-platform style definitions using a minimal, compatible subset of CSS
+  // Designed to work across web (CSS), mobile (React Native), and native platforms (SwiftUI, Flutter, Jetpack Compose)
   "styles": {
-    "h1": { "font-weight": "bold", "text-size": "2xl" },
-    "button": { "bg-color": "primary", "text-color": "white", "rounded": "md" },
-    "p": { "text-color": "neutral-700" },
-    "#header-title": { "text-color": "primary" },
-    ":root": { "bg-color": "neutral-100" }
-    // ... other style rules based on supported properties
+    // Element type selectors
+    "h1": { 
+      "font-weight": "bold", 
+      "font-size": 24,
+      "color": "#1f2937"
+    },
+    "button": { 
+      "background-color": "#3b82f6",
+      "color": "#ffffff",
+      "border": {
+        "radius": 8,
+        "width": 1,
+        "style": "solid",
+        "color": "#2563eb"
+      },
+      "padding-top": 12,
+      "padding-bottom": 12,
+      "padding-left": 16,
+      "padding-right": 16
+    },
+    "p": { 
+      "color": "#374151",
+      "line-height": 1.5
+    },
+    // ID selectors (prefixed with #)
+    "#header-title": { 
+      "color": "#3b82f6",
+      "text-align": "center"
+    },
+    // Class selectors (prefixed with .)
+    ".card": {
+      "background-color": "#ffffff",
+      "border": {
+        "radius": 12,
+        "width": 1,
+        "style": "solid",
+        "color": "#e5e7eb"
+      },
+      "elevation": 2,
+      "padding-top": 16,
+      "padding-bottom": 16,
+      "padding-left": 16,
+      "padding-right": 16
+    },
+    // Root selector for global styles
+    ":root": { 
+      "background-color": "#f9fafb",
+      "font-family": "system-ui, sans-serif"
+    }
   },
 
   // Central query definitions. Keys are query names from HNMD ($query_name).
@@ -194,6 +238,120 @@ The `content` field contains a JSON string which, when parsed, results in the fo
 
 ```
 
+## Cross-Platform Styling System
+
+Hypernote uses a carefully designed subset of CSS properties that can be reliably implemented across web browsers, mobile platforms (React Native), and native UI frameworks (SwiftUI, Flutter, Jetpack Compose). This approach ensures consistent visual presentation regardless of the client implementation.
+
+### Design Philosophy
+
+The styling system prioritizes:
+
+1. **Cross-platform compatibility**: Every property must have a clear mapping to all target platforms
+2. **Minimal complexity**: Only essential styling capabilities are included
+3. **Predictable behavior**: Properties behave consistently across platforms
+4. **Non-cascading**: Styles are applied directly to elements without inheritance complexity
+
+### Key Differences from Standard CSS
+
+**⚠️ Breaking Changes from Standard CSS:**
+
+- **`display`**: Only supports `"flex"` and `"none"` (removed `"block"` as it's not meaningful on native platforms)
+- **`border`**: Simplified to a single object instead of individual `border-*` properties for better cross-platform support
+- **`spacing`**: Replaces CSS `gap` property for flexbox spacing (maps to native spacing parameters)
+- **`overlay`**: New positioning system replaces `position: absolute` for cross-platform absolute positioning
+- **`elevation`**: New property for Material Design-style shadows instead of `box-shadow`
+- **`font-weight`**: Enhanced to support both named values (`"normal"`, `"bold"`) and numeric values (100-900)
+- **`text-decoration`**: Simplified to only `"none"` and `"underline"` (removed `"line-through"`)
+
+### Supported Properties
+
+#### Layout & Box Model
+- `display`: `"flex"` | `"none"`
+- `width`, `height`: Numbers (platform units) or percentages (`"50%"`) or `"auto"`
+- `padding-top`, `padding-right`, `padding-bottom`, `padding-left`: Numbers or percentages
+- `margin-top`, `margin-right`, `margin-bottom`, `margin-left`: Numbers or percentages
+- `border`: Object with `width`, `style`, `color`, `radius` properties
+
+#### Flexbox
+- `flex-direction`: `"row"` | `"row-reverse"` | `"column"` | `"column-reverse"`
+- `justify-content`: `"flex-start"` | `"flex-end"` | `"center"` | `"space-between"` | `"space-around"`
+- `align-items`: `"stretch"` | `"flex-start"` | `"flex-end"` | `"center"` | `"baseline"`
+- `spacing`: Number (replaces CSS `gap`)
+- `flex-grow`, `flex-shrink`: Numbers
+- `flex-basis`: Number, percentage, or `"auto"`
+- `flex-wrap`: `"nowrap"` | `"wrap"`
+
+#### Positioning
+- `position`: `"relative"` only (absolute positioning uses `overlay`)
+- `overlay`: Object with `anchor` and `offset` for cross-platform absolute positioning
+- `top`, `right`, `bottom`, `left`: Numbers or percentages (for relative positioning only)
+- `z-index`: Integer
+
+#### Typography
+- `color`: Hex colors (`#RRGGBB`, `#RRGGBBAA`), RGB/RGBA (`rgb()`, `rgba()`), or `"transparent"`
+- `font-family`: String
+- `font-size`: Number
+- `font-weight`: `"normal"` | `"bold"` | 100-900 (multiples of 100)
+- `line-height`: Number (unitless multiplier)
+- `text-align`: `"left"` | `"right"` | `"center"` | `"justify"`
+- `text-decoration`: `"none"` | `"underline"`
+- `text-transform`: `"none"` | `"capitalize"` | `"uppercase"` | `"lowercase"`
+
+#### Background & Effects
+- `background-color`: Same color formats as `color`
+- `elevation`: Number 0-24 (Material Design elevation for cross-platform shadows)
+- `opacity`: Number 0.0-1.0
+- `overflow`: `"visible"` | `"hidden"`
+
+### Selectors
+
+The styling system supports four types of selectors:
+
+1. **Element type selectors**: `"h1"`, `"button"`, `"div"`, etc.
+2. **ID selectors**: `"#header-title"`, `"#main-content"`, etc.
+3. **Class selectors**: `".card"`, `".highlight"`, etc.
+4. **Root selector**: `":root"` for global styles
+
+### Platform Mapping Examples
+
+```json
+{
+  "styles": {
+    ".modal": {
+      // Cross-platform absolute positioning
+      "overlay": {
+        "anchor": "center",
+        "offset": { "x": 0, "y": -50 }
+      },
+      // CSS: position: absolute; top: 50%; left: 50%; transform: translate(-50%, calc(-50% - 50px));
+      // SwiftUI: .overlay(alignment: .center).offset(x: 0, y: -50)
+      // React Native: position: 'absolute', top: '50%', left: '50%', marginTop: -50, marginLeft: -200
+      // Flutter: Positioned widget in Stack with center alignment and offset
+      // Jetpack Compose: Box with Alignment.Center and offset modifier
+      
+      "elevation": 8,
+      // CSS: box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+      // SwiftUI: .shadow(radius: 8)
+      // React Native: elevation: 8 (Android), shadowRadius: 8 (iOS)
+      // Flutter: elevation: 8 on Material widget
+      // Jetpack Compose: elevation = 8.dp
+      
+      "border": {
+        "radius": 12,
+        "width": 1,
+        "style": "solid", 
+        "color": "#e5e7eb"
+      }
+      // CSS: border: 1px solid #e5e7eb; border-radius: 12px;
+      // SwiftUI: .border(Color(hex: "e5e7eb"), width: 1).cornerRadius(12)
+      // React Native: borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12
+      // Flutter: Container with BoxDecoration border and borderRadius
+      // Jetpack Compose: Modifier.border(1.dp, Color(0xFFe5e7eb)).clip(RoundedCornerShape(12.dp))
+    }
+  }
+}
+```
+
 ## Implementation Notes
 
 * **Context Injection:** Client implementations are responsible for injecting the correct context when evaluating conditions, queries, event templates, and variable substitutions (`{...}`). This includes:
@@ -209,7 +367,7 @@ The `content` field contains a JSON string which, when parsed, results in the fo
     2.  Substitute variables (`form.*`, `target.*`, `user.*`, etc.) into the referenced event template from the `events` map.
     3.  Construct the final Nostr event.
     4.  **Crucially:** Prompt the user to review, sign, and publish the generated event.
-* **Styling:** Clients need to parse the `styles` map and apply the specified (non-cascading) styles to elements based on their type (`h1`, `button`, etc.) or `id`. The exact set of supported style properties and values is implementation-defined but should be documented.
+* **Styling:** Clients need to parse the `styles` map and apply the specified (non-cascading) styles to elements based on their type, ID, or class. The styling system uses a minimal subset of CSS designed for cross-platform compatibility. See the "Cross-Platform Styling System" section above for detailed property mappings and platform-specific implementation guidance.
 * **Component Loading:** When encountering a `component` element, the client needs to:
     1.  Resolve the `alias` using the `imports` map to get the Nostr identifier (`reference`).
     2.  Fetch the referenced Hypernote definition (if not cached).
