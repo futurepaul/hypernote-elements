@@ -1,4 +1,5 @@
 import { z } from "zod/v4";
+import { StyleSheetSchema } from "./style-schema";
 
 /**
  * IMPORTANT: TypeScript Circular Reference Warnings
@@ -159,8 +160,8 @@ const AnyElementSchema = z.union([
   FormElementSchema,
 ]);
 
-// Style properties schema
-const StylePropertiesSchema = z.record(z.string().min(1), z.string());
+// Style properties schema - REMOVED as it's now in style-schema.ts
+// const StylePropertiesSchema = z.record(z.string().min(1), z.string());
 
 // Query pipe step schema
 const QueryPipeStepSchema = z.union([
@@ -221,7 +222,7 @@ export const hypernoteSchema = z.object({
   imports: z.record(z.string().min(1), z.string().min(1)).optional(),
   
   // Style definitions - selectors are keys, properties are values
-  styles: z.record(z.string().min(1), StylePropertiesSchema).optional(),
+  styles: StyleSheetSchema.optional(),
   
   // Query definitions - keys are query names from HNMD ($query_name)
   queries: z.record(z.string().min(1), QuerySchema).optional(),
