@@ -12,11 +12,26 @@ const validHypernoteExample = {
   },
   
   styles: {
-    h1: { "font-weight": "bold", "text-size": "2xl" },
-    button: { "bg-color": "primary", "text-color": "white", "rounded": "md" },
-    p: { "text-color": "neutral-700" },
-    "#header-title": { "text-color": "primary" },
-    ":root": { "bg-color": "neutral-100" }
+    h1: { 
+      "font-weight": "bold", 
+      "font-size": 24
+    },
+    button: { 
+      "background-color": "#3b82f6",
+      color: "#ffffff",
+      border: {
+        radius: 8
+      }
+    },
+    p: { 
+      color: "#374151"
+    },
+    "#header-title": { 
+      color: "#3b82f6"
+    },
+    ":root": { 
+      "background-color": "#f5f5f5"
+    }
   },
   
   queries: {
@@ -265,19 +280,19 @@ test("should validate query structure", () => {
 });
 
 test("should validate styles structure", () => {
-  // Test with various style selectors and properties
+  // Test with various style selectors and properties using valid CSS properties
   const stylesExample = {
     version: "1.1.0",
     styles: {
       // Element selector
       "button": {
-        "bg-color": "blue-500",
-        "text-color": "white"
+        "background-color": "#3b82f6",
+        color: "#ffffff"
       },
       // ID selector
       "#header": {
         "font-weight": "bold",
-        "text-size": "xl"
+        "font-size": 20
       },
       // Root selector
       ":root": {
