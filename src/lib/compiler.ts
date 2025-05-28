@@ -1,12 +1,13 @@
 import * as yaml from 'js-yaml';
 import { tokenize, parseTokens } from './tokenizer';
+import { safeValidateHypernote, type Hypernote } from './schema';
 
 /**
  * Compiles Hypernote Markdown to content object
  * @param hnmd Hypernote Markdown string
- * @returns Content object
+ * @returns Content object or fallback structure if validation fails
  */
-export function compileHypernoteToContent(hnmd: string): any {
+export function compileHypernoteToContent(hnmd: string): Hypernote {
   // Default structure with only required fields
   const result: Record<string, any> = {
     version: "1.1.0",
@@ -44,6 +45,15 @@ export function compileHypernoteToContent(hnmd: string): any {
             result.queries = {};
           }
           result.queries[key] = frontmatter[key];
+        } else if (key === 'kind') {
+          // Handle component kind
+          result.component_kind = frontmatter[key];
+        } else if (key.startsWith('#')) {
+          // Handle imports - create imports object if it doesn't exist
+          if (!result.imports) {
+            result.imports = {};
+          }
+          result.imports[key] = frontmatter[key];
         }
         // We can add more frontmatter sections here as needed
       }
@@ -59,5 +69,31 @@ export function compileHypernoteToContent(hnmd: string): any {
   const tokens = tokenize(content);
   result.elements = parseTokens(tokens);
 
-  return result;
+  // Safely validate the result against the schema
+  const validation = safeValidateHypernote(result);
+  
+  if (validation.success) {
+    return validation.data;
+  } else {
+    // Log validation errors but don't throw
+    console.error('Hypernote validation failed:', validation.error);
+    
+    // Return a fallback structure that's guaranteed to be valid
+    return {
+      version: "1.1.0",
+      component_kind: null,
+      elements: [
+        {
+          type: "div" as const,
+          content: [
+            "Validation Error:",
+            {
+              type: "pre" as const,
+              content: [JSON.stringify(validation.error.issues, null, 2)]
+            }
+          ]
+        }
+      ]
+    };
+  }
 } 

@@ -153,11 +153,11 @@ const FormElementSchema = z.object({
 
 // Union of all element types for simpler type checking
 const AnyElementSchema = z.union([
-  ElementSchema,
+  FormElementSchema,
   ComponentElementSchema,
   IfElementSchema,
   LoopElementSchema,
-  FormElementSchema,
+  ElementSchema,
 ]);
 
 // Style properties schema - REMOVED as it's now in style-schema.ts

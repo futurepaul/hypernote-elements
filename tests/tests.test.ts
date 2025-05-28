@@ -49,9 +49,9 @@ test("should parse frontmatter with styles", () => {
   tags: []
 style:
   "#main-title":
-    text-color: primary
+    color: "#3b82f6"
   button:
-    bg-color: blue-500 
+    background-color: "#3b82f6" 
 ---
 
 {#main-title}
@@ -66,10 +66,10 @@ style:
     component_kind: null,
     styles: {
       "#main-title": {
-        "text-color": "primary",
+        "color": "#3b82f6",
       },
       "button": {
-        "bg-color": "blue-500",
+        "background-color": "#3b82f6",
       }
     },
     events: {
@@ -163,7 +163,6 @@ test("should parse basic H1 and a form triggering a hardcoded event", () => {
           {
             type: "button",
             content: ["Say Hello"],
-            attributes: {}
           },
         ],
       },
@@ -183,9 +182,9 @@ test("should parse H1 with ID and apply a simple style rule", () => {
   tags: []
 style:
   "#main-title":
-    text-color: primary
+    color: "#3b82f6"
   button:
-    bg-color: blue-500 
+    background-color: "#3b82f6" 
 ---
 
 {#main-title}
@@ -200,10 +199,10 @@ style:
     component_kind: null,
     styles: {
       "#main-title": { // Style applied via ID selector
-        "text-color": "primary",
+        "color": "#3b82f6",
       },
       "button": {      // Style applied via element type selector
-        "bg-color": "blue-500",
+        "background-color": "#3b82f6",
       }
     },
     events: {
@@ -226,7 +225,6 @@ style:
           {
             type: "button",
             content: ["Say Hello Blue"],
-            attributes: {}
           },
         ],
       },
@@ -283,7 +281,6 @@ test("should parse form with input and use form variable in event template", () 
           {
             type: "button",
             content: ["Post"],
-            attributes: {}
           },
         ],
       },

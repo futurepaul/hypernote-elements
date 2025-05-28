@@ -4,6 +4,7 @@ import { RelayHandler } from './lib/relayHandler';
 import { compileHypernoteToContent } from './lib/compiler';
 import { queryClient } from './stores/nostrStore';
 import { fetchNostrEvents } from './lib/nostrFetch';
+import type { Hypernote, AnyElement } from './lib/schema';
 
 // Define the structure of elements based on compiler output
 interface HypernoteElement {
@@ -18,22 +19,13 @@ interface HypernoteElement {
   variable?: string;
 }
 
-interface HypernoteContent {
-  version: string;
-  component_kind: string | null;
-  elements: HypernoteElement[];
-  events?: Record<string, any>;
-  styles?: Record<string, Record<string, string>>;
-  queries?: Record<string, any>;
-}
-
 interface RendererProps {
   element: HypernoteElement;
   relayHandler: RelayHandler;
   formData?: Record<string, string>;
   setFormData?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   events?: Record<string, any>;
-  styles?: Record<string, Record<string, string>>;
+  styles?: Hypernote['styles'];
   queries?: Record<string, any>;
   userContext: {
     pubkey: string | null;
@@ -168,6 +160,14 @@ function ElementRenderer({
     return variableName;
   };
 
+  // Process content and replace variable references
+  const processContent = (content: string): string => {
+    // Replace variable references like {$note.content} with actual values
+    return content.replace(/\{(\$[^}]+)\}/g, (match, variableName) => {
+      return resolveVariable(variableName);
+    });
+  };
+
   // Apply styles for this element
   const elementStyles = getStyles(element);
 
@@ -185,7 +185,7 @@ function ElementRenderer({
         { id: element.id, style: elementStyles as React.CSSProperties },
         element.content?.map((item, idx) => 
           typeof item === 'string' 
-            ? item 
+            ? processContent(item)
             : <ElementRenderer 
                 key={idx}
                 element={item as HypernoteElement}
@@ -232,7 +232,7 @@ function ElementRenderer({
           type="submit"
           style={elementStyles as React.CSSProperties}
         >
-          {element.content?.join(' ') || 'Submit'}
+          {element.content?.map(item => typeof item === 'string' ? processContent(item) : item).join(' ') || 'Submit'}
         </button>
       );
       
@@ -312,7 +312,7 @@ function ElementRenderer({
         <div id={element.id} style={elementStyles as React.CSSProperties}>
           {element.content?.map((item, idx) => 
             typeof item === 'string' 
-              ? item 
+              ? processContent(item)
               : <ElementRenderer 
                   key={idx}
                   element={item as HypernoteElement}
@@ -348,7 +348,7 @@ function ElementRenderer({
 // Main renderer function that takes markdown and returns React node
 export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string, relayHandler: RelayHandler }) {
   // Compile markdown to content object
-  const content: HypernoteContent = compileHypernoteToContent(markdown);
+  const content: Hypernote = compileHypernoteToContent(markdown);
   
   // Set up form data state
   const [formData, setFormData] = useState<Record<string, string>>({});
@@ -396,7 +396,7 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
 
 // Component to output the compiled JSON from markdown
 export function HypernoteJsonOutput({ markdown }: { markdown: string }) {
-  const content: HypernoteContent = compileHypernoteToContent(markdown);
+  const content: Hypernote = compileHypernoteToContent(markdown);
   return (
     <pre className="bg-slate-100 text-green-900 text-xs p-4 rounded overflow-auto">
       {JSON.stringify(content, null, 2)}

@@ -92,12 +92,13 @@ export function tokenize(content: string): Token[] {
     
     // Handle variable reference (e.g., {$variable})
     if (char === '{' && content[pos + 1] === '$') {
-      pos += 2; // Skip '{'
-      let variableName = '$';
+      let variableName = '{';
+      pos++; // Skip '{'
       while (pos < content.length && content[pos] !== '}') {
         variableName += content[pos];
         pos++;
       }
+      variableName += '}'; // Include closing brace
       pos++; // Skip '}'
       
       tokens.push({ 
@@ -352,6 +353,10 @@ export function parseTokens(tokens: Token[]): any[] {
           if (childElement.attributes && 'content' in childElement.attributes) {
             delete childElement.attributes.content;
           }
+          // Remove attributes if empty
+          if (childElement.attributes && Object.keys(childElement.attributes).length === 0) {
+            delete childElement.attributes;
+          }
           formElements.push(childElement);
           currentIndex++;
           continue;
@@ -393,10 +398,25 @@ export function parseTokens(tokens: Token[]): any[] {
           continue;
         }
         if (t.type === TokenType.VARIABLE_REFERENCE) {
-          loopInlineBuffer.push({ type: 'variable', name: t.value });
-          loopLastTokenWasNewline = false;
-          currentIndex++;
-          continue;
+          // Check if this is a standalone variable (next token is newline or EOF)
+          // Also check if the buffer only contains whitespace
+          const nextToken = tokens[currentIndex + 1];
+          const bufferOnlyWhitespace = loopInlineBuffer.every(item => typeof item === 'string' && item.trim() === '');
+          if ((loopInlineBuffer.length === 0 || bufferOnlyWhitespace) && (nextToken?.type === TokenType.NEWLINE || nextToken?.type === TokenType.EOF)) {
+            // Clear any whitespace-only buffer
+            loopInlineBuffer = [];
+            // Standalone variable reference
+            loopElements.push({ type: 'span', content: [t.value] });
+            loopLastTokenWasNewline = false;
+            currentIndex++;
+            continue;
+          } else {
+            // Variable reference within text content
+            loopInlineBuffer.push(t.value);
+            loopLastTokenWasNewline = false;
+            currentIndex++;
+            continue;
+          }
         }
         if (t.type === TokenType.TEXT) {
           loopInlineBuffer.push(t.value);
@@ -443,10 +463,33 @@ export function parseTokens(tokens: Token[]): any[] {
       continue;
     }
     if (token.type === TokenType.VARIABLE_REFERENCE) {
-      inlineBuffer.push({ type: 'variable', name: token.value });
-      lastTokenWasNewline = false;
-      currentIndex++;
-      continue;
+      // Check if this is a standalone variable (next token is newline or EOF)
+      // Also check if the buffer only contains whitespace
+      const nextToken = tokens[currentIndex + 1];
+      const bufferOnlyWhitespace = inlineBuffer.every(item => typeof item === 'string' && item.trim() === '');
+      if ((inlineBuffer.length === 0 || bufferOnlyWhitespace) && (nextToken?.type === TokenType.NEWLINE || nextToken?.type === TokenType.EOF)) {
+        // Clear any whitespace-only buffer
+        inlineBuffer = [];
+        // Standalone variable reference - create a span element
+        const spanElement = {
+          type: 'span',
+          content: [token.value]
+        };
+        if (currentId) {
+          spanElement['id'] = currentId;
+          currentId = null;
+        }
+        elements.push(spanElement);
+        lastTokenWasNewline = false;
+        currentIndex++;
+        continue;
+      } else {
+        // Variable reference within text content
+        inlineBuffer.push(token.value);
+        lastTokenWasNewline = false;
+        currentIndex++;
+        continue;
+      }
     }
     // Handle variable references outside loops
     // (already handled above)

@@ -34,13 +34,10 @@ const TEMPLATES = {
   content: "{form.message}"
   tags: [["client", "hypernote-test"]]
 style:
-  "#title":
-    text-color: primary
   button:
-    bg-color: blue-500
+    background-color: "#eeeeee"
 ---
 
-{#title}
 # Post a Message
 
 [form @post_message]
