@@ -1,3 +1,9 @@
+preload = ["./scripts/md-loader.ts"]
+
+[test]
+preload = ["./scripts/md-loader.ts"]
+
 [serve.static]
-plugins = ["bun-plugin-tailwind"]
+preload = ["./scripts/md-loader.ts"]
+plugins = ["bun-plugin-tailwind", "./scripts/md-loader.ts"]
 env = "BUN_PUBLIC_*"

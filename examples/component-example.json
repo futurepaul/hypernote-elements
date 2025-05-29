@@ -1,0 +1,57 @@
+{
+  "version": "1.1.0",
+  "component_kind": 1,
+  "imports": {
+    "#profile_card": "naddr1abc...",
+    "#note_display": "nevent1def..."
+  },
+  "styles": {
+    ":root": {
+      "font-family": "system-ui, sans-serif",
+      "background-color": "#f9fafb"
+    }
+  },
+  "queries": {
+    "$user_profile": {
+      "kinds": [
+        0
+      ],
+      "authors": [
+        "target.pubkey"
+      ],
+      "limit": 1
+    }
+  },
+  "elements": [
+    {
+      "type": "h1",
+      "content": [
+        "Event Details"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "  "
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "  "
+      ]
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Author Profile"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "  "
+      ]
+    }
+  ]
+}

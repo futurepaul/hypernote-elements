@@ -347,6 +347,15 @@ function ElementRenderer({
 
 // Main renderer function that takes markdown and returns React node
 export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string, relayHandler: RelayHandler }) {
+  // Guard against undefined or null markdown
+  if (!markdown || typeof markdown !== 'string') {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <div>No content to display. Please select an example or enter markdown content.</div>
+      </QueryClientProvider>
+    );
+  }
+
   // Compile markdown to content object
   const content: Hypernote = compileHypernoteToContent(markdown);
   
@@ -396,6 +405,15 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
 
 // Component to output the compiled JSON from markdown
 export function HypernoteJsonOutput({ markdown }: { markdown: string }) {
+  // Guard against undefined or null markdown
+  if (!markdown || typeof markdown !== 'string') {
+    return (
+      <pre className="bg-slate-100 text-red-900 text-xs p-4 rounded overflow-auto">
+        No markdown content provided
+      </pre>
+    );
+  }
+
   const content: Hypernote = compileHypernoteToContent(markdown);
   return (
     <pre className="bg-slate-100 text-green-900 text-xs p-4 rounded overflow-auto">

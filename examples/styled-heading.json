@@ -1,0 +1,40 @@
+{
+  "version": "1.1.0",
+  "component_kind": null,
+  "styles": {
+    "#main-title": {
+      "color": "#3b82f6"
+    },
+    "button": {
+      "background-color": "#3b82f6"
+    }
+  },
+  "events": {
+    "@post_hello": {
+      "kind": 1,
+      "content": "hello world",
+      "tags": []
+    }
+  },
+  "elements": [
+    {
+      "type": "h1",
+      "id": "main-title",
+      "content": [
+        "Hello Styled"
+      ]
+    },
+    {
+      "type": "form",
+      "event": "@post_hello",
+      "elements": [
+        {
+          "type": "button",
+          "content": [
+            "Say Hello Blue"
+          ]
+        }
+      ]
+    }
+  ]
+}

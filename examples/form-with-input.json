@@ -1,0 +1,44 @@
+{
+  "version": "1.1.0",
+  "component_kind": null,
+  "events": {
+    "@post_message": {
+      "kind": 1,
+      "content": "{form.message}",
+      "tags": [
+        [
+          "client",
+          "hypernote-test"
+        ]
+      ]
+    }
+  },
+  "elements": [
+    {
+      "type": "h1",
+      "content": [
+        "Post a Message"
+      ]
+    },
+    {
+      "type": "form",
+      "event": "@post_message",
+      "elements": [
+        {
+          "type": "input",
+          "content": [],
+          "attributes": {
+            "name": "message",
+            "placeholder": "Enter message..."
+          }
+        },
+        {
+          "type": "button",
+          "content": [
+            "Post"
+          ]
+        }
+      ]
+    }
+  ]
+}

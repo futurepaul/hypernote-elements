@@ -1,0 +1,31 @@
+{
+  "version": "1.1.0",
+  "component_kind": null,
+  "events": {
+    "@post_hello": {
+      "kind": 1,
+      "content": "hello world",
+      "tags": []
+    }
+  },
+  "elements": [
+    {
+      "type": "h1",
+      "content": [
+        "Hello There"
+      ]
+    },
+    {
+      "type": "form",
+      "event": "@post_hello",
+      "elements": [
+        {
+          "type": "button",
+          "content": [
+            "Say Hello"
+          ]
+        }
+      ]
+    }
+  ]
+}

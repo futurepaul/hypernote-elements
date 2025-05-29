@@ -17,46 +17,44 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Toaster } from "sonner";
+import { AVAILABLE_EXAMPLES, loadExample, type ExampleName } from "../tests/example-loader";
 
+// Load all examples at build time
+const EXAMPLES = Object.fromEntries(
+  AVAILABLE_EXAMPLES.map(name => {
+    const example = loadExample(name);
+    // Handle case where markdown might be an object with .default property
+    const markdown = typeof example.markdown === 'string' 
+      ? example.markdown 
+      : (example.markdown as any)?.default || String(example.markdown);
+    return [name, markdown];
+  })
+);
+
+// Add a blank template option
 const TEMPLATES = {
   blank: "",
-  feed: `---
-"$my_feed":
-  kinds: [1]
-  limit: 20
----
-[each $my_feed as $note]
-  {$note.content}
-`,
-  form: `---
-"@post_message":
-  kind: 1
-  content: "{form.message}"
-  tags: [["client", "hypernote-test"]]
-style:
-  button:
-    background-color: "#eeeeee"
----
-
-# Post a Message
-
-[form @post_message]
-  [input name="message" placeholder="Enter message..."]
-  [button "Post"]
-`
+  ...EXAMPLES
 } as const;
 
-type TemplateKey = keyof typeof TEMPLATES;
+type TemplateKey = "blank" | ExampleName;
 
 export function App() {
-  const [markdownStates, setMarkdownStates] = useState<Record<TemplateKey, string>>(() => ({
-    feed: TEMPLATES.feed,
-    blank: TEMPLATES.blank,
-    form: TEMPLATES.form
-  }));
-  const [template, setTemplate] = useState<TemplateKey>("feed");
+  const [markdownStates, setMarkdownStates] = useState<Record<TemplateKey, string>>(() => {
+    // Initialize with all templates (blank + examples)
+    const initialStates = { ...TEMPLATES } as Record<TemplateKey, string>;
+    console.log("App: Initial templates:", TEMPLATES);
+    console.log("App: Initial states:", initialStates);
+    return initialStates;
+  });
+  const [template, setTemplate] = useState<TemplateKey>("basic-hello");
   
   const { relayHandler, initialize, cleanup, logs } = useNostrStore();
+
+  // Debug logging
+  console.log("App: Current template:", template);
+  console.log("App: Current markdown value:", markdownStates[template]);
+  console.log("App: Type of markdown value:", typeof markdownStates[template]);
 
   useEffect(() => {
     initialize();
@@ -64,6 +62,13 @@ export function App() {
       cleanup();
     };
   }, []);
+
+  // Helper function to format example names for display
+  const formatExampleName = (name: string) => {
+    return name.split('-').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
 
   return (
     <div className="h-screen p-4 flex flex-col">
@@ -75,12 +80,15 @@ export function App() {
           }}
         >
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Select a template" />
+            <SelectValue placeholder="Select an example" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="feed">Feed</SelectItem>
             <SelectItem value="blank">Blank</SelectItem>
-            <SelectItem value="form">Form</SelectItem>
+            {AVAILABLE_EXAMPLES.map(name => (
+              <SelectItem key={name} value={name}>
+                {formatExampleName(name)}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>

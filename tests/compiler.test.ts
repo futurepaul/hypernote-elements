@@ -1,23 +1,11 @@
 import { test, expect } from "bun:test";
 import { compileHypernoteToContent } from "../src/lib/compiler";
+import { loadExample, AVAILABLE_EXAMPLES } from "./example-loader";
 import type { FormElement, LoopElement, Element } from "../src/lib/schema";
 
 test("should parse basic H1 and a form triggering a hardcoded event", () => {
-  const inputHnmd = `
----
-"@post_hello":
-  kind: 1
-  content: "hello world"
-  tags: [] 
----
-
-# Hello There
-
-[form @post_hello]
-  [button "Say Hello"]
-`.trim();
-
-  const result = compileHypernoteToContent(inputHnmd);
+  const example = loadExample("basic-hello");
+  const result = compileHypernoteToContent(example.markdown);
   
   expect(result.version).toBe("1.1.0");
   expect(result.component_kind).toBe(null);
@@ -39,27 +27,8 @@ test("should parse basic H1 and a form triggering a hardcoded event", () => {
 });
 
 test("should parse H1 with ID and apply a simple style rule", () => {
-  const inputHnmd = `
----
-"@post_hello":
-  kind: 1
-  content: "hello world"
-  tags: []
-style:
-  "#main-title":
-    color: "#3b82f6"
-  button:
-    background-color: "#3b82f6" 
----
-
-{#main-title}
-# Hello Styled
-
-[form @post_hello]
-  [button "Say Hello Blue"]
-`.trim();
-
-  const result = compileHypernoteToContent(inputHnmd);
+  const example = loadExample("styled-heading");
+  const result = compileHypernoteToContent(example.markdown);
   
   // Check styles
   expect(result.styles).toBeDefined();
@@ -73,22 +42,8 @@ style:
 });
 
 test("should parse form with input and use form variable in event template", () => {
-  const inputHnmd = `
----
-"@post_message":
-  kind: 1
-  content: "{form.message}" 
-  tags: [["client", "hypernote-test"]] 
----
-
-# Post a Message
-
-[form @post_message]
-  [input name="message" placeholder="Enter message..."]
-  [button "Post"]
-`.trim();
-
-  const result = compileHypernoteToContent(inputHnmd);
+  const example = loadExample("form-with-input");
+  const result = compileHypernoteToContent(example.markdown);
   
   // Check event template
   expect(result.events?.["@post_message"].content).toBe("{form.message}");
@@ -111,18 +66,8 @@ test("should parse form with input and use form variable in event template", () 
 });
 
 test("should parse query in frontmatter and loop in content", () => {
-  const inputHnmd = `
----
-"$my_feed":
-  authors: [user.pubkey]
-  limit: 20
----
-
-[each $my_feed as $note]
-  {$note.content}
-`.trim();
-
-  const result = compileHypernoteToContent(inputHnmd);
+  const example = loadExample("query-and-loop");
+  const result = compileHypernoteToContent(example.markdown);
   
   // Check the query in frontmatter
   expect(result.queries).toBeDefined();
@@ -149,9 +94,32 @@ test("should parse query in frontmatter and loop in content", () => {
   expect((loopElement.elements?.[0] as Element).content?.[0]).toBe("{$note.content}");
 });
 
+test("should compile all examples without errors", () => {
+  for (const exampleName of AVAILABLE_EXAMPLES) {
+    const example = loadExample(exampleName);
+    
+    // This should not throw
+    const result = compileHypernoteToContent(example.markdown);
+    
+    // Basic sanity checks
+    expect(result.version).toBe("1.1.0");
+    expect(result.elements).toBeArray();
+    expect(result.elements.length).toBeGreaterThan(0);
+  }
+});
+
+test("should match expected JSON output for all examples", () => {
+  for (const exampleName of AVAILABLE_EXAMPLES) {
+    const example = loadExample(exampleName);
+    const result = compileHypernoteToContent(example.markdown);
+    
+    // Compare the compiled result with the expected JSON
+    expect(result).toEqual(example.expectedJson);
+  }
+});
+
 test("should handle invalid query gracefully and return fallback structure", () => {
-  const inputHnmd = `
----
+  const invalidHnmd = `---
 "$my_feed":
   limit: null  # Invalid - should be a number
   authors: [user.pubkey]
@@ -159,8 +127,7 @@ test("should handle invalid query gracefully and return fallback structure", () 
 
 # Test Content
 
-Some content here.
-`.trim();
+Some content here.`;
 
   // Capture console.error calls
   const originalConsoleError = console.error;
@@ -170,7 +137,7 @@ Some content here.
   };
 
   try {
-    const result = compileHypernoteToContent(inputHnmd);
+    const result = compileHypernoteToContent(invalidHnmd);
     
     // Should return fallback structure instead of throwing
     expect(result.version).toBe("1.1.0");
