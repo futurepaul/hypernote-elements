@@ -1,5 +1,5 @@
 import { z } from "zod/v4";
-import { StyleSheetSchema } from "./style-schema";
+import { StyleSheetSchema, StylePropertiesSchema } from "./style-schema";
 
 /**
  * IMPORTANT: TypeScript Circular Reference Warnings
@@ -21,7 +21,7 @@ import { StyleSheetSchema } from "./style-schema";
  */
 const ComponentElementSchema = z.object({
   type: z.literal("component"),
-  id: z.base64url().optional(),
+  elementId: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, "Invalid elementId format").optional(),
   alias: z.string().min(1),
   argument: z.string().min(1),
 });
@@ -29,7 +29,7 @@ const ComponentElementSchema = z.object({
 /**
  * Supported HTML-like element types
  * Markdown basics: headers, paragraphs, line breaks, emphasis, blockquotes, lists, code, hr, links, images
- * Hypernote additions: button, form, input, div, span
+ * Hypernote additions: input, textarea (form, div, button, span have their own schemas)
  */
 const SupportedElementType = z.union([
   // Markdown headers
@@ -45,7 +45,6 @@ const SupportedElementType = z.union([
   z.literal("em"),
   z.literal("strong"),
   z.literal("blockquote"),
-  z.literal("span"),
   // Markdown lists
   z.literal("ul"),
   z.literal("ol"),
@@ -58,15 +57,12 @@ const SupportedElementType = z.union([
   z.literal("a"),
   z.literal("img"),
   // Hypernote additions
-  z.literal("button"),
-  z.literal("form"),
   z.literal("input"),
   z.literal("textarea"),
-  z.literal("div"),
 ], {
   error: (issue) => {
     if (issue.code === "invalid_union") {
-      return `Unsupported element type "${issue.input}". Supported types are: h1, h2, h3, h4, h5, h6, p, br, em, strong, blockquote, span, ul, ol, li, code, pre, hr, a, img, button, form, input, textarea, div`;
+      return `Unsupported element type "${issue.input}". Supported types are: h1, h2, h3, h4, h5, h6, p, br, em, strong, blockquote, ul, ol, li, code, pre, hr, a, img, input, textarea (form, div, button, span have separate schemas)`;
     }
     return undefined; // defer to default
   }
@@ -74,12 +70,14 @@ const SupportedElementType = z.union([
 
 /**
  * Basic element schema for standard HTML-like elements
- * Elements can have a type (like "p", "h1", "div"), optional ID, 
- * optional content (array of strings/elements), and optional attributes
+ * Elements can have a type (like "p", "h1", "div"), optional elementId, 
+ * optional content (array of strings/elements), optional attributes,
+ * and optional inline styles (CSS-in-JS object)
  */
 const ElementSchema = z.object({
   type: SupportedElementType,
-  id: z.base64url().optional(),
+  elementId: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, "Invalid elementId format").optional(),
+  style: StylePropertiesSchema.optional(), // Inline styles as CSS-in-JS object
   get content() {
     return ElementContentSchema.optional();
   },
@@ -107,7 +105,7 @@ const ElementContentSchema = z.array(
  */
 const IfElementSchema = z.object({
   type: z.literal("if"),
-  id: z.base64url().optional(),
+  elementId: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, "Invalid elementId format").optional(),
   condition: z.string().min(1),
   get elements() {
     return z.array(AnyElementSchema);
@@ -122,7 +120,7 @@ const IfElementSchema = z.object({
  */
 const LoopElementSchema = z.object({
   type: z.literal("loop"),
-  id: z.base64url().optional(),
+  elementId: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, "Invalid elementId format").optional(),
   source: z.string().min(1),
   variable: z.string().min(1),
   get elements() {
@@ -134,16 +132,19 @@ const LoopElementSchema = z.object({
  * Form element schema
  * Creates an interactive form that can trigger event publishing
  * - event: References an event template in the events map
- * - target: Optional ID of an element to update upon successful submission
+ * - target: Optional elementId of an element to update upon successful submission
  */
 const FormElementSchema = z.object({
   type: z.literal("form"),
-  id: z.base64url().optional(),
+  elementId: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, "Invalid elementId format").optional(),
   event: z.string().min(1),
-  target: z.base64url().optional(),
+  target: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, "Invalid elementId format").optional(),
   get elements() {
     return z.array(z.union([
       ElementSchema,
+      DivElementSchema,
+      ButtonElementSchema,
+      SpanElementSchema,
       ComponentElementSchema,
       IfElementSchema,
       LoopElementSchema
@@ -151,9 +152,57 @@ const FormElementSchema = z.object({
   },
 });
 
+/**
+ * Div element schema
+ * Creates a container element that can hold nested elements
+ * Similar to form but without event handling - purely for structure and styling
+ */
+const DivElementSchema = z.object({
+  type: z.literal("div"),
+  elementId: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, "Invalid elementId format").optional(),
+  style: StylePropertiesSchema.optional(),
+  attributes: z.record(z.string().min(1), z.string()).optional(),
+  get elements() {
+    return z.array(AnyElementSchema).optional();
+  },
+});
+
+/**
+ * Button element schema
+ * Creates a button container that can hold nested elements (text, icons, etc.)
+ * Can be styled and contain complex content
+ */
+const ButtonElementSchema = z.object({
+  type: z.literal("button"),
+  elementId: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, "Invalid elementId format").optional(),
+  style: StylePropertiesSchema.optional(),
+  attributes: z.record(z.string().min(1), z.string()).optional(),
+  get elements() {
+    return z.array(AnyElementSchema).optional();
+  },
+});
+
+/**
+ * Span element schema  
+ * Creates an inline container that can hold nested elements
+ * Useful for styling sections of text or grouping inline content
+ */
+const SpanElementSchema = z.object({
+  type: z.literal("span"),
+  elementId: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, "Invalid elementId format").optional(),
+  style: StylePropertiesSchema.optional(),
+  attributes: z.record(z.string().min(1), z.string()).optional(),
+  get elements() {
+    return z.array(AnyElementSchema).optional();
+  },
+});
+
 // Union of all element types for simpler type checking
 const AnyElementSchema = z.union([
   FormElementSchema,
+  DivElementSchema,
+  ButtonElementSchema,
+  SpanElementSchema,
   ComponentElementSchema,
   IfElementSchema,
   LoopElementSchema,
@@ -221,8 +270,9 @@ export const hypernoteSchema = z.object({
   // Maps aliases used in HNMD to their Nostr identifiers (naddr, nevent, etc.)
   imports: z.record(z.string().min(1), z.string().min(1)).optional(),
   
-  // Style definitions - selectors are keys, properties are values
-  styles: StyleSheetSchema.optional(),
+  // Root-level styles as CSS-in-JS object (compiled from HNMD Tailwind classes)
+  // In HNMD, this is specified as Tailwind classes, but gets compiled to a style object
+  style: StylePropertiesSchema.optional(),
   
   // Query definitions - keys are query names from HNMD ($query_name)
   queries: z.record(z.string().min(1), QuerySchema).optional(),
@@ -243,6 +293,9 @@ export type ComponentElement = z.infer<typeof ComponentElementSchema>;
 export type IfElement = z.infer<typeof IfElementSchema>;
 export type LoopElement = z.infer<typeof LoopElementSchema>;
 export type FormElement = z.infer<typeof FormElementSchema>;
+export type DivElement = z.infer<typeof DivElementSchema>;
+export type ButtonElement = z.infer<typeof ButtonElementSchema>;
+export type SpanElement = z.infer<typeof SpanElementSchema>;
 export type AnyElement = z.infer<typeof AnyElementSchema>;
 export type SupportedElementType = z.infer<typeof SupportedElementType>;
 

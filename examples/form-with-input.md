@@ -9,4 +9,5 @@
 
 [form @post_message]
   [input name="message" placeholder="Enter message..."]
-  [button "Post"]
+  [button]Post[/button]
+[/form]

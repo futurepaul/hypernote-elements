@@ -23,26 +23,21 @@ test("should parse basic event from frontmatter", () => {
 });
 
 test("should parse frontmatter with styles", () => {
-  const example = loadExample("styled-heading");
+  const example = loadExample("div-container");
   const result = compileHypernoteToContent(example.markdown);
   
   expect(result.version).toBe("1.1.0");
   expect(result.component_kind).toBe(null);
   expect(result.events).toEqual({
-    "@post_hello": {
+    "@submit_feedback": {
       kind: 1,
-      content: "hello world",
+      content: "Thanks for your feedback: {form.message}",
       tags: [],
     },
   });
-  expect(result.styles).toEqual({
-    "#main-title": {
-      "color": "#3b82f6",
-    },
-    "button": {
-      "background-color": "#3b82f6",
-    }
-  });
+  expect(result.style).toBeDefined();
+  expect(result.style?.padding).toBe("1rem");
+  expect(result.style?.backgroundColor).toBe("rgb(243,244,246)");
 });
 
 test("should parse frontmatter with event using variable", () => {
@@ -70,7 +65,7 @@ test("should parse basic H1 and a form triggering a hardcoded event", () => {
 });
 
 test("should parse H1 with ID and apply a simple style rule", () => {
-  const example = loadExample("styled-heading");
+  const example = loadExample("div-container");
   const result = compileHypernoteToContent(example.markdown);
   
   expect(result).toEqual(example.expectedJson);

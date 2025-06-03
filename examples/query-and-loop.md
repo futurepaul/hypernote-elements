@@ -6,3 +6,4 @@
 
 [each $my_feed as $note]
   {$note.content}
+[/each]

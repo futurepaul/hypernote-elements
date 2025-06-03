@@ -21,7 +21,7 @@ This project implements the Hypernote protocol - a declarative system for creati
 
 ### Phase 2: Hypernote Schema & Validation
 - [src/lib/schema.ts](mdc:src/lib/schema.ts) - **Main schema** for Hypernote JSON validation using Zod, defines all element types and structure
-- [src/lib/style-schema.ts](mdc:src/lib/style-schema.ts) - **Cross-platform styling schema** with CSS-like properties designed for web/mobile/native compatibility
+- [src/lib/style-schema.ts](mdc:src/lib/style-schema.ts) - **CSS-in-JS styling schema** with camelCase properties for security and cross-platform compatibility
 
 ### Phase 3: Frontend Rendering (JSON → UI)
 - [src/lib/nostrFetch.ts](mdc:src/lib/nostrFetch.ts) - Utilities for fetching Nostr events from relays
@@ -46,26 +46,52 @@ This project implements the Hypernote protocol - a declarative system for creati
   - Style schema validation
   - Round-trip compilation tests
 
-## Build System
+## Build System & Development Tools
 
-- [scripts/md-loader.ts](mdc:scripts/md-loader.ts) - **Custom Bun plugin** that allows importing `.md` files directly into TypeScript/JavaScript as string modules
+### Runtime & Package Manager
 - Uses **Bun** as bundler, runtime, and test framework
+- **ALWAYS use `bun` for everything** - never use `node` or `npm`
+- For quick inline tests: `bun -e "console.log('test')"`
+- For running scripts: `bun run script.ts`
+- For testing: `bun test`
+
+### Build Tools
+- [scripts/md-loader.ts](mdc:scripts/md-loader.ts) - **Custom Bun plugin** that allows importing `.md` files directly into TypeScript/JavaScript as string modules
+
+### Debugging
+- **Debug Mode**: Set `HYPERNOTE_DEBUG=true` environment variable for verbose logging
+  - Shows detailed parsing steps
+  - Logs style class conversion
+  - Enhanced validation error reporting with actual values
+  - Example: `HYPERNOTE_DEBUG=true bun run debug.ts`
 
 ## Key Architecture Concepts
 
 1. **Two-Phase Design**: HNMD is human-readable source; Hypernote JSON is machine-optimized for publishing/rendering
 2. **Protocol-First**: Implementation follows spec documents exactly - specs drive code, not vice versa
-3. **Cross-Platform Styling**: Style system designed to work across web, React Native, SwiftUI, Flutter, etc.
-4. **Nostr Integration**: Hypernotes are published as Nostr events and can reference other Nostr events
-5. **Component System**: Supports reusable components referenced by Nostr identifiers
-6. **Query Language**: Built-in query system for fetching and transforming Nostr data
+3. **CSS-in-JS Styling**: Uses validated CSS-in-JS objects for security and cross-platform compatibility
+4. **Security-First**: All CSS properties are validated through strict schemas to prevent XSS attacks
+5. **Nostr Integration**: Hypernotes are published as Nostr events and can reference other Nostr events
+6. **Component System**: Supports reusable components referenced by Nostr identifiers (implementation pending)
+7. **Query Language**: Built-in query system for fetching and transforming Nostr data
 
 ## Development Workflow
 
 1. **Spec Changes**: Update [README.md](mdc:README.md) or [OUTPUT.md](mdc:OUTPUT.md) first
 2. **Implementation**: Update schemas, compiler, tokenizer to match spec
-3. **Examples**: Add/update examples in [examples/](mdc:examples) folder
-4. **Tests**: Ensure tests pass and cover new functionality
-5. **Frontend**: Update renderer if new element types are added
+3. **Examples**: Add/update examples in [examples/](mdc:examples) folder - **only use implemented features**
+4. **Tests**: Ensure tests pass and cover new functionality using `bun test`
+5. **Debugging**: Use `HYPERNOTE_DEBUG=true` for detailed logging when issues arise
+6. **Frontend**: Update renderer if new element types are added
+
+## Development Best Practices
+
+- **Use Bun for everything**: `bun run`, `bun test`, `bun -e`, never `node` or `npm`
+- **Debug Mode**: Always use `HYPERNOTE_DEBUG=true` when debugging parsing issues
+- **Examples**: Only include examples that demonstrate fully implemented features
+- **Security**: All user-provided styles go through validated CSS-in-JS objects, never raw CSS
+- **Schema-First**: Update schemas before implementing new features
 
 When debugging issues, check this order: spec → schema → compiler → tokenizer → examples → tests → renderer.
+
+Use debug mode liberally: `HYPERNOTE_DEBUG=true bun run your-script.ts`

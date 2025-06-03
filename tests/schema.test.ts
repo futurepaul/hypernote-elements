@@ -75,7 +75,7 @@ const validHypernoteExample = {
   elements: [
     {
       type: "h1",
-      id: "header-title",
+      elementId: "header-title",
       content: ["This is a header"]
     },
     {
@@ -88,7 +88,7 @@ const validHypernoteExample = {
         "Some paragraph with an explicitly ID'd span: ",
         {
           type: "em",
-          id: "special-text",
+          elementId: "special-text",
           content: ["important"]
         },
         "."
@@ -98,7 +98,7 @@ const validHypernoteExample = {
       type: "component",
       alias: "profile_card",
       argument: "npub1...",
-      id: "profile-display"
+      elementId: "profile-display"
     },
     {
       type: "if",
@@ -136,7 +136,7 @@ const validHypernoteExample = {
     {
       type: "form",
       event: "@post_comment",
-      target: "#profile-display",
+      target: "profile-display",
       elements: [
         {
           type: "textarea",
@@ -147,7 +147,12 @@ const validHypernoteExample = {
         },
         {
           type: "button",
-          content: ["Send Reply"]
+          elements: [
+            {
+              type: "p",
+              content: ["Send Reply"]
+            }
+          ]
         }
       ]
     }
@@ -211,26 +216,30 @@ test("should properly check content structure", () => {
 });
 
 test("should validate nested elements in content", () => {
-  // Test with deeply nested content structure
+  // Test with div container and nested paragraphs
   const nestedContentExample = {
     version: "1.1.0",
     elements: [
       {
         type: "div",
-        content: [
-          "Outer text ",
+        elements: [
           {
-            type: "span",
+            type: "p",
             content: [
-              "Inner text ",
-              {
-                type: "em",
-                content: ["emphasized"]
-              },
-              " more inner text"
+              "Outer text with some content."
             ]
           },
-          " more outer text"
+          {
+            type: "p",
+            content: [
+              "Another paragraph with ",
+              {
+                type: "em",
+                content: ["emphasized text"]
+              },
+              " in the content."
+            ]
+          }
         ]
       }
     ]
@@ -361,7 +370,7 @@ test("should reject unsupported HTML element types with helpful error message", 
     expect(allErrorMessages).toContain("video");
     expect(allErrorMessages).toContain("Supported types are:");
     expect(allErrorMessages).toContain("h1, h2, h3");
-    expect(allErrorMessages).toContain("button, form, input, textarea, div");
+    expect(allErrorMessages).toContain("input, textarea");
   }
   
   // Test the direct validation method also throws

@@ -1,0 +1,124 @@
+{
+  "version": "1.1.0",
+  "component_kind": null,
+  "style": {
+    "padding": "1rem",
+    "backgroundColor": "rgb(243,244,246)"
+  },
+  "events": {
+    "@submit_feedback": {
+      "kind": 1,
+      "content": "Thanks for your feedback: {form.message}",
+      "tags": []
+    }
+  },
+  "elements": [
+    {
+      "type": "h1",
+      "content": [
+        "Div Container Example"
+      ]
+    },
+    {
+      "type": "p",
+      "elementId": "card-container",
+      "content": [
+        "This shows how div elements can contain nested content and be styled."
+      ]
+    },
+    {
+      "type": "div",
+      "style": {
+        "padding": "1.5rem",
+        "backgroundColor": "rgb(255,255,255)",
+        "borderWidth": "1px",
+        "borderRadius": "0.5rem",
+        "boxShadow": "0 0 #0000, 0 0 #0000, 0 4px 6px -1px rgb(0,0,0,0.1), 0 2px 4px -2px rgb(0,0,0,0.1)"
+      },
+      "elements": [
+        {
+          "type": "h2",
+          "content": [
+            "Card Title"
+          ]
+        },
+        {
+          "type": "p",
+          "content": [
+            "  ",
+            "  This is some content inside a styled div container.",
+            "  ",
+            "  ",
+            "  "
+          ]
+        },
+        {
+          "type": "div",
+          "style": {
+            "marginTop": "1rem",
+            "padding": "0.75rem",
+            "backgroundColor": "rgb(254,249,195)",
+            "borderColor": "rgb(234,179,8)",
+            "borderRadius": "0.25rem",
+            "borderLeftWidth": "4px"
+          },
+          "elements": [
+            {
+              "type": "span",
+              "elements": [
+                {
+                  "type": "p",
+                  "content": [
+                    "**Important note:**"
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "p",
+              "content": [
+                " Div elements can contain any nested content including text, headers, forms, and other divs.",
+                "  "
+              ]
+            }
+          ]
+        },
+        {
+          "type": "form",
+          "event": "@submit_feedback",
+          "elements": [
+            {
+              "type": "input",
+              "content": [],
+              "attributes": {
+                "name": "message",
+                "placeholder": "Enter your feedback"
+              }
+            },
+            {
+              "type": "button",
+              "style": {
+                "marginTop": "0.5rem",
+                "paddingTop": "0.5rem",
+                "paddingRight": "1rem",
+                "paddingBottom": "0.5rem",
+                "paddingLeft": "1rem",
+                "color": "rgb(255,255,255)",
+                "backgroundColor": "rgb(59,130,246)",
+                "borderRadius": "0.25rem"
+              },
+              "elements": [
+                {
+                  "type": "p",
+                  "content": [
+                    "Submit"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

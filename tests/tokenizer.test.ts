@@ -19,34 +19,39 @@ test("should tokenize heading with ID", () => {
   
   expect(tokens.length).toBeGreaterThan(2); // ID + heading + EOF
   expect(tokens[0].type).toBe(TokenType.ID_MARKER);
-  expect(tokens[0].id).toBe("title");
+  expect(tokens[0].elementId).toBe("title");
   expect(tokens[2].type).toBe(TokenType.HEADING);
 });
 
 test("should tokenize form with button", () => {
-  const input = "[form @post_hello]\n  [button \"Say Hello\"]";
+  const input = "[form @post_hello]\n  [button]Say Hello[/button]\n[/form]";
   const tokens = tokenize(input);
   
-  expect(tokens.length).toBeGreaterThan(3); // form + newline + text + button + EOF
+  expect(tokens.length).toBeGreaterThan(5); // form start + newline + text + button start + text + button end + form end + EOF
   expect(tokens[0].type).toBe(TokenType.FORM_START);
   expect(tokens[0].attributes?.event).toBe("@post_hello");
-  expect(tokens[3].type).toBe(TokenType.ELEMENT_START); // Button is at index 3, not 2
-  expect(tokens[3].value).toBe("button");
-  expect(tokens[3].attributes?.content).toBe("Say Hello");
+  
+  // Find button start token
+  const buttonToken = tokens.find(t => t.type === TokenType.BUTTON_START);
+  expect(buttonToken).toBeDefined();
+  expect(buttonToken?.value).toBe("button");
 });
 
 test("should tokenize form with input", () => {
-  const input = "[form @post_message]\n  [input name=\"message\" placeholder=\"Enter message...\"]\n  [button \"Post\"]";
+  const input = "[form @post_message]\n  [input name=\"message\" placeholder=\"Enter message...\"]\n  [button]Post[/button]\n[/form]";
   const tokens = tokenize(input);
   
   const inputToken = tokens.find(t => t.type === TokenType.ELEMENT_START && t.value === "input");
   expect(inputToken).toBeDefined();
   expect(inputToken?.attributes?.name).toBe("message");
   expect(inputToken?.attributes?.placeholder).toBe("Enter message...");
+  
+  const buttonToken = tokens.find(t => t.type === TokenType.BUTTON_START);
+  expect(buttonToken).toBeDefined();
 });
 
 test("should tokenize each loop with variable references", async () => {
-  const input = "[each $my_feed as $note]\n  {$note.content}";
+  const input = "[each $my_feed as $note]\n  {$note.content}\n[/each]";
   const tokens = tokenize(input);
   
   // Find the EACH_START token
@@ -59,6 +64,10 @@ test("should tokenize each loop with variable references", async () => {
   const varToken = tokens.find(t => t.type === TokenType.VARIABLE_REFERENCE);
   expect(varToken).toBeDefined();
   expect(varToken?.value).toBe("{$note.content}");
+  
+  // Find the EACH_END token
+  const eachEndToken = tokens.find(t => t.type === TokenType.EACH_END);
+  expect(eachEndToken).toBeDefined();
 });
 
 test("should tokenize form event correctly", () => {
@@ -90,10 +99,10 @@ test("should handle variable reference with leading whitespace", () => {
   const tokens = tokenize(input);
   const elements = parseTokens(tokens);
   
-  // Should create a span element for standalone variable even with leading whitespace
+  // Should create a paragraph element for standalone variable with leading whitespace
   expect(elements.length).toBe(1);
-  expect(elements[0].type).toBe("span");
-  expect(elements[0].content).toEqual(["{$variable}"]);
+  expect(elements[0].type).toBe("p");
+  expect(elements[0].content).toEqual(["  ", "{$variable}"]);
 });
 
 test("should handle variable reference within text content", () => {
@@ -120,7 +129,7 @@ test("should correctly tokenize and parse query-and-loop example", () => {
   expect(elements[0].source).toBe("$my_feed");
   expect(elements[0].variable).toBe("$note");
   expect(elements[0].elements?.length).toBe(1);
-  expect(elements[0].elements?.[0].type).toBe("span");
+  expect(elements[0].elements?.[0].type).toBe("p");
 });
 
 test("should correctly tokenize and parse form-with-input example", () => {

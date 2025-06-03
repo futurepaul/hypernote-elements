@@ -8,4 +8,5 @@
 # Hello There
 
 [form @post_hello]
-  [button "Say Hello"]
+  [button]Say Hello[/button]
+[/form]

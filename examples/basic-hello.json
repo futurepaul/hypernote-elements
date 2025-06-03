@@ -21,8 +21,13 @@
       "elements": [
         {
           "type": "button",
-          "content": [
-            "Say Hello"
+          "elements": [
+            {
+              "type": "p",
+              "content": [
+                "Say Hello"
+              ]
+            }
           ]
         }
       ]

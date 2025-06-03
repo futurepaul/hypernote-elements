@@ -16,8 +16,9 @@
       "variable": "$note",
       "elements": [
         {
-          "type": "span",
+          "type": "p",
           "content": [
+            "  ",
             "{$note.content}"
           ]
         }

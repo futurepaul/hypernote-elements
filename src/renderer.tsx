@@ -10,13 +10,14 @@ import type { Hypernote, AnyElement } from './lib/schema';
 interface HypernoteElement {
   type: string;
   content?: string[] | HypernoteElement[];
-  id?: string;
+  elementId?: string;
   event?: string;
   elements?: HypernoteElement[];
   attributes?: Record<string, string>;
   name?: string;
   source?: string;
   variable?: string;
+  style?: Record<string, any>; // CSS-in-JS style object
 }
 
 interface RendererProps {
@@ -25,7 +26,6 @@ interface RendererProps {
   formData?: Record<string, string>;
   setFormData?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   events?: Record<string, any>;
-  styles?: Hypernote['styles'];
   queries?: Record<string, any>;
   userContext: {
     pubkey: string | null;
@@ -49,37 +49,71 @@ function ElementRenderer({
   formData = {}, 
   setFormData, 
   events = {}, 
-  styles = {}, 
   queries = {},
   userContext,
   loopVariables = {}
 }: RendererProps) {
+  // Helper function to substitute variables in query configurations
+  const substituteQueryVariables = (queryConfig: any): any => {
+    if (!queryConfig) return queryConfig;
+    
+    // Deep clone the query config to avoid mutations
+    const processedConfig = JSON.parse(JSON.stringify(queryConfig));
+    
+    // Recursively substitute variables in the query config
+    const substituteInValue = (value: any): any => {
+      if (typeof value === 'string') {
+        // Handle user.pubkey substitution
+        if (value === 'user.pubkey' && userContext.pubkey) {
+          return userContext.pubkey;
+        }
+        // Handle time.now substitution
+        if (value === 'time.now') {
+          return Date.now();
+        }
+        // Handle time expressions like "time.now - 86400000"
+        if (value.includes('time.now')) {
+          try {
+            // Simple arithmetic evaluation for time expressions
+            const timeNow = Date.now();
+            const result = value.replace(/time\.now/g, timeNow.toString());
+            return eval(result); // Note: In production, use a safer expression evaluator
+          } catch (e) {
+            console.warn(`Failed to evaluate time expression: ${value}`);
+            return value;
+          }
+        }
+        return value;
+      } else if (Array.isArray(value)) {
+        return value.map(substituteInValue);
+      } else if (value && typeof value === 'object') {
+        const result: any = {};
+        for (const [key, val] of Object.entries(value)) {
+          result[key] = substituteInValue(val);
+        }
+        return result;
+      }
+      return value;
+    };
+    
+    return substituteInValue(processedConfig);
+  };
+
   // If this is a loop element, fetch the data for its source using React Query
   const querySourceName = element.type === 'loop' ? element.source : undefined;
   const queryConfig = querySourceName ? queries[querySourceName] : undefined;
+  
+  // Substitute variables in the query config before using it
+  const processedQueryConfig = substituteQueryVariables(queryConfig);
+  
+  console.log(`Original query config for ${querySourceName}:`, queryConfig);
+  console.log(`Processed query config for ${querySourceName}:`, processedQueryConfig);
 
   // Use the new React Query hook for fetching events
   const { data: loopData, isLoading, isError } =
-    querySourceName && queryConfig
-      ? useNostrEventsQuery(relayHandler, queryConfig)
+    querySourceName && processedQueryConfig
+      ? useNostrEventsQuery(relayHandler, processedQueryConfig)
       : { data: undefined, isLoading: false, isError: false };
-
-  // Helper to apply styles based on element type or ID
-  const getStyles = (element: HypernoteElement) => {
-    const elementStyles: Record<string, string> = {};
-    
-    // Apply styles by type
-    if (styles[element.type]) {
-      Object.assign(elementStyles, styles[element.type]);
-    }
-    
-    // Apply styles by ID if available
-    if (element.id && styles[`#${element.id}`]) {
-      Object.assign(elementStyles, styles[`#${element.id}`]);
-    }
-    
-    return elementStyles;
-  };
 
   // Process form submission
   const handleFormSubmit = async (e: React.FormEvent, eventName?: string) => {
@@ -168,8 +202,8 @@ function ElementRenderer({
     });
   };
 
-  // Apply styles for this element
-  const elementStyles = getStyles(element);
+  // Get the element's inline styles (direct mapping from style property)
+  const elementStyles = element.style || {};
 
   // Debugging log
   console.log("Rendering element:", element);
@@ -182,7 +216,7 @@ function ElementRenderer({
     case 'p':
       return React.createElement(
         element.type,
-        { id: element.id, style: elementStyles as React.CSSProperties },
+        { id: element.elementId, style: elementStyles as React.CSSProperties },
         element.content?.map((item, idx) => 
           typeof item === 'string' 
             ? processContent(item)
@@ -193,7 +227,6 @@ function ElementRenderer({
                 formData={formData}
                 setFormData={setFormData}
                 events={events}
-                styles={styles}
                 queries={queries}
                 userContext={userContext}
                 loopVariables={loopVariables}
@@ -204,7 +237,7 @@ function ElementRenderer({
     case 'form':
       return (
         <form 
-          id={element.id} 
+          id={element.elementId} 
           onSubmit={(e) => handleFormSubmit(e, element.event)}
           style={elementStyles as React.CSSProperties}
         >
@@ -216,7 +249,6 @@ function ElementRenderer({
               formData={formData}
               setFormData={setFormData}
               events={events}
-              styles={styles}
               queries={queries}
               userContext={userContext}
               loopVariables={loopVariables}
@@ -228,19 +260,75 @@ function ElementRenderer({
     case 'button':
       return (
         <button 
-          id={element.id} 
+          id={element.elementId} 
           type="submit"
           style={elementStyles as React.CSSProperties}
         >
-          {element.content?.map(item => typeof item === 'string' ? processContent(item) : item).join(' ') || 'Submit'}
+          {element.elements && element.elements.map((child, index) => (
+            <ElementRenderer 
+              key={index} 
+              element={child} 
+              relayHandler={relayHandler}
+              formData={formData}
+              setFormData={setFormData}
+              events={events}
+              queries={queries}
+              userContext={userContext}
+              loopVariables={loopVariables}
+            />
+          ))}
         </button>
+      );
+      
+    case 'span':
+      return (
+        <span 
+          id={element.elementId} 
+          style={elementStyles as React.CSSProperties}
+        >
+          {element.elements && element.elements.map((child, index) => (
+            <ElementRenderer 
+              key={index} 
+              element={child} 
+              relayHandler={relayHandler}
+              formData={formData}
+              setFormData={setFormData}
+              events={events}
+              queries={queries}
+              userContext={userContext}
+              loopVariables={loopVariables}
+            />
+          ))}
+        </span>
+      );
+      
+    case 'div':
+      return (
+        <div 
+          id={element.elementId} 
+          style={elementStyles as React.CSSProperties}
+        >
+          {element.elements && element.elements.map((child, index) => (
+            <ElementRenderer 
+              key={index} 
+              element={child} 
+              relayHandler={relayHandler}
+              formData={formData}
+              setFormData={setFormData}
+              events={events}
+              queries={queries}
+              userContext={userContext}
+              loopVariables={loopVariables}
+            />
+          ))}
+        </div>
       );
       
     case 'input':
       const name = element.attributes?.name || '';
       return (
         <input
-          id={element.id}
+          id={element.elementId}
           name={name}
           placeholder={element.attributes?.placeholder || ''}
           value={formData[name] || ''}
@@ -267,7 +355,7 @@ function ElementRenderer({
       
       // Render the loop elements for each item in the data
       return (
-        <div id={element.id} style={elementStyles as React.CSSProperties}>
+        <div id={element.elementId} style={elementStyles as React.CSSProperties}>
           {sourceData.length === 0 ? (
             <div>No data found</div>
           ) : (
@@ -290,7 +378,6 @@ function ElementRenderer({
                       formData={formData}
                       setFormData={setFormData}
                       events={events}
-                      styles={styles}
                       queries={queries}
                       userContext={userContext}
                       loopVariables={newLoopVariables}
@@ -309,7 +396,7 @@ function ElementRenderer({
       
     default:
       return (
-        <div id={element.id} style={elementStyles as React.CSSProperties}>
+        <div id={element.elementId} style={elementStyles as React.CSSProperties}>
           {element.content?.map((item, idx) => 
             typeof item === 'string' 
               ? processContent(item)
@@ -320,7 +407,6 @@ function ElementRenderer({
                   formData={formData}
                   setFormData={setFormData}
                   events={events}
-                  styles={styles}
                   queries={queries}
                   userContext={userContext}
                   loopVariables={loopVariables}
@@ -334,7 +420,6 @@ function ElementRenderer({
               formData={formData}
               setFormData={setFormData}
               events={events}
-              styles={styles}
               queries={queries}
               userContext={userContext}
               loopVariables={loopVariables}
@@ -380,10 +465,13 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
       </QueryClientProvider>
     );
   }
+
+  // Get the root-level styles from the hypernote
+  const rootStyles = content.style || {};
   
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="hypernote-content">
+      <div className="hypernote-content" style={rootStyles as React.CSSProperties}>
         {content.elements.map((element, index) => (
           <ElementRenderer
             key={index}
@@ -392,7 +480,6 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
             formData={formData}
             setFormData={setFormData}
             events={content.events}
-            styles={content.styles}
             queries={content.queries}
             userContext={userContext}
             loopVariables={{}}

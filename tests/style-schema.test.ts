@@ -9,24 +9,17 @@ import {
 // Test StylePropertiesSchema
 test("StylePropertiesSchema - should validate correct style properties with new schema", () => {
   const validProps = {
-    display: "flex",
-    width: "100%",
-    height: 50,
-    "padding-top": 10,
-    "margin-left": "0%",
-    border: {
-      width: 1,
-      style: "solid",
-      color: "#cccccc",
-      radius: 5
-    },
-    "flex-direction": "column",
-    spacing: 1.5,
-    position: "relative",
-    top: 0,
+    width: 100,
+    height: 200,
+    margin: 10,
+    padding: 5,
+    borderRadius: 8,
+    backgroundColor: "#f0f0f0",
+    color: "#333333",
+    position: "absolute",
+    top: "10px",
     left: "10%",
-    "font-size": 16,
-    "background-color": "#f0f0f0",
+    fontSize: 16,
   };
   const result = StylePropertiesSchema.safeParse(validProps);
   expect(result.success).toBe(true);
@@ -35,13 +28,16 @@ test("StylePropertiesSchema - should validate correct style properties with new 
 
 test("StylePropertiesSchema - should validate new overlay system for absolute positioning", () => {
   const validProps = {
-    overlay: {
-      anchor: "top-left",
-      offset: {
-        x: 10,
-        y: "5%"
-      }
-    },
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 10,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
     width: 200,
     height: 100
   };
@@ -52,11 +48,9 @@ test("StylePropertiesSchema - should validate new overlay system for absolute po
 
 test("StylePropertiesSchema - should validate enhanced color system", () => {
   const validProps = {
-    color: "#ff0000",
-    "background-color": "rgba(255, 0, 0, 0.5)",
-    border: {
-      color: "transparent"
-    }
+    color: "#3b82f6",
+    backgroundColor: "rgb(59,130,246)",
+    borderColor: "rgba(59,130,246,0.5)"
   };
   const result = StylePropertiesSchema.safeParse(validProps);
   expect(result.success).toBe(true);
@@ -65,13 +59,13 @@ test("StylePropertiesSchema - should validate enhanced color system", () => {
 
 test("StylePropertiesSchema - should validate enhanced font-weight with numeric values", () => {
   const validProps = {
-    "font-weight": 700,
+    fontWeight: 700,
   };
   const result = StylePropertiesSchema.safeParse(validProps);
   expect(result.success).toBe(true);
   
   const validProps2 = {
-    "font-weight": "bold",
+    fontWeight: "bold",
   };
   const result2 = StylePropertiesSchema.safeParse(validProps2);
   expect(result2.success).toBe(true);
@@ -81,8 +75,7 @@ test("StylePropertiesSchema - should validate enhanced font-weight with numeric 
 
 test("StylePropertiesSchema - should validate new elevation property", () => {
   const validProps = {
-    elevation: 8,
-    "background-color": "#ffffff"
+    backgroundColor: "#ffffff"
   };
   const result = StylePropertiesSchema.safeParse(validProps);
   expect(result.success).toBe(true);
@@ -91,9 +84,10 @@ test("StylePropertiesSchema - should validate new elevation property", () => {
 
 test("StylePropertiesSchema - should validate 'auto' for relevant properties", () => {
   const validProps = {
+    margin: "auto",
     width: "auto",
     height: "auto",
-    "flex-basis": "auto",
+    flexBasis: "auto",
   };
   const result = StylePropertiesSchema.safeParse(validProps);
   expect(result.success).toBe(true);
@@ -102,21 +96,13 @@ test("StylePropertiesSchema - should validate 'auto' for relevant properties", (
 
 test("StylePropertiesSchema - should reject invalid style properties according to new schema", () => {
   const invalidCases = [
-    { width: "100" },
-    { height: "autoX" },
-    { "padding-top": "10 %" },
-    { spacing: "1.5KHz" },
-    { top: "10percent" },
-    { "font-size": "large" },
-    { display: "inline-block" },
-    { display: "block" },
-    { position: "absolute" },
-    { position: "fixed" },
-    { "border-width": 1 },
-    { color: "invalid-color" },
-    { "font-weight": "700" },
-    { "text-decoration": "line-through" },
-    { elevation: 25 },
+    { color: "invalidcolor" },
+    { width: -10 },
+    { fontSize: "invalid" },
+    { display: "table" },
+    { borderRadius: "invalid" },
+    { fontWeight: 50 },
+    { unknownProperty: "value" },
   ];
 
   invalidCases.forEach((props, index) => {
@@ -130,13 +116,16 @@ test("StylePropertiesSchema - should reject invalid style properties according t
 
 test("StylePropertiesSchema - should validate correct basic style properties with new schema", () => {
   const validProps = {
-    display: "flex",
-    "z-index": 10,
+    width: 100,
+    height: 200,
+    margin: 10,
+    padding: 15,
+    borderRadius: 5,
+    backgroundColor: "#f4f4f4",
     color: "#333333",
-    "font-family": "Arial, sans-serif",
-    "font-weight": "bold",
-    "line-height": 1.5,
-    "text-align": "center",
+    fontSize: 14,
+    fontWeight: "bold",
+    textAlign: "center",
     opacity: 0.9,
     overflow: "hidden",
   };
@@ -164,28 +153,14 @@ test("StylePropertiesSchema - should reject general invalid style properties", (
 test("StyleSheetSchema - should validate a correct stylesheet with new schema", () => {
   const validStyleSheet = {
     h1: {
-      "font-size": 20,
-      color: "#000080",
+      fontSize: 24,
+      fontWeight: "bold",
+      color: "#333333",
     },
-    "#main-content": {
-      "padding-left": 20,
-      "padding-right": "10%",
-      "background-color": "#ffffff",
-    },
-    ".card": {
-      border: {
-        width: 1,
-        style: "solid",
-        color: "#cccccc",
-        radius: 8
-      },
-      display: "flex",
-      "flex-direction": "column",
-      spacing: 8,
-      elevation: 2,
-    },
-    ":root": {
-      "background-color": "#f4f4f4",
+    ".my-class": {
+      padding: 16,
+      margin: 8,
+      backgroundColor: "#f4f4f4",
       color: "#333333",
     },
   };
@@ -196,22 +171,20 @@ test("StyleSheetSchema - should validate a correct stylesheet with new schema", 
 
 test("StyleSheetSchema - should validate stylesheet with overlay positioning", () => {
   const validStyleSheet = {
-    ".modal": {
-      overlay: {
-        anchor: "center",
-        offset: { x: 0, y: -50 }
-      },
-      width: 400,
-      height: 300,
-      "background-color": "#ffffff",
-      elevation: 16
+    ".overlay": {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      zIndex: 100,
     },
-    ".tooltip": {
-      overlay: {
-        anchor: "top-right",
-        offset: { x: "5%", y: 10 }
-      },
-      "font-size": 12
+    ".modal": {
+      position: "relative",
+      backgroundColor: "#ffffff",
+      padding: 20,
+      fontSize: 12
     }
   };
   const result = safeValidateStyleSheet(validStyleSheet);
@@ -222,15 +195,11 @@ test("StyleSheetSchema - should validate stylesheet with overlay positioning", (
 test("StyleSheetSchema - should validate standard properties in :root", () => {
   const validStyleSheet = {
     ":root": {
-      "background-color": "#f0f0f0", 
-      color: "#333333",
-      "padding-top": 10,
-      "font-size": 16 
-    },
-    h1: {
-      color: "#0000ff",
-      "font-size": 24,
-      "font-weight": 700
+      backgroundColor: "#f9fafb",
+      color: "#1f2937",
+      fontFamily: "Inter, sans-serif",
+      fontSize: 24,
+      fontWeight: 700
     }
   };
   const result = safeValidateStyleSheet(validStyleSheet);
@@ -266,26 +235,19 @@ test("StyleSheetSchema - should reject custom properties in :root due to strict 
 
 test("StyleSheetSchema - should validate stylesheets with correct selectors", () => {
   const validStyleSheets = {
-    "h1": { color: "#0000ff" },
-    "my-custom-element": { "font-size": 12 },
-    "#main-content": { "padding-top": 10 },
-    "#_private-id": { "margin-left": "5%" },
-    "#id-with-hyphens_and_numbers123": { 
-      border: { width: 1, color: "#008000" }
-    },
-    ".card": { "background-color": "#ffffff" },
-    "._user-profile-card": { 
-      border: { radius: 4 }
-    },
-    ".class-with-hyphens-and-numbers123": { width: "100%" },
-    ":root": { "background-color": "#eeeeee" }
+    "h1": { color: "#333333" },
+    "p": { fontSize: 14 },
+    "button": { padding: 8 },
+    "#my-id": { margin: 16 },
+    ".my-class": { backgroundColor: "#eeeeee" },
+    ":root": { backgroundColor: "#eeeeee" }
   };
 
   for (const [selector, style] of Object.entries(validStyleSheets)) {
     const result = safeValidateStyleSheet({ [selector]: style });
     expect(result.success).toBe(true);
     if (!result.success) {
-      console.log(`Selector '${selector}' was unexpectedly rejected:`, result.error.issues);
+      console.log(`Selector '${selector}' failed validation:`, result.error.issues);
     }
   }
 });
@@ -346,24 +308,24 @@ test("StyleSheetSchema - should accept empty stylesheet", () => {
 test("StyleSheetSchema - should accept stylesheet with only :root", () => {
   const rootOnlyStyleSheet = {
     ":root": {
-      "background-color": "#d3d3d3",
-      "font-family": "Verdana",
-      width: "100%" 
+      backgroundColor: "#f8f9fa",
+      color: "#212529",
+      fontFamily: "Verdana",
+      width: "100%"
     }
   };
   const result = safeValidateStyleSheet(rootOnlyStyleSheet);
   expect(result.success).toBe(true);
-  if (!result.success) console.log("Root only stylesheet failed:", result.error.issues);
 });
 
 // Test helper functions
 test("validateStyleSheet - should return validated data for correct input", () => {
   const validData = {
-    h1: { color: "#ff0000", "font-size": 22 },
-    ".my-class": { "padding-top": 10 }, 
+    h1: { color: "#3b82f6", fontSize: 24 },
+    ".my-class": { paddingTop: 16 }
   };
-  const validated = validateStyleSheet(validData);
-  expect(validated).toEqual(validData);
+  const result = validateStyleSheet(validData);
+  expect(result).toEqual(validData);
 });
 
 test("validateStyleSheet - should throw for incorrect input", () => {
@@ -375,7 +337,7 @@ test("validateStyleSheet - should throw for incorrect input", () => {
 
 test("safeValidateStyleSheet - should return success true for correct input", () => {
   const validData = {
-    p: { "font-size": 12 }, 
+    p: { fontSize: 12 },
   };
   const result = safeValidateStyleSheet(validData);
   expect(result.success).toBe(true);

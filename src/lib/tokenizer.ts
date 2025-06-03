@@ -6,6 +6,12 @@ export enum TokenType {
   HEADING,
   FORM_START,
   FORM_END,
+  DIV_START,
+  DIV_END,
+  BUTTON_START,
+  BUTTON_END,
+  SPAN_START, 
+  SPAN_END,
   ELEMENT_START,
   ELEMENT_END,
   ATTRIBUTE,
@@ -25,7 +31,7 @@ export interface Token {
   value: string;
   level?: number; // For headings
   attributes?: Record<string, string>; // For elements with attributes
-  id?: string; // For elements with IDs
+  elementId?: string; // For elements with elementIds
 }
 
 /**
@@ -72,20 +78,20 @@ export function tokenize(content: string): Token[] {
       continue;
     }
     
-    // Handle ID marker (e.g., {#id})
+    // Handle ID marker (e.g., {#elementId})
     if (char === '{' && content[pos + 1] === '#') {
       pos += 2; // Skip '{#'
-      let id = '';
+      let elementId = '';
       while (pos < content.length && content[pos] !== '}') {
-        id += content[pos];
+        elementId += content[pos];
         pos++;
       }
       pos++; // Skip '}'
       
       tokens.push({ 
         type: TokenType.ID_MARKER, 
-        value: id,
-        id
+        value: elementId,
+        elementId
       });
       continue;
     }
@@ -111,6 +117,41 @@ export function tokenize(content: string): Token[] {
     // Handle form or element start (e.g., [form @event])
     if (char === '[') {
       pos++; // Skip '['
+      
+      // Check if this is a closing tag (e.g., [/form])
+      if (content[pos] === '/') {
+        pos++; // Skip '/'
+        let elementType = '';
+        
+        // Collect closing element type
+        while (pos < content.length && content[pos] !== ']') {
+          elementType += content[pos];
+          pos++;
+        }
+        
+        if (content[pos] === ']') pos++; // Skip ']'
+        
+        // Generate appropriate END token
+        switch (elementType) {
+          case 'form':
+            tokens.push({ type: TokenType.FORM_END, value: elementType });
+            break;
+          case 'div':
+            tokens.push({ type: TokenType.DIV_END, value: elementType });
+            break;
+          case 'button':
+            tokens.push({ type: TokenType.BUTTON_END, value: elementType });
+            break;
+          case 'span':
+            tokens.push({ type: TokenType.SPAN_END, value: elementType });
+            break;
+          case 'each':
+            tokens.push({ type: TokenType.EACH_END, value: elementType });
+            break;
+        }
+        continue;
+      }
+      
       let elementType = '';
       
       // Collect element type
@@ -140,6 +181,144 @@ export function tokenize(content: string): Token[] {
           type: TokenType.FORM_START, 
           value: elementType,
           attributes: { event }
+        });
+        continue;
+      } else if (elementType === 'div') {
+        // Handle div container element
+        let attributes: Record<string, string> = {};
+        
+        // Process attributes until we hit closing bracket
+        while (pos < content.length && content[pos] !== ']') {
+          // Skip whitespace
+          if (content[pos] === ' ') {
+            pos++;
+            continue;
+          }
+          
+          // Handle named attribute (e.g., [div class="value"])
+          let attributeName = '';
+          while (pos < content.length && content[pos] !== '=' && content[pos] !== ' ' && content[pos] !== ']') {
+            attributeName += content[pos];
+            pos++;
+          }
+          
+          if (attributeName && content[pos] === '=') {
+            pos++; // Skip '='
+            
+            // Handle quoted attribute value
+            if (content[pos] === '"') {
+              pos++; // Skip opening quote
+              let attributeValue = '';
+              
+              while (pos < content.length && content[pos] !== '"') {
+                attributeValue += content[pos];
+                pos++;
+              }
+              
+              pos++; // Skip closing quote
+              attributes[attributeName] = attributeValue;
+            }
+          }
+        }
+        
+        if (content[pos] === ']') pos++; // Skip ']'
+        
+        tokens.push({ 
+          type: TokenType.DIV_START, 
+          value: elementType,
+          attributes
+        });
+        continue;
+      } else if (elementType === 'button') {
+        // Handle button container element
+        let attributes: Record<string, string> = {};
+        
+        // Process attributes until we hit closing bracket
+        while (pos < content.length && content[pos] !== ']') {
+          // Skip whitespace
+          if (content[pos] === ' ') {
+            pos++;
+            continue;
+          }
+          
+          // Handle named attribute (e.g., [button class="value"])
+          let attributeName = '';
+          while (pos < content.length && content[pos] !== '=' && content[pos] !== ' ' && content[pos] !== ']') {
+            attributeName += content[pos];
+            pos++;
+          }
+          
+          if (attributeName && content[pos] === '=') {
+            pos++; // Skip '='
+            
+            // Handle quoted attribute value
+            if (content[pos] === '"') {
+              pos++; // Skip opening quote
+              let attributeValue = '';
+              
+              while (pos < content.length && content[pos] !== '"') {
+                attributeValue += content[pos];
+                pos++;
+              }
+              
+              pos++; // Skip closing quote
+              attributes[attributeName] = attributeValue;
+            }
+          }
+        }
+        
+        if (content[pos] === ']') pos++; // Skip ']'
+        
+        tokens.push({ 
+          type: TokenType.BUTTON_START, 
+          value: elementType,
+          attributes
+        });
+        continue;
+      } else if (elementType === 'span') {
+        // Handle span container element
+        let attributes: Record<string, string> = {};
+        
+        // Process attributes until we hit closing bracket
+        while (pos < content.length && content[pos] !== ']') {
+          // Skip whitespace
+          if (content[pos] === ' ') {
+            pos++;
+            continue;
+          }
+          
+          // Handle named attribute (e.g., [span class="value"])
+          let attributeName = '';
+          while (pos < content.length && content[pos] !== '=' && content[pos] !== ' ' && content[pos] !== ']') {
+            attributeName += content[pos];
+            pos++;
+          }
+          
+          if (attributeName && content[pos] === '=') {
+            pos++; // Skip '='
+            
+            // Handle quoted attribute value
+            if (content[pos] === '"') {
+              pos++; // Skip opening quote
+              let attributeValue = '';
+              
+              while (pos < content.length && content[pos] !== '"') {
+                attributeValue += content[pos];
+                pos++;
+              }
+              
+              pos++; // Skip closing quote
+              attributes[attributeName] = attributeValue;
+            }
+          }
+        }
+        
+        if (content[pos] === ']') pos++; // Skip ']'
+        
+        tokens.push({ 
+          type: TokenType.SPAN_START, 
+          value: elementType,
+          attributes
         });
         continue;
       } else if (elementType === 'each') {
@@ -263,7 +442,7 @@ export function tokenize(content: string): Token[] {
 }
 
 /**
- * Parses tokens into an elements array
+ * Parses tokens into an elements array using explicit closing tags
  * @param tokens Array of tokens to parse
  * @returns Array of element objects
  */
@@ -272,49 +451,201 @@ export function parseTokens(tokens: Token[]): any[] {
   let currentIndex = 0;
   let currentId: string | null = null;
 
-  // Buffer for inline content (for paragraphs)
+  // Simple paragraph buffer for collecting inline content
   let inlineBuffer: any[] = [];
-  let lastTokenWasNewline = false;
 
   function flushParagraph() {
     if (inlineBuffer.length > 0) {
-      const paragraph = {
-        type: 'p',
-        content: [...inlineBuffer],
-      };
-      if (currentId) {
-        paragraph['id'] = currentId;
-        currentId = null;
+      // Skip paragraphs that are only whitespace
+      const hasNonWhitespace = inlineBuffer.some(item => 
+        typeof item === 'string' ? item.trim().length > 0 : true
+      );
+      
+      if (hasNonWhitespace) {
+        const paragraph = {
+          type: 'p',
+          content: [...inlineBuffer],
+        };
+        if (currentId) {
+          paragraph['elementId'] = currentId;
+          currentId = null;
+        }
+        elements.push(paragraph);
       }
-      elements.push(paragraph);
       inlineBuffer = [];
     }
   }
 
-  // Helper for loop paragraph flushing
-  let loopInlineBuffer: any[] = [];
-  let loopLastTokenWasNewline = false;
-  function flushLoopParagraph(loopElements: any[]) {
-    if (loopInlineBuffer.length > 0) {
-      loopElements.push({ type: 'p', content: [...loopInlineBuffer] });
-      loopInlineBuffer = [];
+  // Helper function to parse container elements with explicit closing tags
+  function parseContainer(startTokenType: TokenType, endTokenType: TokenType, containerType: string, token: Token): any {
+    const containerElements: any[] = [];
+    currentIndex++; // Skip the start token
+    
+    let containerInlineBuffer: any[] = [];
+
+    function flushContainerParagraph() {
+      if (containerInlineBuffer.length > 0) {
+        // Skip paragraphs that are only whitespace
+        const hasNonWhitespace = containerInlineBuffer.some(item => 
+          typeof item === 'string' ? item.trim().length > 0 : true
+        );
+        
+        if (hasNonWhitespace) {
+          containerElements.push({ type: 'p', content: [...containerInlineBuffer] });
+        }
+        containerInlineBuffer = [];
+      }
     }
+
+    // Parse until we find the matching closing tag
+    while (currentIndex < tokens.length && tokens[currentIndex].type !== TokenType.EOF) {
+      const t = tokens[currentIndex];
+      
+      // Found the closing tag - we're done
+      if (t.type === endTokenType) {
+        flushContainerParagraph();
+        currentIndex++; // Skip the end token
+        break;
+      }
+      
+      // Handle nested containers
+      if (t.type === TokenType.FORM_START) {
+        flushContainerParagraph();
+        const nestedForm = parseContainer(TokenType.FORM_START, TokenType.FORM_END, 'form', t);
+        containerElements.push(nestedForm);
+        continue;
+      }
+      
+      if (t.type === TokenType.DIV_START) {
+        flushContainerParagraph();
+        const nestedDiv = parseContainer(TokenType.DIV_START, TokenType.DIV_END, 'div', t);
+        containerElements.push(nestedDiv);
+        continue;
+      }
+      
+      if (t.type === TokenType.BUTTON_START) {
+        flushContainerParagraph();
+        const nestedButton = parseContainer(TokenType.BUTTON_START, TokenType.BUTTON_END, 'button', t);
+        containerElements.push(nestedButton);
+        continue;
+      }
+      
+      if (t.type === TokenType.SPAN_START) {
+        flushContainerParagraph();
+        const nestedSpan = parseContainer(TokenType.SPAN_START, TokenType.SPAN_END, 'span', t);
+        containerElements.push(nestedSpan);
+        continue;
+      }
+      
+      // Handle headings
+      if (t.type === TokenType.HEADING) {
+        flushContainerParagraph();
+        const heading = {
+          type: `h${t.level}`,
+          content: [t.value]
+        };
+        containerElements.push(heading);
+        currentIndex++;
+        continue;
+      }
+      
+      // Handle regular elements (input, etc.)
+      if (t.type === TokenType.ELEMENT_START) {
+        flushContainerParagraph();
+        const element = {
+          type: t.value,
+          content: t.attributes?.content ? [t.attributes.content] : [],
+          attributes: { ...t.attributes }
+        };
+        if (element.attributes && 'content' in element.attributes) {
+          delete element.attributes.content;
+        }
+        if (element.attributes && Object.keys(element.attributes).length === 0) {
+          delete element.attributes;
+        }
+        containerElements.push(element);
+        currentIndex++;
+        continue;
+      }
+      
+      // Handle loops
+      if (t.type === TokenType.EACH_START) {
+        flushContainerParagraph();
+        const loopElement = parseContainer(TokenType.EACH_START, TokenType.EACH_END, 'loop', t);
+        containerElements.push(loopElement);
+        continue;
+      }
+      
+      // Handle variable references
+      if (t.type === TokenType.VARIABLE_REFERENCE) {
+        containerInlineBuffer.push(t.value);
+        currentIndex++;
+        continue;
+      }
+      
+      // Handle text
+      if (t.type === TokenType.TEXT) {
+        containerInlineBuffer.push(t.value);
+        currentIndex++;
+        continue;
+      }
+      
+      // Skip newlines and other tokens
+      currentIndex++;
+    }
+    
+    // Create the container element
+    const container: any = {
+      type: containerType,
+      elements: containerElements
+    };
+    
+    // Add attributes if present
+    if (token.attributes && Object.keys(token.attributes).length > 0) {
+      container.attributes = token.attributes;
+    }
+    
+    // Handle special properties for specific container types
+    if (containerType === 'form' && token.attributes?.event) {
+      container.event = token.attributes.event;
+      // Remove event from attributes since it's now a separate property
+      if (container.attributes) {
+        const { event, ...otherAttributes } = container.attributes;
+        if (Object.keys(otherAttributes).length > 0) {
+          container.attributes = otherAttributes;
+        } else {
+          delete container.attributes;
+        }
+      }
+    }
+    
+    if (containerType === 'loop') {
+      container.source = token.attributes?.source;
+      container.variable = token.attributes?.variable;
+      delete container.attributes; // Loop doesn't use regular attributes
+    }
+    
+    return container;
   }
 
+  // Main parsing loop
   while (currentIndex < tokens.length && tokens[currentIndex].type !== TokenType.EOF) {
     const token = tokens[currentIndex];
 
     // Handle ID marker - applies to the next element
     if (token.type === TokenType.ID_MARKER) {
-      currentId = token.id;
+      currentId = token.elementId;
       currentIndex++;
       continue;
     }
 
-    // Block-level tokens: flush paragraph before handling
+    // Block-level elements: flush paragraph before handling
     if (
       token.type === TokenType.HEADING ||
       token.type === TokenType.FORM_START ||
+      token.type === TokenType.DIV_START ||
+      token.type === TokenType.BUTTON_START ||
+      token.type === TokenType.SPAN_START ||
       token.type === TokenType.EACH_START
     ) {
       flushParagraph();
@@ -327,7 +658,7 @@ export function parseTokens(tokens: Token[]): any[] {
         content: [token.value]
       };
       if (currentId) {
-        heading['id'] = currentId;
+        heading['elementId'] = currentId;
         currentId = null;
       }
       elements.push(heading);
@@ -335,167 +666,97 @@ export function parseTokens(tokens: Token[]): any[] {
       continue;
     }
 
-    // Handle form
+    // Handle container elements with explicit closing tags
     if (token.type === TokenType.FORM_START) {
-      const formElements: any[] = [];
-      currentIndex++;
-      while (currentIndex < tokens.length && tokens[currentIndex].type !== TokenType.EOF && tokens[currentIndex].type !== TokenType.FORM_END) {
-        if (tokens[currentIndex].type === TokenType.NEWLINE) {
-          currentIndex++;
-          continue;
-        }
-        if (tokens[currentIndex].type === TokenType.ELEMENT_START) {
-          const childElement = {
-            type: tokens[currentIndex].value,
-            content: tokens[currentIndex].attributes?.content ? [tokens[currentIndex].attributes.content] : [],
-            attributes: { ...tokens[currentIndex].attributes }
-          };
-          if (childElement.attributes && 'content' in childElement.attributes) {
-            delete childElement.attributes.content;
-          }
-          // Remove attributes if empty
-          if (childElement.attributes && Object.keys(childElement.attributes).length === 0) {
-            delete childElement.attributes;
-          }
-          formElements.push(childElement);
-          currentIndex++;
-          continue;
-        }
-        if (tokens[currentIndex].type === TokenType.HEADING || tokens[currentIndex].type === TokenType.FORM_START) {
-          break;
-        }
-        currentIndex++;
-      }
-      const formElement = {
-        type: 'form',
-        event: token.attributes?.event,
-        elements: formElements
-      };
+      const formElement = parseContainer(TokenType.FORM_START, TokenType.FORM_END, 'form', token);
       if (currentId) {
-        formElement['id'] = currentId;
+        formElement.elementId = currentId;
         currentId = null;
       }
       elements.push(formElement);
       continue;
     }
 
-    // Handle each loop
-    if (token.type === TokenType.EACH_START) {
-      const loopElements: any[] = [];
-      currentIndex++;
-      loopInlineBuffer = [];
-      loopLastTokenWasNewline = false;
-      while (currentIndex < tokens.length && tokens[currentIndex].type !== TokenType.EOF && tokens[currentIndex].type !== TokenType.EACH_END) {
-        const t = tokens[currentIndex];
-        if (t.type === TokenType.NEWLINE) {
-          if (loopLastTokenWasNewline) {
-            flushLoopParagraph(loopElements);
-            loopLastTokenWasNewline = false;
-          } else {
-            loopLastTokenWasNewline = true;
-          }
-          currentIndex++;
-          continue;
-        }
-        if (t.type === TokenType.VARIABLE_REFERENCE) {
-          // Check if this is a standalone variable (next token is newline or EOF)
-          // Also check if the buffer only contains whitespace
-          const nextToken = tokens[currentIndex + 1];
-          const bufferOnlyWhitespace = loopInlineBuffer.every(item => typeof item === 'string' && item.trim() === '');
-          if ((loopInlineBuffer.length === 0 || bufferOnlyWhitespace) && (nextToken?.type === TokenType.NEWLINE || nextToken?.type === TokenType.EOF)) {
-            // Clear any whitespace-only buffer
-            loopInlineBuffer = [];
-            // Standalone variable reference
-            loopElements.push({ type: 'span', content: [t.value] });
-            loopLastTokenWasNewline = false;
-            currentIndex++;
-            continue;
-          } else {
-            // Variable reference within text content
-            loopInlineBuffer.push(t.value);
-            loopLastTokenWasNewline = false;
-            currentIndex++;
-            continue;
-          }
-        }
-        if (t.type === TokenType.TEXT) {
-          loopInlineBuffer.push(t.value);
-          loopLastTokenWasNewline = false;
-          currentIndex++;
-          continue;
-        }
-        if (t.type === TokenType.HEADING || t.type === TokenType.FORM_START || t.type === TokenType.EACH_START) {
-          flushLoopParagraph(loopElements);
-          break;
-        }
-        currentIndex++;
-      }
-      flushLoopParagraph(loopElements);
-      const loopElement = {
-        type: 'loop',
-        source: token.attributes?.source,
-        variable: token.attributes?.variable,
-        elements: loopElements
-      };
+    if (token.type === TokenType.DIV_START) {
+      const divElement = parseContainer(TokenType.DIV_START, TokenType.DIV_END, 'div', token);
       if (currentId) {
-        loopElement['id'] = currentId;
+        divElement.elementId = currentId;
+        currentId = null;
+      }
+      elements.push(divElement);
+      continue;
+    }
+
+    if (token.type === TokenType.BUTTON_START) {
+      const buttonElement = parseContainer(TokenType.BUTTON_START, TokenType.BUTTON_END, 'button', token);
+      if (currentId) {
+        buttonElement.elementId = currentId;
+        currentId = null;
+      }
+      elements.push(buttonElement);
+      continue;
+    }
+
+    if (token.type === TokenType.SPAN_START) {
+      const spanElement = parseContainer(TokenType.SPAN_START, TokenType.SPAN_END, 'span', token);
+      if (currentId) {
+        spanElement.elementId = currentId;
+        currentId = null;
+      }
+      elements.push(spanElement);
+      continue;
+    }
+
+    if (token.type === TokenType.EACH_START) {
+      const loopElement = parseContainer(TokenType.EACH_START, TokenType.EACH_END, 'loop', token);
+      if (currentId) {
+        loopElement.elementId = currentId;
         currentId = null;
       }
       elements.push(loopElement);
       continue;
     }
 
-    // Inline content handling (outside loops/forms)
-    if (token.type === TokenType.NEWLINE) {
-      if (lastTokenWasNewline) {
-        flushParagraph();
-        lastTokenWasNewline = false;
-      } else {
-        lastTokenWasNewline = true;
+    // Handle regular elements
+    if (token.type === TokenType.ELEMENT_START) {
+      flushParagraph();
+      const element = {
+        type: token.value,
+        content: token.attributes?.content ? [token.attributes.content] : [],
+        attributes: { ...token.attributes }
+      };
+      if (element.attributes && 'content' in element.attributes) {
+        delete element.attributes.content;
       }
+      if (element.attributes && Object.keys(element.attributes).length === 0) {
+        delete element.attributes;
+      }
+      if (currentId) {
+        element['elementId'] = currentId;
+        currentId = null;
+      }
+      elements.push(element);
       currentIndex++;
       continue;
     }
+
+    // Handle inline content (text and variable references)
     if (token.type === TokenType.TEXT) {
       inlineBuffer.push(token.value);
-      lastTokenWasNewline = false;
       currentIndex++;
       continue;
     }
+
     if (token.type === TokenType.VARIABLE_REFERENCE) {
-      // Check if this is a standalone variable (next token is newline or EOF)
-      // Also check if the buffer only contains whitespace
-      const nextToken = tokens[currentIndex + 1];
-      const bufferOnlyWhitespace = inlineBuffer.every(item => typeof item === 'string' && item.trim() === '');
-      if ((inlineBuffer.length === 0 || bufferOnlyWhitespace) && (nextToken?.type === TokenType.NEWLINE || nextToken?.type === TokenType.EOF)) {
-        // Clear any whitespace-only buffer
-        inlineBuffer = [];
-        // Standalone variable reference - create a span element
-        const spanElement = {
-          type: 'span',
-          content: [token.value]
-        };
-        if (currentId) {
-          spanElement['id'] = currentId;
-          currentId = null;
-        }
-        elements.push(spanElement);
-        lastTokenWasNewline = false;
-        currentIndex++;
-        continue;
-      } else {
-        // Variable reference within text content
-        inlineBuffer.push(token.value);
-        lastTokenWasNewline = false;
-        currentIndex++;
-        continue;
-      }
+      inlineBuffer.push(token.value);
+      currentIndex++;
+      continue;
     }
-    // Handle variable references outside loops
-    // (already handled above)
-    // Skip any other tokens
+
+    // Skip newlines and other tokens
     currentIndex++;
   }
+
   flushParagraph();
   return elements;
 } 

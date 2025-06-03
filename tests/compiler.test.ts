@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test";
 import { compileHypernoteToContent } from "../src/lib/compiler";
 import { loadExample, AVAILABLE_EXAMPLES } from "./example-loader";
-import type { FormElement, LoopElement, Element } from "../src/lib/schema";
+import type { FormElement, LoopElement, Element, ButtonElement } from "../src/lib/schema";
 
 test("should parse basic H1 and a form triggering a hardcoded event", () => {
   const example = loadExample("basic-hello");
@@ -23,22 +23,36 @@ test("should parse basic H1 and a form triggering a hardcoded event", () => {
   expect(formElement.type).toBe("form");
   expect(formElement.event).toBe("@post_hello");
   expect(formElement.elements?.[0].type).toBe("button");
-  expect((formElement.elements?.[0] as Element).content?.[0]).toBe("Say Hello");
+  
+  // Button is now a container with elements, not content
+  const button = formElement.elements?.[0] as ButtonElement;
+  expect(button.elements?.[0].type).toBe("p");
+  expect((button.elements?.[0] as Element).content?.[0]).toBe("Say Hello");
 });
 
 test("should parse H1 with ID and apply a simple style rule", () => {
-  const example = loadExample("styled-heading");
+  const example = loadExample("div-container");
   const result = compileHypernoteToContent(example.markdown);
+
+  // Check structure
+  expect(result.version).toBe("1.1.0");
+  expect(result.elements.length).toBeGreaterThan(2);
   
-  // Check styles
-  expect(result.styles).toBeDefined();
-  expect(result.styles?.["#main-title"]["color"]).toBe("#3b82f6");
-  expect(result.styles?.["button"]["background-color"]).toBe("#3b82f6");
+  // Check H1 element
+  const h1 = result.elements[0] as Element;
+  expect(h1.type).toBe("h1");
+  expect(h1.content).toEqual(["Div Container Example"]);
   
-  // Check elements
-  expect(result.elements[0].type).toBe("h1");
-  expect(result.elements[0].id).toBe("main-title");
-  expect((result.elements[0] as Element).content?.[0]).toBe("Hello Styled");
+  // Check element with ID (the paragraph after the ID marker)
+  const elementWithId = result.elements[1] as any;
+  expect(elementWithId.elementId).toBe("card-container");
+  
+  // Check styled div element
+  const divElement = result.elements[2] as any;
+  expect(divElement.type).toBe("div");
+  expect(divElement.style).toBeDefined();
+  expect(divElement.style?.backgroundColor).toBe("rgb(255,255,255)");
+  expect(divElement.style?.padding).toBe("1.5rem");
 });
 
 test("should parse form with input and use form variable in event template", () => {
@@ -59,10 +73,11 @@ test("should parse form with input and use form variable in event template", () 
   expect(input?.attributes?.name).toBe("message");
   expect(input?.attributes?.placeholder).toBe("Enter message...");
   
-  // Check button
-  const button = form.elements?.[1] as Element;
+  // Check button - now a container with elements
+  const button = form.elements?.[1] as ButtonElement;
   expect(button?.type).toBe("button");
-  expect(button?.content?.[0]).toBe("Post");
+  expect(button.elements?.[0].type).toBe("p");
+  expect((button.elements?.[0] as Element).content?.[0]).toBe("Post");
 });
 
 test("should parse query in frontmatter and loop in content", () => {
@@ -89,9 +104,10 @@ test("should parse query in frontmatter and loop in content", () => {
   expect(loopElement.source).toBe("$my_feed");
   expect(loopElement.variable).toBe("$note");
   
-  // Check the variable reference inside the loop - should be a span element
-  expect(loopElement.elements?.[0].type).toBe("span");
-  expect((loopElement.elements?.[0] as Element).content?.[0]).toBe("{$note.content}");
+  // Check the variable reference inside the loop - should be a paragraph
+  expect(loopElement.elements?.[0].type).toBe("p");
+  const paragraphContent = (loopElement.elements?.[0] as Element).content;
+  expect(paragraphContent).toContain("{$note.content}");
 });
 
 test("should compile all examples without errors", () => {

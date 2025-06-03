@@ -34,8 +34,13 @@
         },
         {
           "type": "button",
-          "content": [
-            "Post"
+          "elements": [
+            {
+              "type": "p",
+              "content": [
+                "Post"
+              ]
+            }
           ]
         }
       ]
