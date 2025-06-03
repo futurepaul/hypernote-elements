@@ -1,0 +1,71 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Hypernote Protocol Architecture
+
+This project implements the Hypernote protocol - a declarative system for creating interactive, hypermedia experiences on Nostr. The architecture follows a clear two-phase design: **HNMD** (source format) → **Hypernote JSON** (compiled format) → **Rendered UI**.
+
+## Core Specification Documents
+
+### Language Specification
+- [README.md](mdc:README.md) - **Primary spec document** defining the high-level HNMD (Hypernote Markdown) language, syntax, and semantics
+- [OUTPUT.md](mdc:OUTPUT.md) - **JSON format specification** defining the compiled Hypernote structure that gets published as Nostr events
+
+## Implementation Pipeline
+
+### Phase 1: HNMD Processing (Markdown → JSON)
+- [src/lib/tokenizer.ts](mdc:src/lib/tokenizer.ts) - Tokenizes HNMD syntax into structured tokens (headings, forms, variables, etc.)
+- [src/lib/compiler.ts](mdc:src/lib/compiler.ts) - Compiles tokenized HNMD into valid Hypernote JSON structure
+
+### Phase 2: Hypernote Schema & Validation
+- [src/lib/schema.ts](mdc:src/lib/schema.ts) - **Main schema** for Hypernote JSON validation using Zod, defines all element types and structure
+- [src/lib/style-schema.ts](mdc:src/lib/style-schema.ts) - **Cross-platform styling schema** with CSS-like properties designed for web/mobile/native compatibility
+
+### Phase 3: Frontend Rendering (JSON → UI)
+- [src/lib/nostrFetch.ts](mdc:src/lib/nostrFetch.ts) - Utilities for fetching Nostr events from relays
+- [src/lib/relayHandler.ts](mdc:src/lib/relayHandler.ts) - Nostr relay connection management and event publishing
+- [src/stores/nostrStore.ts](mdc:src/stores/nostrStore.ts) - Zustand store for Nostr state management and user context
+- [src/renderer.tsx](mdc:src/renderer.tsx) - **Core renderer** that converts Hypernote JSON to React components
+- [src/App.tsx](mdc:src/App.tsx) - Main application with split-pane editor/preview interface
+- [src/frontend.tsx](mdc:src/frontend.tsx) - React app entry point
+
+## Testing & Examples
+
+### Sample Data
+- [examples/](mdc:examples) - **Source of truth examples** containing pairs of:
+  - `.md` files - HNMD source code
+  - `.json` files - Expected compiled Hypernote JSON output
+
+### Test Suite
+- [tests/](mdc:tests) - Comprehensive test suite covering:
+  - Tokenizer functionality
+  - Compiler accuracy (HNMD → JSON)
+  - Schema validation
+  - Style schema validation
+  - Round-trip compilation tests
+
+## Build System
+
+- [scripts/md-loader.ts](mdc:scripts/md-loader.ts) - **Custom Bun plugin** that allows importing `.md` files directly into TypeScript/JavaScript as string modules
+- Uses **Bun** as bundler, runtime, and test framework
+
+## Key Architecture Concepts
+
+1. **Two-Phase Design**: HNMD is human-readable source; Hypernote JSON is machine-optimized for publishing/rendering
+2. **Protocol-First**: Implementation follows spec documents exactly - specs drive code, not vice versa
+3. **Cross-Platform Styling**: Style system designed to work across web, React Native, SwiftUI, Flutter, etc.
+4. **Nostr Integration**: Hypernotes are published as Nostr events and can reference other Nostr events
+5. **Component System**: Supports reusable components referenced by Nostr identifiers
+6. **Query Language**: Built-in query system for fetching and transforming Nostr data
+
+## Development Workflow
+
+1. **Spec Changes**: Update [README.md](mdc:README.md) or [OUTPUT.md](mdc:OUTPUT.md) first
+2. **Implementation**: Update schemas, compiler, tokenizer to match spec
+3. **Examples**: Add/update examples in [examples/](mdc:examples) folder
+4. **Tests**: Ensure tests pass and cover new functionality
+5. **Frontend**: Update renderer if new element types are added
+
+When debugging issues, check this order: spec → schema → compiler → tokenizer → examples → tests → renderer.
