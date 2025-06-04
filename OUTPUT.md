@@ -1,8 +1,8 @@
 # Output: Hypernote JSON Structure (Version 1.1.0)
 
-This document defines the JSON structure used within the `content` field of a Nostr event to represent a Hypernote. This structure is the compiled output derived from the HNMD (Hypernote Markdown) source.
+This document defines the JSON structure used within the `content` field of a Nostr event to represent a Hypernote. This JSON structure can be created manually, generated programmatically, or compiled from authoring formats like HNMD (Hypernote Markdown).
 
-> **Important:** In the original HNMD frontmatter YAML, keys that start with special characters like `@`, `$`, or `#` must be quoted (e.g., `"@post_comment"`, `"$following_feed"`, `"#profile_card"`). This is a YAML requirement for keys that start with special characters.
+> **Important:** When using YAML-based frontmatter formats, keys that start with special characters like `@`, `$`, or `#` must be quoted (e.g., `"@post_comment"`, `"$following_feed"`, `"#profile_card"`). This is a YAML requirement for keys that start with special characters.
 
 ## Nostr Event Fields
 
@@ -35,58 +35,12 @@ The `content` field contains a JSON string which, when parsed, results in the fo
     "note_display": "nevent1..."
   },
 
-  // Cross-platform style definitions using a minimal, compatible subset of CSS
-  // Designed to work across web (CSS), mobile (React Native), and native platforms (SwiftUI, Flutter, Jetpack Compose)
-  "styles": {
-    // Element type selectors
-    "h1": { 
-      "font-weight": "bold", 
-      "font-size": 24,
-      "color": "#1f2937"
-    },
-    "button": { 
-      "background-color": "#3b82f6",
-      "color": "#ffffff",
-      "border": {
-        "radius": 8,
-        "width": 1,
-        "style": "solid",
-        "color": "#2563eb"
-      },
-      "padding-top": 12,
-      "padding-bottom": 12,
-      "padding-left": 16,
-      "padding-right": 16
-    },
-    "p": { 
-      "color": "#374151",
-      "line-height": 1.5
-    },
-    // ID selectors (prefixed with #)
-    "#header-title": { 
-      "color": "#3b82f6",
-      "text-align": "center"
-    },
-    // Class selectors (prefixed with .)
-    ".card": {
-      "background-color": "#ffffff",
-      "border": {
-        "radius": 12,
-        "width": 1,
-        "style": "solid",
-        "color": "#e5e7eb"
-      },
-      "elevation": 2,
-      "padding-top": 16,
-      "padding-bottom": 16,
-      "padding-left": 16,
-      "padding-right": 16
-    },
-    // Root selector for global styles
-    ":root": { 
-      "background-color": "#f9fafb",
-      "font-family": "system-ui, sans-serif"
-    }
+  // Cross-platform style definition for the root container
+  // Applied to the outermost container of the Hypernote
+  "style": {
+    "backgroundColor": "rgb(0,0,0)",
+    "borderRadius": "0.75rem", 
+    "padding": "1rem"
   },
 
   // Central query definitions. Keys are query names from HNMD ($query_name).
@@ -179,6 +133,13 @@ The `content` field contains a JSON string which, when parsed, results in the fo
       "elements": [
         {
           "type": "img",
+          // Element-specific styles as CSS-in-JS properties
+          // Applied directly to this specific image element
+          "style": {
+            "width": "8rem",
+            "height": "8rem",
+            "alignSelf": "center"
+          },
           "attributes": {
             "src": "{target.picture}", // Variables substituted by client
             "alt": "Profile picture"
@@ -228,6 +189,16 @@ The `content` field contains a JSON string which, when parsed, results in the fo
         },
         {
           "type": "button",
+          // Element-specific styles as CSS-in-JS properties
+          "style": {
+            "backgroundColor": "rgb(59,130,246)",
+            "color": "rgb(255,255,255)",
+            "paddingLeft": "1rem",
+            "paddingRight": "1rem", 
+            "paddingTop": "0.5rem",
+            "paddingBottom": "0.5rem",
+            "borderRadius": "0.25rem"
+          },
           "content": [ "Send Reply" ]
           // Note: Button implicitly triggers form submission
         }
@@ -240,117 +211,125 @@ The `content` field contains a JSON string which, when parsed, results in the fo
 
 ## Cross-Platform Styling System
 
-Hypernote uses a carefully designed subset of CSS properties that can be reliably implemented across web browsers, mobile platforms (React Native), and native UI frameworks (SwiftUI, Flutter, Jetpack Compose). This approach ensures consistent visual presentation regardless of the client implementation.
+Hypernote uses an **element-specific styling system** where styles are applied as CSS-in-JS objects. This approach ensures consistent visual presentation across web browsers, mobile platforms (React Native), and native UI frameworks (SwiftUI, Flutter, Jetpack Compose).
 
 ### Design Philosophy
 
 The styling system prioritizes:
 
-1. **Cross-platform compatibility**: Every property must have a clear mapping to all target platforms
-2. **Minimal complexity**: Only essential styling capabilities are included
-3. **Predictable behavior**: Properties behave consistently across platforms
-4. **Non-cascading**: Styles are applied directly to elements without inheritance complexity
+1. **Element-Specific Application**: Styles are applied directly to individual elements via their `style` property
+2. **Cross-platform compatibility**: CSS-in-JS properties that work across all target platforms  
+3. **Predictable behavior**: Well-defined property mappings with consistent behavior
+4. **No CSS Selectors**: Eliminates complex cascading and selector specificity issues
 
-### Key Differences from Standard CSS
+### Styling Architecture
 
-**⚠️ Breaking Changes from Standard CSS:**
+**Root-Level Styling:**
+- Single `style` object at the top level for the root container
+- Applied to the outermost container of the Hypernote
+- Example: `{"backgroundColor": "rgb(0,0,0)", "borderRadius": "0.75rem", "padding": "1rem"}`
 
-- **`display`**: Only supports `"flex"` and `"none"` (removed `"block"` as it's not meaningful on native platforms)
-- **`border`**: Simplified to a single object instead of individual `border-*` properties for better cross-platform support
-- **`spacing`**: Replaces CSS `gap` property for flexbox spacing (maps to native spacing parameters)
-- **`overlay`**: New positioning system replaces `position: absolute` for cross-platform absolute positioning
-- **`elevation`**: New property for Material Design-style shadows instead of `box-shadow`
-- **`font-weight`**: Enhanced to support both named values (`"normal"`, `"bold"`) and numeric values (100-900)
-- **`text-decoration`**: Simplified to only `"none"` and `"underline"` (removed `"line-through"`)
+**Element-Specific Styling:**  
+- Individual elements have their own `style` property
+- Applied directly to the specific element without inheritance
+- Example: `{"backgroundColor": "rgb(59,130,246)", "color": "rgb(255,255,255)", "paddingLeft": "1rem", ...}`
 
-### Supported Properties
+### JSON Structure Examples
 
-#### Layout & Box Model
-- `display`: `"flex"` | `"none"`
-- `width`, `height`: Numbers (platform units) or percentages (`"50%"`) or `"auto"`
-- `padding-top`, `padding-right`, `padding-bottom`, `padding-left`: Numbers or percentages
-- `margin-top`, `margin-right`, `margin-bottom`, `margin-left`: Numbers or percentages
-- `border`: Object with `width`, `style`, `color`, `radius` properties
+**Basic Structure:**
+```json
+{
+  "style": {
+    "backgroundColor": "rgb(243,244,246)",
+    "padding": "1rem"
+  },
+  "elements": [
+    {
+      "type": "div", 
+      "style": {
+        "backgroundColor": "rgb(255,255,255)",
+        "padding": "1.5rem",
+        "borderRadius": "0.5rem",
+        "boxShadow": "0 4px 6px -1px rgb(0,0,0,0.1), 0 2px 4px -2px rgb(0,0,0,0.1)",
+        "borderWidth": "1px"
+      },
+      "elements": [
+        {
+          "type": "button",
+          "style": {
+            "backgroundColor": "rgb(59,130,246)", 
+            "color": "rgb(255,255,255)",
+            "paddingLeft": "1rem",
+            "paddingRight": "1rem",
+            "paddingTop": "0.5rem", 
+            "paddingBottom": "0.5rem",
+            "borderRadius": "0.25rem",
+            "marginTop": "0.5rem"
+          }
+        }
+      ]
+    }
+  ]
+}
+```
 
-#### Flexbox
-- `flex-direction`: `"row"` | `"row-reverse"` | `"column"` | `"column-reverse"`
-- `justify-content`: `"flex-start"` | `"flex-end"` | `"center"` | `"space-between"` | `"space-around"`
-- `align-items`: `"stretch"` | `"flex-start"` | `"flex-end"` | `"center"` | `"baseline"`
-- `spacing`: Number (replaces CSS `gap`)
-- `flex-grow`, `flex-shrink`: Numbers
-- `flex-basis`: Number, percentage, or `"auto"`
-- `flex-wrap`: `"nowrap"` | `"wrap"`
+### Complete Example
 
-#### Positioning
-- `position`: `"relative"` only (absolute positioning uses `overlay`)
-- `overlay`: Object with `anchor` and `offset` for cross-platform absolute positioning
-- `top`, `right`, `bottom`, `left`: Numbers or percentages (for relative positioning only)
-- `z-index`: Integer
-
-#### Typography
-- `color`: Hex colors (`#RRGGBB`, `#RRGGBBAA`), RGB/RGBA (`rgb()`, `rgba()`), or `"transparent"`
-- `font-family`: String
-- `font-size`: Number
-- `font-weight`: `"normal"` | `"bold"` | 100-900 (multiples of 100)
-- `line-height`: Number (unitless multiplier)
-- `text-align`: `"left"` | `"right"` | `"center"` | `"justify"`
-- `text-decoration`: `"none"` | `"underline"`
-- `text-transform`: `"none"` | `"capitalize"` | `"uppercase"` | `"lowercase"`
-
-#### Background & Effects
-- `background-color`: Same color formats as `color`
-- `elevation`: Number 0-24 (Material Design elevation for cross-platform shadows)
-- `opacity`: Number 0.0-1.0
-- `overflow`: `"visible"` | `"hidden"`
-
-### Selectors
-
-The styling system supports four types of selectors:
-
-1. **Element type selectors**: `"h1"`, `"button"`, `"div"`, etc.
-2. **ID selectors**: `"#header-title"`, `"#main-content"`, etc.
-3. **Class selectors**: `".card"`, `".highlight"`, etc.
-4. **Root selector**: `":root"` for global styles
+See [`div-container.json`](examples/div-container.json) for a comprehensive example showcasing:
+- Root-level styling for the container
+- Multiple nested div elements with individual styling
+- Form elements with proper style definitions
+- Complex layouts with element-specific styles
 
 ### Platform Mapping Examples
 
+CSS-in-JS properties map consistently across platforms:
+
 ```json
 {
-  "styles": {
-    ".modal": {
-      // Cross-platform absolute positioning
-      "overlay": {
-        "anchor": "center",
-        "offset": { "x": 0, "y": -50 }
-      },
-      // CSS: position: absolute; top: 50%; left: 50%; transform: translate(-50%, calc(-50% - 50px));
-      // SwiftUI: .overlay(alignment: .center).offset(x: 0, y: -50)
-      // React Native: position: 'absolute', top: '50%', left: '50%', marginTop: -50, marginLeft: -200
-      // Flutter: Positioned widget in Stack with center alignment and offset
-      // Jetpack Compose: Box with Alignment.Center and offset modifier
-      
-      "elevation": 8,
-      // CSS: box-shadow: 0 8px 16px rgba(0,0,0,0.15);
-      // SwiftUI: .shadow(radius: 8)
-      // React Native: elevation: 8 (Android), shadowRadius: 8 (iOS)
-      // Flutter: elevation: 8 on Material widget
-      // Jetpack Compose: elevation = 8.dp
-      
-      "border": {
-        "radius": 12,
-        "width": 1,
-        "style": "solid", 
-        "color": "#e5e7eb"
-      }
-      // CSS: border: 1px solid #e5e7eb; border-radius: 12px;
-      // SwiftUI: .border(Color(hex: "e5e7eb"), width: 1).cornerRadius(12)
-      // React Native: borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12
-      // Flutter: Container with BoxDecoration border and borderRadius
-      // Jetpack Compose: Modifier.border(1.dp, Color(0xFFe5e7eb)).clip(RoundedCornerShape(12.dp))
-    }
+  // Example button styles
+  "style": {
+    "backgroundColor": "rgb(59,130,246)",
+    "color": "rgb(255,255,255)",
+    "paddingLeft": "1rem",
+    "paddingRight": "1rem",
+    "paddingTop": "0.5rem",
+    "paddingBottom": "0.5rem",
+    "borderRadius": "0.25rem"
   }
+  // CSS: background-color: rgb(59,130,246); color: rgb(255,255,255); ...
+  // SwiftUI: .background(Color(red: 59/255, green: 130/255, blue: 246/255))
+  // React Native: backgroundColor: 'rgb(59,130,246)', color: 'rgb(255,255,255)', ...
+  // Flutter: Container with BoxDecoration backgroundColor and TextStyle color
+  // Jetpack Compose: Modifier.background(Color(0xFF3B82F6)) and color parameters
 }
 ```
+
+### Supported CSS-in-JS Properties
+
+The styling system supports a validated subset of CSS-in-JS properties designed for cross-platform compatibility:
+
+#### Layout & Box Model
+- `display`, `width`, `height`, `minWidth`, `maxWidth`, `minHeight`, `maxHeight`
+- `padding`, `paddingTop`, `paddingRight`, `paddingBottom`, `paddingLeft`
+- `margin`, `marginTop`, `marginRight`, `marginBottom`, `marginLeft`
+- `borderWidth`, `borderRadius`, `borderColor` (individual border properties)
+
+#### Flexbox
+- `flexDirection`, `justifyContent`, `alignItems`, `alignSelf` 
+- `flex`, `flexGrow`, `flexShrink`, `flexBasis`, `flexWrap`
+- `gap` (for flexbox spacing)
+
+#### Typography  
+- `color`, `fontSize`, `fontWeight`, `fontFamily`, `lineHeight`
+- `textAlign`, `textDecoration`, `textTransform`, `letterSpacing`
+
+#### Background & Effects
+- `backgroundColor`, `opacity`, `overflow`
+- `boxShadow` (for drop shadows and elevation effects)
+
+#### Positioning
+- `position`, `top`, `right`, `bottom`, `left`, `zIndex`
 
 ## Implementation Notes
 
@@ -367,7 +346,7 @@ The styling system supports four types of selectors:
     2.  Substitute variables (`form.*`, `target.*`, `user.*`, etc.) into the referenced event template from the `events` map.
     3.  Construct the final Nostr event.
     4.  **Crucially:** Prompt the user to review, sign, and publish the generated event.
-* **Styling:** Clients need to parse the `styles` map and apply the specified (non-cascading) styles to elements based on their type, ID, or class. The styling system uses a minimal subset of CSS designed for cross-platform compatibility. See the "Cross-Platform Styling System" section above for detailed property mappings and platform-specific implementation guidance.
+* **Styling:** Clients need to parse the `style` object and apply the specified styles to elements based on their type, ID, or class. The styling system uses a minimal subset of CSS designed for cross-platform compatibility. See the "Cross-Platform Styling System" section above for detailed property mappings and platform-specific implementation guidance.
 * **Component Loading:** When encountering a `component` element, the client needs to:
     1.  Resolve the `alias` using the `imports` map to get the Nostr identifier (`reference`).
     2.  Fetch the referenced Hypernote definition (if not cached).

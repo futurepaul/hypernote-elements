@@ -382,154 +382,172 @@ This provides a direct, unambiguous link between a form's output and a specific 
 
 ## Hypernote Styling
 
-Define styles in the `style:` block of the frontmatter using a YAML-based, non-cascading subset of CSS properties designed for cross-platform compatibility.
+Define styles using Tailwind CSS classes that get compiled to cross-platform CSS-in-JS objects. Styling is applied at two levels: **top-level styles** for the root container and **element-specific styles** using `class` attributes.
 
-### Syntax
+### Top-Level Styling
+
+Apply styles to the root container using the `style:` field in the frontmatter with Tailwind classes:
 
 ```yaml
 ---
-style:
-  # Target elements by ID (using Markdown {#id} or auto-generated header IDs)
-  "#header-title":
-    font-size: 24
-    color: "#3b82f6"
-    font-weight: "bold"
-    text-align: "center"
-
-  # Target elements by HTML tag name
-  h1:
-    font-size: 32
-    font-weight: "bold"
-    color: "#1f2937"
-  p:
-    color: "#374151"
-    line-height: 1.5
-  button:
-    background-color: "#3b82f6"
-    color: "#ffffff"
-    border:
-      radius: 8
-      width: 1
-      style: "solid"
-      color: "#2563eb"
-    padding: 12
-  input:
-    border:
-      color: "#e5e7eb"
-      width: 1
-      style: "solid"
-      radius: 4
-    padding: 8
-
-  # Target elements by class name
-  ".card":
-    background-color: "#ffffff"
-    border:
-      radius: 12
-      width: 1
-      style: "solid"
-      color: "#e5e7eb"
-    elevation: 2
-    padding: 16
-
-  # Target the root container (applies default styles)
-  ":root":
-    background-color: "#f9fafb"
-    font-family: "system-ui, sans-serif"
+style: bg-black rounded-xl p-4  # Applied to root container
 ---
+```
+
+### Element-Specific Styling
+
+Apply styles directly to individual elements using the `class` attribute with Tailwind classes:
+
+```md
+[div class="bg-white p-6 rounded-lg shadow-md border"]
+  ## Card Title
+  Content inside a styled container
+[/div]
+
+[button class="bg-blue-500 text-white px-4 py-2 rounded"]Submit[/button]
+
+{class="w-32 h-32 self-center"}
+![Logo](image.png)
 ```
 
 ### Key Features:
 
-* **Selectors:** Target elements by ID (`#my-id`), HTML tag name (`h1`, `p`, `button`, `input`, `textarea`, etc.), class name (`.my-class`), or the root container (`:root`).
-* **Non-Cascading:** Styles apply *only* to the targeted element. Child elements do *not* inherit styles and must be targeted explicitly if styling is needed.
-* **No Overrides:** Inline style overrides (`style="..."`) on component calls (`[#component ...]`) are **not** supported. Styling is controlled solely by the `style:` block.
-* **Cross-Platform Compatibility:** Uses a carefully designed subset of CSS properties that can be reliably implemented across web browsers, mobile platforms (React Native), and native UI frameworks (SwiftUI, Flutter, Jetpack Compose).
+* **Tailwind Classes**: Use standard Tailwind CSS classes for styling (`bg-blue-500`, `p-4`, `rounded-lg`, etc.)
+* **Element-Specific**: Styles are applied directly to individual elements, not through CSS selectors
+* **Cross-Platform**: Tailwind classes compile to CSS-in-JS objects compatible with web, React Native, and native UI frameworks
+* **No Selectors**: The system does not support CSS-style selectors (`#id`, `.class`, `element`) - all styling is element-specific
+* **Manual Element IDs**: Use `{#id}` syntax for element identification, but styling is done via `class` attributes
 
-### Supported Properties
+### Complete Styling Example
 
-#### Layout & Box Model
-* **`display`**: `"flex"` | `"none"` (Note: `"block"` removed for cross-platform compatibility)
-* **`width`, `height`**: Numbers (platform units), percentages (`"50%"`), or `"auto"`
-* **`padding`**: Number or percentage (shorthand for uniform padding on all sides)
-* **`padding-top`, `padding-right`, `padding-bottom`, `padding-left`**: Numbers or percentages
-* **`margin-top`, `margin-right`, `margin-bottom`, `margin-left`**: Numbers or percentages
-* **`border`**: Object with `width`, `style`, `color`, `radius` properties
-
-#### Flexbox (when `display: "flex"`)
-* **`flex-direction`**: `"row"` | `"row-reverse"` | `"column"` | `"column-reverse"`
-* **`justify-content`**: `"flex-start"` | `"flex-end"` | `"center"` | `"space-between"` | `"space-around"`
-* **`align-items`**: `"stretch"` | `"flex-start"` | `"flex-end"` | `"center"` | `"baseline"`
-* **`spacing`**: Number (replaces CSS `gap` for better cross-platform support)
-* **`flex-grow`, `flex-shrink`**: Numbers
-* **`flex-basis`**: Number, percentage, or `"auto"`
-* **`flex-wrap`**: `"nowrap"` | `"wrap"`
-
-#### Positioning
-* **`position`**: `"relative"` only (absolute positioning uses `overlay`)
-* **`overlay`**: Object with `anchor` and `offset` for cross-platform absolute positioning
-  ```yaml
-  overlay:
-    anchor: "center"  # "top-left", "top-right", "center", etc.
-    offset:
-      x: 0
-      y: -50
-  ```
-* **`top`, `right`, `bottom`, `left`**: Numbers or percentages (for relative positioning only)
-* **`z-index`**: Integer
-
-#### Typography
-* **`color`**: Hex colors (`#RRGGBB`, `#RRGGBBAA`), RGB/RGBA (`rgb()`, `rgba()`), or `"transparent"`
-* **`font-family`**: String
-* **`font-size`**: Number
-* **`font-weight`**: `"normal"` | `"bold"` | 100-900 (multiples of 100)
-* **`line-height`**: Number (unitless multiplier)
-* **`text-align`**: `"left"` | `"right"` | `"center"` | `"justify"`
-* **`text-decoration`**: `"none"` | `"underline"`
-* **`text-transform`**: `"none"` | `"capitalize"` | `"uppercase"` | `"lowercase"`
-
-#### Background & Effects
-* **`background-color`**: Same color formats as `color`
-* **`elevation`**: Number 0-24 (Material Design elevation for cross-platform shadows)
-* **`opacity`**: Number 0.0-1.0
-* **`overflow`**: `"visible"` | `"hidden"`
-
-### Border Syntax
-
-Borders use a simplified object syntax for cross-platform compatibility:
+See [`div-container.md`](examples/div-container.md) for a comprehensive example:
 
 ```yaml
-border:
-  width: 1           # Border width in platform units
-  style: "solid"     # "solid", "dashed", or "dotted"
-  color: "#e5e7eb"   # Border color
-  radius: 8          # Border radius in platform units
+---
+style: p-4 bg-gray-100  # Root container styling
+"@submit_feedback":
+  kind: 1
+  content: "Thanks for your feedback: {form.message}"
+  tags: []
+---
+
+# Div Container Example
+
+{#card-container}
+[div class="bg-white p-6 rounded-lg shadow-md border"]
+  ## Card Title
+  
+  This is some content inside a styled div container.
+  
+  [div class="bg-yellow-100 p-3 mt-4 rounded border-l-4 border-yellow-500"]
+    **Important note:** Div elements can contain any nested content.
+  [/div]
+  
+  [form @submit_feedback]
+    [input name="message" placeholder="Enter your feedback"]
+    [button class="bg-blue-500 text-white px-4 py-2 rounded mt-2"]Submit[/button]
+  [/form]
+[/div]
 ```
 
-### Color Values
+### Supported Tailwind Classes
 
-Colors support multiple formats for maximum compatibility:
+The system supports a comprehensive subset of Tailwind classes that compile to cross-platform CSS-in-JS properties:
+
+#### Layout & Spacing
+* **Padding**: `p-*`, `px-*`, `py-*`, `pt-*`, `pr-*`, `pb-*`, `pl-*`
+* **Margin**: `m-*`, `mx-*`, `my-*`, `mt-*`, `mr-*`, `mb-*`, `ml-*`
+* **Width/Height**: `w-*`, `h-*`, `min-w-*`, `max-w-*`, `min-h-*`, `max-h-*`
+
+#### Colors
+* **Background**: `bg-*` (e.g., `bg-blue-500`, `bg-gray-100`, `bg-black`)
+* **Text**: `text-*` (e.g., `text-white`, `text-gray-900`, `text-blue-600`)
+* **Border**: `border-*` (e.g., `border-gray-300`, `border-blue-500`)
+
+#### Borders & Radius
+* **Border Width**: `border`, `border-*` (e.g., `border-2`, `border-l-4`)
+* **Border Radius**: `rounded`, `rounded-*` (e.g., `rounded-lg`, `rounded-xl`)
+
+#### Flexbox & Layout
+* **Display**: `flex`, `hidden`
+* **Direction**: `flex-row`, `flex-col`
+* **Alignment**: `items-center`, `items-start`, `justify-center`, `self-center`
+* **Gap**: `gap-*` (e.g., `gap-4`, `gap-8`)
+
+#### Typography
+* **Font Size**: `text-*` (e.g., `text-sm`, `text-lg`, `text-2xl`)
+* **Font Weight**: `font-*` (e.g., `font-normal`, `font-bold`)
+* **Text Alignment**: `text-left`, `text-center`, `text-right`
+
+#### Effects
+* **Shadow**: `shadow`, `shadow-*` (e.g., `shadow-md`, `shadow-lg`)
+* **Opacity**: `opacity-*` (e.g., `opacity-75`, `opacity-50`)
+
+### Dark Theme Example
+
+See [`zap-cloud.md`](examples/zap-cloud.md) for a dark theme implementation:
 
 ```yaml
-# Hex colors (recommended)
-color: "#3b82f6"        # 6-digit hex
-color: "#3b82f6ff"      # 8-digit hex with alpha
+---
+style: bg-black rounded-xl p-4
+---
 
-# RGB/RGBA functions
-color: "rgb(59, 130, 246)"
-color: "rgba(59, 130, 246, 0.8)"
+{class="w-32 h-32 self-center"}
+![Logo](logo.png)
 
-# Named colors (limited set)
-color: "transparent"
+[div class="items-center"]
+# App Title
+## Subtitle
+[/div]
+
+[div class="rounded-xl p-2 bg-gray-800"]
+Feature list content
+[/div]
+
+[div class="gap-4"]
+  [button class="bg-blue-500"]Primary Action[/button]
+  [button class="bg-purple-500"]Secondary Action[/button]
+[/div]
+```
+
+### Compilation to CSS-in-JS
+
+Tailwind classes are compiled to camelCase CSS-in-JS properties for cross-platform compatibility:
+
+```yaml
+# HNMD Input
+style: bg-black rounded-xl p-4
+[button class="bg-blue-500 text-white px-4 py-2 rounded"]Submit[/button]
+
+# Compiled JSON Output
+{
+  "style": {
+    "backgroundColor": "rgb(0,0,0)",
+    "borderRadius": "0.75rem", 
+    "padding": "1rem"
+  },
+  "elements": [{
+    "type": "button",
+    "style": {
+      "backgroundColor": "rgb(59,130,246)",
+      "color": "rgb(255,255,255)",
+      "paddingLeft": "1rem",
+      "paddingRight": "1rem",
+      "paddingTop": "0.5rem",
+      "paddingBottom": "0.5rem",
+      "borderRadius": "0.25rem"
+    }
+  }]
+}
 ```
 
 ### Cross-Platform Notes
 
-* **Elevation vs Box Shadow**: Use `elevation` instead of `box-shadow` for consistent shadow rendering across platforms
-* **Spacing vs Gap**: Use `spacing` instead of CSS `gap` for flexbox spacing
-* **Overlay vs Absolute**: Use `overlay` instead of `position: absolute` for cross-platform absolute positioning
-* **Border Object**: Borders use a single object instead of individual `border-*` properties for better platform support
-* **Padding Shorthand**: Use `padding: 16` as a shorthand for uniform padding on all sides, equivalent to setting `padding-top`, `padding-right`, `padding-bottom`, and `padding-left` to the same value
+* **CSS-in-JS Output**: All styles compile to CSS-in-JS objects with camelCase properties
+* **Color Values**: Tailwind color names compile to RGB values for maximum compatibility
+* **Spacing Units**: Tailwind spacing compiles to `rem` units for web and equivalent values for native platforms
+* **Box Shadows**: Tailwind shadow classes compile to platform-appropriate shadow properties
+* **Flexbox**: Tailwind flex utilities compile to cross-platform flexbox properties
 
 ## Error Handling
 
