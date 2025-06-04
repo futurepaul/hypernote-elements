@@ -1,4 +1,5 @@
 import "./index.css";
+import "../styles/hypernote-base.css";
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { 

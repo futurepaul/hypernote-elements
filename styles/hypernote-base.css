@@ -1,0 +1,228 @@
+/* Hypernote Base Styles
+ * Modern, cross-platform compatible styles for Hypernote elements
+ * Uses flexbox for layout compatibility across web and native
+ */
+
+/* Root container styles */
+.hypernote-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.6;
+  color: rgb(15, 23, 42); /* slate-900 */
+}
+
+/* Typography Elements */
+.hypernote-content h1 {
+  display: flex;
+  flex-direction: column;
+  font-size: 2.25rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  margin: 0;
+  color: inherit;
+}
+
+.hypernote-content h2 {
+  display: flex;
+  flex-direction: column;
+  font-size: 1.875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+  margin: 0;
+  color: inherit;
+}
+
+.hypernote-content h3 {
+  display: flex;
+  flex-direction: column;
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0;
+  color: inherit;
+}
+
+.hypernote-content p {
+  display: flex;
+  flex-direction: column;
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 0;
+  color: inherit;
+}
+
+/* Layout Elements */
+.hypernote-content div {
+  display: flex;
+  flex-direction: column;
+}
+
+.hypernote-content span {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.hypernote-content form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Interactive Elements */
+.hypernote-content button {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  padding: 0.875rem 1.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1;
+  border-radius: 0.5rem;
+  border: none;
+  background-color: rgb(59, 130, 246); /* blue-500 */
+  color: rgb(255, 255, 255);
+  cursor: pointer;
+  gap: 0.5rem;
+  transition: all 0.15s ease;
+  min-height: 44px;
+  text-align: center;
+}
+
+.hypernote-content button:hover {
+  background-color: rgb(37, 99, 235); /* blue-600 */
+  transform: translateY(-1px);
+}
+
+.hypernote-content button:focus {
+  outline: 2px solid rgb(59, 130, 246);
+  outline-offset: 2px;
+}
+
+.hypernote-content button:active {
+  transform: translateY(0);
+}
+
+.hypernote-content input {
+  display: flex;
+  padding: 0.875rem 1rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(203, 213, 225); /* slate-300 */
+  background-color: rgb(255, 255, 255);
+  color: rgb(15, 23, 42); /* slate-900 */
+  min-height: 44px;
+  transition: border-color 0.15s ease;
+}
+
+.hypernote-content input:hover {
+  border-color: rgb(156, 163, 175); /* gray-400 */
+}
+
+.hypernote-content input:focus {
+  border-color: rgb(59, 130, 246); /* blue-500 */
+  outline: 2px solid rgba(59, 130, 246, 0.2);
+  outline-offset: 0px;
+}
+
+.hypernote-content img {
+  display: flex;
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.375rem; /* Default rounded corners */
+  object-fit: cover;
+}
+
+/* Dark Theme */
+.hypernote-content.hypernote-dark {
+  color: rgb(248, 250, 252); /* slate-50 */
+}
+
+.hypernote-content.hypernote-dark h1,
+.hypernote-content.hypernote-dark h2,
+.hypernote-content.hypernote-dark h3 {
+  color: rgb(248, 250, 252); /* slate-50 */
+}
+
+.hypernote-content.hypernote-dark p {
+  color: rgb(203, 213, 225); /* slate-300 */
+}
+
+.hypernote-content.hypernote-dark input {
+  background-color: rgb(30, 41, 59); /* slate-800 */
+  border-color: rgb(71, 85, 105); /* slate-600 */
+  color: rgb(248, 250, 252); /* slate-50 */
+}
+
+.hypernote-content.hypernote-dark input:hover {
+  border-color: rgb(100, 116, 139); /* slate-500 */
+}
+
+.hypernote-content.hypernote-dark input:focus {
+  border-color: rgb(59, 130, 246); /* blue-500 */
+  outline: 2px solid rgba(59, 130, 246, 0.3);
+}
+
+.hypernote-content.hypernote-dark input::placeholder {
+  color: rgb(148, 163, 184); /* slate-400 */
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+  .hypernote-content {
+    gap: 0.75rem;
+  }
+  
+  .hypernote-content h1 {
+    font-size: 1.875rem;
+  }
+  
+  .hypernote-content h2 {
+    font-size: 1.5rem;
+  }
+  
+  .hypernote-content h3 {
+    font-size: 1.25rem;
+  }
+  
+  .hypernote-content button {
+    padding: 0.75rem 1.5rem;
+    font-size: 0.875rem;
+  }
+}
+
+/* Utility Classes for Common Patterns */
+.hypernote-content .flex-row {
+  flex-direction: row !important;
+}
+
+.hypernote-content .flex-col {
+  flex-direction: column !important;
+}
+
+.hypernote-content .items-center {
+  align-items: center !important;
+}
+
+.hypernote-content .justify-center {
+  justify-content: center !important;
+}
+
+.hypernote-content .gap-2 {
+  gap: 0.5rem !important;
+}
+
+.hypernote-content .gap-4 {
+  gap: 1rem !important;
+}
+
+.hypernote-content .gap-6 {
+  gap: 1.5rem !important;
+} 

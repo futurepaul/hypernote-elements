@@ -1,0 +1,41 @@
+{
+  "version": "1.1.0",
+  "component_kind": null,
+  "elements": [
+    {
+      "type": "h1",
+      "content": [
+        "Image Test"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "Basic image:"
+      ]
+    },
+    {
+      "type": "img",
+      "attributes": {
+        "alt": "Logo",
+        "src": "https://via.placeholder.com/200x100"
+      }
+    },
+    {
+      "type": "p",
+      "content": [
+        "Styled image:"
+      ]
+    },
+    {
+      "type": "img",
+      "style": {
+        "borderRadius": "9999px"
+      },
+      "attributes": {
+        "alt": "Avatar",
+        "src": "https://via.placeholder.com/100x100"
+      }
+    }
+  ]
+} 

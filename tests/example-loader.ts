@@ -5,12 +5,16 @@ import basicHelloMd from "../examples/basic-hello.md";
 import formWithInputMd from "../examples/form-with-input.md";
 import queryAndLoopMd from "../examples/query-and-loop.md";
 import divContainerMd from "../examples/div-container.md";
+import zapCloudMd from "../examples/zap-cloud.md";
+import imageTestMd from "../examples/image-test.md";
 
 // Import all JSON examples directly using Bun's built-in JSON loader
 import basicHelloJson from "../examples/basic-hello.json";
 import formWithInputJson from "../examples/form-with-input.json";
 import queryAndLoopJson from "../examples/query-and-loop.json";
 import divContainerJson from "../examples/div-container.json";
+import zapCloudJson from "../examples/zap-cloud.json";
+import imageTestJson from "../examples/image-test.json";
 
 // Map of example names to their imported content
 const EXAMPLE_MAP = {
@@ -18,6 +22,8 @@ const EXAMPLE_MAP = {
   "form-with-input": { markdown: formWithInputMd, json: formWithInputJson },
   "query-and-loop": { markdown: queryAndLoopMd, json: queryAndLoopJson },
   "div-container": { markdown: divContainerMd, json: divContainerJson },
+  "zap-cloud": { markdown: zapCloudMd, json: zapCloudJson },
+  "image-test": { markdown: imageTestMd, json: imageTestJson },
 } as const;
 
 export interface ExampleData {
@@ -58,6 +64,8 @@ export const AVAILABLE_EXAMPLES = [
   "form-with-input",
   "query-and-loop",
   "div-container",
+  "zap-cloud",
+  "image-test",
 ] as const;
 
 export type ExampleName = typeof AVAILABLE_EXAMPLES[number]; 

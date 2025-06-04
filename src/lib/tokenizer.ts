@@ -16,6 +16,8 @@ export enum TokenType {
   ELEMENT_END,
   ATTRIBUTE,
   ID_MARKER,
+  STYLE_MARKER,
+  IMAGE,
   NEWLINE,
   EACH_START,
   EACH_END,
@@ -96,6 +98,30 @@ export function tokenize(content: string): Token[] {
       continue;
     }
     
+    // Handle style marker (e.g., {class="rounded-lg"})
+    if (char === '{' && content.slice(pos, pos + 6) === '{class') {
+      pos++; // Skip '{'
+      let styleContent = '';
+      
+      // Capture the entire {class="..."} content
+      while (pos < content.length && content[pos] !== '}') {
+        styleContent += content[pos];
+        pos++;
+      }
+      pos++; // Skip '}'
+      
+      // Parse class="value" to extract the class value
+      const classMatch = styleContent.match(/class="([^"]+)"/);
+      if (classMatch && classMatch[1]) {
+        tokens.push({ 
+          type: TokenType.STYLE_MARKER, 
+          value: classMatch[1],
+          attributes: { class: classMatch[1] }
+        });
+      }
+      continue;
+    }
+    
     // Handle variable reference (e.g., {$variable})
     if (char === '{' && content[pos + 1] === '$') {
       let variableName = '{';
@@ -112,6 +138,47 @@ export function tokenize(content: string): Token[] {
         value: variableName
       });
       continue;
+    }
+    
+    // Handle image syntax (e.g., ![alt text](src))
+    if (char === '!' && content[pos + 1] === '[') {
+      pos += 2; // Skip '!['
+      
+      let altText = '';
+      while (pos < content.length && content[pos] !== ']') {
+        altText += content[pos];
+        pos++;
+      }
+      
+      if (content[pos] === ']') pos++; // Skip ']'
+      
+      // Expect opening parenthesis for src
+      if (content[pos] === '(') {
+        pos++; // Skip '('
+        
+        let src = '';
+        while (pos < content.length && content[pos] !== ')') {
+          src += content[pos];
+          pos++;
+        }
+        
+        if (content[pos] === ')') pos++; // Skip ')'
+        
+        tokens.push({ 
+          type: TokenType.IMAGE, 
+          value: src,
+          attributes: { alt: altText, src: src }
+        });
+        continue;
+      } else {
+        // Invalid image syntax, treat as text
+        pos -= (2 + altText.length + 1); // Go back to start
+        let text = '';
+        text += content[pos];
+        pos++;
+        tokens.push({ type: TokenType.TEXT, value: text });
+        continue;
+      }
     }
     
     // Handle form or element start (e.g., [form @event])
@@ -422,7 +489,8 @@ export function tokenize(content: string): Token[] {
            content[pos] !== '\n' && 
            content[pos] !== '#' && 
            content[pos] !== '[' && 
-           content[pos] !== '{') {
+           content[pos] !== '{' &&
+           !(content[pos] === '!' && content[pos + 1] === '[')) {
       text += content[pos];
       pos++;
     }
@@ -450,6 +518,7 @@ export function parseTokens(tokens: Token[]): any[] {
   const elements: any[] = [];
   let currentIndex = 0;
   let currentId: string | null = null;
+  let currentStyle: string | null = null;
 
   // Simple paragraph buffer for collecting inline content
   let inlineBuffer: any[] = [];
@@ -469,6 +538,10 @@ export function parseTokens(tokens: Token[]): any[] {
         if (currentId) {
           paragraph['elementId'] = currentId;
           currentId = null;
+        }
+        if (currentStyle) {
+          paragraph['attributes'] = { class: currentStyle };
+          currentStyle = null;
         }
         elements.push(paragraph);
       }
@@ -568,6 +641,18 @@ export function parseTokens(tokens: Token[]): any[] {
         continue;
       }
       
+      // Handle image elements
+      if (t.type === TokenType.IMAGE) {
+        flushContainerParagraph();
+        const imageElement = {
+          type: 'img',
+          attributes: { ...t.attributes }
+        };
+        containerElements.push(imageElement);
+        currentIndex++;
+        continue;
+      }
+      
       // Handle loops
       if (t.type === TokenType.EACH_START) {
         flushContainerParagraph();
@@ -639,6 +724,14 @@ export function parseTokens(tokens: Token[]): any[] {
       continue;
     }
 
+    // Handle style marker - applies to the next element
+    if (token.type === TokenType.STYLE_MARKER) {
+      flushParagraph(); // Flush any pending paragraph before applying style
+      currentStyle = token.value;
+      currentIndex++;
+      continue;
+    }
+
     // Block-level elements: flush paragraph before handling
     if (
       token.type === TokenType.HEADING ||
@@ -646,7 +739,8 @@ export function parseTokens(tokens: Token[]): any[] {
       token.type === TokenType.DIV_START ||
       token.type === TokenType.BUTTON_START ||
       token.type === TokenType.SPAN_START ||
-      token.type === TokenType.EACH_START
+      token.type === TokenType.EACH_START ||
+      token.type === TokenType.IMAGE
     ) {
       flushParagraph();
     }
@@ -661,6 +755,10 @@ export function parseTokens(tokens: Token[]): any[] {
         heading['elementId'] = currentId;
         currentId = null;
       }
+      if (currentStyle) {
+        heading['attributes'] = { class: currentStyle };
+        currentStyle = null;
+      }
       elements.push(heading);
       currentIndex++;
       continue;
@@ -673,6 +771,13 @@ export function parseTokens(tokens: Token[]): any[] {
         formElement.elementId = currentId;
         currentId = null;
       }
+      if (currentStyle) {
+        if (!formElement.attributes) {
+          formElement.attributes = {};
+        }
+        formElement.attributes.class = currentStyle;
+        currentStyle = null;
+      }
       elements.push(formElement);
       continue;
     }
@@ -682,6 +787,13 @@ export function parseTokens(tokens: Token[]): any[] {
       if (currentId) {
         divElement.elementId = currentId;
         currentId = null;
+      }
+      if (currentStyle) {
+        if (!divElement.attributes) {
+          divElement.attributes = {};
+        }
+        divElement.attributes.class = currentStyle;
+        currentStyle = null;
       }
       elements.push(divElement);
       continue;
@@ -693,6 +805,13 @@ export function parseTokens(tokens: Token[]): any[] {
         buttonElement.elementId = currentId;
         currentId = null;
       }
+      if (currentStyle) {
+        if (!buttonElement.attributes) {
+          buttonElement.attributes = {};
+        }
+        buttonElement.attributes.class = currentStyle;
+        currentStyle = null;
+      }
       elements.push(buttonElement);
       continue;
     }
@@ -703,6 +822,13 @@ export function parseTokens(tokens: Token[]): any[] {
         spanElement.elementId = currentId;
         currentId = null;
       }
+      if (currentStyle) {
+        if (!spanElement.attributes) {
+          spanElement.attributes = {};
+        }
+        spanElement.attributes.class = currentStyle;
+        currentStyle = null;
+      }
       elements.push(spanElement);
       continue;
     }
@@ -712,6 +838,13 @@ export function parseTokens(tokens: Token[]): any[] {
       if (currentId) {
         loopElement.elementId = currentId;
         currentId = null;
+      }
+      if (currentStyle) {
+        if (!loopElement.attributes) {
+          loopElement.attributes = {};
+        }
+        loopElement.attributes.class = currentStyle;
+        currentStyle = null;
       }
       elements.push(loopElement);
       continue;
@@ -735,7 +868,34 @@ export function parseTokens(tokens: Token[]): any[] {
         element['elementId'] = currentId;
         currentId = null;
       }
+      if (currentStyle) {
+        if (!element.attributes) {
+          element.attributes = {};
+        }
+        element.attributes.class = currentStyle;
+        currentStyle = null;
+      }
       elements.push(element);
+      currentIndex++;
+      continue;
+    }
+
+    // Handle image elements
+    if (token.type === TokenType.IMAGE) {
+      flushParagraph();
+      const imageElement = {
+        type: 'img',
+        attributes: { ...token.attributes }
+      };
+      if (currentId) {
+        imageElement['elementId'] = currentId;
+        currentId = null;
+      }
+      if (currentStyle) {
+        imageElement.attributes.class = currentStyle;
+        currentStyle = null;
+      }
+      elements.push(imageElement);
       currentIndex++;
       continue;
     }

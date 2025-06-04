@@ -11,7 +11,8 @@
     "build": "bun run build.ts",
     "seed": "bun run src/utils/seed.ts",
     "test:seed": "bun run src/utils/seed.ts && bun test tests/seed.test.ts",
-    "query": "bun run src/utils/query-test.ts"
+    "query": "bun run src/utils/query-test.ts",
+    "update-examples": "bun scripts/update-example-json.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.0",

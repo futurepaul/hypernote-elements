@@ -44,7 +44,7 @@ const fontWeightValue = z.union([
  */
 export const StylePropertiesSchema = z.object({
   // Layout & Display
-  display: z.enum(["none", "flex", "block", "inline", "inline-block", "inline-flex"]).optional(),
+  display: z.enum(["none", "flex"]).optional(),
   position: z.enum(["static", "relative", "absolute", "fixed", "sticky"]).optional(),
   overflow: z.enum(["visible", "hidden", "scroll", "auto"]).optional(),
   

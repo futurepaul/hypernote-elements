@@ -214,24 +214,41 @@ function ElementRenderer({
     case 'h2':
     case 'h3':
     case 'p':
+      // Handle content arrays by joining with newlines for proper display
+      const textContent = element.content?.map((item) => 
+        typeof item === 'string' 
+          ? processContent(item)
+          : null // We'll handle nested elements separately
+      ).filter(Boolean).join('\n');
+      
+      // Handle nested elements
+      const nestedElements = element.content?.filter(item => typeof item !== 'string');
+      
       return React.createElement(
         element.type,
-        { id: element.elementId, style: elementStyles as React.CSSProperties },
-        element.content?.map((item, idx) => 
-          typeof item === 'string' 
-            ? processContent(item)
-            : <ElementRenderer 
-                key={idx}
-                element={item as HypernoteElement}
-                relayHandler={relayHandler}
-                formData={formData}
-                setFormData={setFormData}
-                events={events}
-                queries={queries}
-                userContext={userContext}
-                loopVariables={loopVariables}
-              />
-        )
+        { 
+          id: element.elementId, 
+          style: { 
+            whiteSpace: 'pre-line', // Preserve line breaks
+            ...elementStyles 
+          } 
+        },
+        [
+          textContent,
+          ...(nestedElements?.map((item, idx) => (
+            <ElementRenderer 
+              key={`nested-${idx}`}
+              element={item as HypernoteElement}
+              relayHandler={relayHandler}
+              formData={formData}
+              setFormData={setFormData}
+              events={events}
+              queries={queries}
+              userContext={userContext}
+              loopVariables={loopVariables}
+            />
+          )) || [])
+        ].filter(Boolean)
       );
       
     case 'form':
@@ -239,7 +256,7 @@ function ElementRenderer({
         <form 
           id={element.elementId} 
           onSubmit={(e) => handleFormSubmit(e, element.event)}
-          style={elementStyles as React.CSSProperties}
+          style={elementStyles}
         >
           {element.elements && element.elements.map((child, index) => (
             <ElementRenderer 
@@ -262,7 +279,7 @@ function ElementRenderer({
         <button 
           id={element.elementId} 
           type="submit"
-          style={elementStyles as React.CSSProperties}
+          style={elementStyles}
         >
           {element.elements && element.elements.map((child, index) => (
             <ElementRenderer 
@@ -284,7 +301,7 @@ function ElementRenderer({
       return (
         <span 
           id={element.elementId} 
-          style={elementStyles as React.CSSProperties}
+          style={elementStyles}
         >
           {element.elements && element.elements.map((child, index) => (
             <ElementRenderer 
@@ -306,7 +323,7 @@ function ElementRenderer({
       return (
         <div 
           id={element.elementId} 
-          style={elementStyles as React.CSSProperties}
+          style={elementStyles}
         >
           {element.elements && element.elements.map((child, index) => (
             <ElementRenderer 
@@ -333,7 +350,17 @@ function ElementRenderer({
           placeholder={element.attributes?.placeholder || ''}
           value={formData[name] || ''}
           onChange={(e) => handleInputChange(e, name)}
-          style={elementStyles as React.CSSProperties}
+          style={elementStyles}
+        />
+      );
+      
+    case 'img':
+      return (
+        <img
+          id={element.elementId}
+          src={element.attributes?.src || ''}
+          alt={element.attributes?.alt || ''}
+          style={elementStyles}
         />
       );
       
@@ -355,7 +382,7 @@ function ElementRenderer({
       
       // Render the loop elements for each item in the data
       return (
-        <div id={element.elementId} style={elementStyles as React.CSSProperties}>
+        <div id={element.elementId} style={elementStyles}>
           {sourceData.length === 0 ? (
             <div>No data found</div>
           ) : (
@@ -396,7 +423,7 @@ function ElementRenderer({
       
     default:
       return (
-        <div id={element.elementId} style={elementStyles as React.CSSProperties}>
+        <div id={element.elementId} style={elementStyles}>
           {element.content?.map((item, idx) => 
             typeof item === 'string' 
               ? processContent(item)
@@ -469,9 +496,18 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
   // Get the root-level styles from the hypernote
   const rootStyles = content.style || {};
   
+  // Determine theme class based on background color or explicit class
+  let themeClass = '';
+  if (rootStyles.backgroundColor === 'rgb(0,0,0)' || rootStyles.backgroundColor === '#000000' || rootStyles.backgroundColor === 'black') {
+    themeClass = 'hypernote-dark';
+  }
+  
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="hypernote-content" style={rootStyles as React.CSSProperties}>
+      <div 
+        className={`hypernote-content ${themeClass}`.trim()} 
+        style={rootStyles as React.CSSProperties}
+      >
         {content.elements.map((element, index) => (
           <ElementRenderer
             key={index}
