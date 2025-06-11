@@ -56,7 +56,7 @@ test("should parse H1 with ID and apply a simple style rule", () => {
 });
 
 test("should parse form with input and use form variable in event template", () => {
-  const example = loadExample("form-with-input");
+  const example = loadExample("feed");
   const result = compileHypernoteToContent(example.markdown);
   
   // Check event template
@@ -81,7 +81,7 @@ test("should parse form with input and use form variable in event template", () 
 });
 
 test("should parse query in frontmatter and loop in content", () => {
-  const example = loadExample("query-and-loop");
+  const example = loadExample("feed");
   const result = compileHypernoteToContent(example.markdown);
   
   // Check the query in frontmatter
@@ -97,9 +97,9 @@ test("should parse query in frontmatter and loop in content", () => {
     throw new Error("Expected simple query with authors and limit");
   }
   
-  // Check the loop structure
+  // Check the loop structure - it's the 3rd element (after h1 and form)
   expect(result.elements).toBeArray();
-  const loopElement = result.elements[0] as LoopElement;
+  const loopElement = result.elements[2] as LoopElement;
   expect(loopElement.type).toBe("loop");
   expect(loopElement.source).toBe("$my_feed");
   expect(loopElement.variable).toBe("$note");

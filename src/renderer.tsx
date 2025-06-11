@@ -364,6 +364,60 @@ function ElementRenderer({
         />
       );
       
+    case 'json':
+      // Get the variable path from attributes (e.g., "$note" or "$note.content")
+      const variablePath = element.attributes?.variable || '$data';
+      
+      // Parse the variable path to handle dot notation
+      let actualData: any;
+      let displayVariableName = variablePath;
+      
+      if (variablePath.includes('.')) {
+        // Handle dot notation like "$note.content"
+        const [varName, ...propertyPath] = variablePath.split('.');
+        const baseData = loopVariables[varName];
+        
+        if (baseData !== undefined) {
+          // Navigate the property path
+          actualData = propertyPath.reduce((obj, prop) => obj?.[prop], baseData);
+        }
+      } else {
+        // Simple variable reference like "$note"
+        actualData = loopVariables[variablePath];
+      }
+      
+      // Pretty-print the JSON
+      let displayContent: string;
+      
+      if (actualData !== undefined) {
+        try {
+          // Stringify the actual data with pretty formatting
+          displayContent = JSON.stringify(actualData, null, 2);
+        } catch (e) {
+          // If stringify fails, convert to string
+          displayContent = String(actualData);
+        }
+      } else {
+        // If no data found, show a helpful message
+        displayContent = `No data found for variable: ${variablePath}`;
+      }
+      
+      return (
+        <details 
+          id={element.elementId} 
+          className="bg-gray-100 rounded border border-gray-300 p-1 flex flex-col"
+          style={elementStyles}
+          open={element.attributes?.open === 'true'}
+        >
+          <summary className="bg-gray-300 self-start rounded p-1 cursor-pointer">
+            {displayVariableName}
+          </summary>
+          <pre className="whitespace-pre-wrap text-sm overflow-auto">
+            {displayContent}
+          </pre>
+        </details>
+      );
+      
     case 'loop':
       if (isLoading) {
         console.log(`Loop data for ${element.source} is still loading...`);

@@ -419,6 +419,33 @@ export function tokenize(content: string): Token[] {
           attributes: { source, variable }
         });
         continue;
+      } else if (elementType === 'json') {
+        // Handle [json $variable] or [json $variable.property] syntax
+        let attributes: Record<string, string> = {};
+        
+        // Skip whitespace
+        if (content[pos] === ' ') pos++;
+        
+        // Get the variable parameter (including dot notation)
+        let variable = '';
+        while (pos < content.length && content[pos] !== ']' && content[pos] !== ' ') {
+          variable += content[pos];
+          pos++;
+        }
+        
+        if (variable) {
+          // Store the full variable path as the variable attribute
+          attributes['variable'] = variable;
+        }
+        
+        if (content[pos] === ']') pos++; // Skip ']'
+        
+        tokens.push({ 
+          type: TokenType.ELEMENT_START, 
+          value: elementType,
+          attributes
+        });
+        continue;
       } else {
         // Handle other elements (e.g., [button "Text"])
         let attributes: Record<string, string> = {};

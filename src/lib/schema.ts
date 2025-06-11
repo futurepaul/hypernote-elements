@@ -59,10 +59,11 @@ const SupportedElementType = z.union([
   // Hypernote additions
   z.literal("input"),
   z.literal("textarea"),
+  z.literal("json"), // For JSON data display
 ], {
   error: (issue) => {
     if (issue.code === "invalid_union") {
-      return `Unsupported element type "${issue.input}". Supported types are: h1, h2, h3, h4, h5, h6, p, br, em, strong, blockquote, ul, ol, li, code, pre, hr, a, img, input, textarea (form, div, button, span have separate schemas)`;
+      return `Unsupported element type "${issue.input}". Supported types are: h1, h2, h3, h4, h5, h6, p, br, em, strong, blockquote, ul, ol, li, code, pre, hr, a, img, input, textarea, json (form, div, button, span have separate schemas)`;
     }
     return undefined; // defer to default
   }

@@ -558,3 +558,22 @@ Hypernote implementations should prioritize clear and precise error reporting. W
 3.  **Be Precise:** Indicate the exact location (file, line number, component, query, template section) where the error occurred.
 
 This approach aids developers in debugging Hypernotes effectively.
+
+## Upcoming Features
+
+The Hypernote specification and reference implementation continue to evolve. Major features in development include:
+
+### JSON Element Type
+A new `json` element type for rendering JSON data with syntax highlighting, particularly useful for debugging Nostr events and exploring new event types.
+
+### Nostr Publishing
+Hypernotes will be publishable as Nostr events, enabling true decentralized distribution and component sharing across the network.
+
+### Enhanced Query Pipelines
+The query language will support multi-stage data transformation pipelines with jq-like operations for complex data manipulation and aggregation.
+
+### Lightning Integration
+Built-in support for Lightning Network payments ("zaps") will enable monetization and tipping directly within Hypernote interfaces.
+
+### Native UI Components
+Host applications will be able to provide native UI overrides for common Nostr elements (profiles, notes, avatars) while maintaining fallback compatibility.

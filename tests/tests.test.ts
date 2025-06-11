@@ -41,7 +41,7 @@ test("should parse frontmatter with styles", () => {
 });
 
 test("should parse frontmatter with event using variable", () => {
-  const example = loadExample("form-with-input");
+  const example = loadExample("feed");
   const result = compileHypernoteToContent(example.markdown);
   
   expect(result.version).toBe("1.1.0");
@@ -72,7 +72,7 @@ test("should parse H1 with ID and apply a simple style rule", () => {
 });
 
 test("should parse form with input and use form variable in event template", () => {
-  const example = loadExample("form-with-input");
+  const example = loadExample("feed");
   const result = compileHypernoteToContent(example.markdown);
   
   expect(result).toEqual(example.expectedJson);

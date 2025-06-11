@@ -58,6 +58,22 @@ This project implements the Hypernote protocol - a declarative system for creati
 ### Build Tools
 - [scripts/md-loader.ts](mdc:scripts/md-loader.ts) - **Custom Bun plugin** that allows importing `.md` files directly into TypeScript/JavaScript as string modules
 
+### Example Management
+- [scripts/update-example-json.ts](mdc:scripts/update-example-json.ts) - **Example JSON updater** that automatically compiles HNMD examples to JSON
+- Usage: `bun run update-examples <example-name>` or `bun run update-examples all`
+- Automatically discovers all `.md` files in examples/ directory
+- Ensures JSON output always matches compiled HNMD source
+- Use `bun run update-examples --list` to see available examples
+
+### Testing Infrastructure
+- [tests/example-loader.ts](mdc:tests/example-loader.ts) - **Example loader utility** for test suite
+- Automatically imports all examples as modules (no filesystem operations during tests)
+- Must be manually updated when adding/removing examples from [examples/](mdc:examples) directory
+- Provides `loadExample()`, `loadExamples()`, and `AVAILABLE_EXAMPLES` exports
+- **IMPORTANT**: When adding new examples, update both the imports and `EXAMPLE_MAP`
+- **Test Philosophy**: Tests should focus on input/output behavior, not be tightly coupled to specific example details
+- **Prefer comprehensive examples**: Use examples that demonstrate multiple features (like "feed") over single-purpose examples
+
 ### Debugging
 - **Debug Mode**: Set `HYPERNOTE_DEBUG=true` environment variable for verbose logging
   - Shows detailed parsing steps
@@ -80,15 +96,19 @@ This project implements the Hypernote protocol - a declarative system for creati
 1. **Spec Changes**: Update [README.md](mdc:README.md) or [OUTPUT.md](mdc:OUTPUT.md) first
 2. **Implementation**: Update schemas, compiler, tokenizer to match spec
 3. **Examples**: Add/update examples in [examples/](mdc:examples) folder - **only use implemented features**
-4. **Tests**: Ensure tests pass and cover new functionality using `bun test`
-5. **Debugging**: Use `HYPERNOTE_DEBUG=true` for detailed logging when issues arise
-6. **Frontend**: Update renderer if new element types are added
+4. **Update JSON**: Use `bun run update-examples <example-name>` or `bun run update-examples all` to regenerate JSON output
+5. **Update Tests**: When adding/removing examples, update [tests/example-loader.ts](mdc:tests/example-loader.ts) imports and `EXAMPLE_MAP`
+6. **Run Tests**: **ALWAYS run `bun test` after example changes** - tests depend on examples for validation
+7. **Fix Test Failures**: Update test expectations if examples change functionality (prefer comprehensive examples over specific ones)
+8. **Debugging**: Use `HYPERNOTE_DEBUG=true` for detailed logging when issues arise
+9. **Frontend**: Update renderer if new element types are added
 
 ## Development Best Practices
 
 - **Use Bun for everything**: `bun run`, `bun test`, `bun -e`, never `node` or `npm`
 - **Debug Mode**: Always use `HYPERNOTE_DEBUG=true` when debugging parsing issues
 - **Examples**: Only include examples that demonstrate fully implemented features
+- **Testing**: **ALWAYS run `bun test` after example changes** - tests depend on examples
 - **Security**: All user-provided styles go through validated CSS-in-JS objects, never raw CSS
 - **Schema-First**: Update schemas before implementing new features
 

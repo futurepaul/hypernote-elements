@@ -353,3 +353,33 @@ The styling system supports a validated subset of CSS-in-JS properties designed 
     3.  Parse the component's JSON structure.
     4.  Render the component, providing the `argument` and establishing the correct `target` context within the component's scope.
 * **Error Handling:** Follow the principles outlined in the main README: fail explicitly, be verbose, be precise.
+
+## Future Extensions
+
+The Hypernote JSON specification is designed to accommodate planned features while maintaining backwards compatibility:
+
+### JSON Element Type
+A new `json` element type will enable syntax-highlighted rendering of JSON data, supporting both static JSON content and dynamic query results for debugging and data exploration.
+
+```json
+{
+  "type": "json",
+  "content": "{$query_result}", // Variable containing JSON data
+  "attributes": {
+    "collapsible": true,        // Optional: Enable collapse/expand
+    "maxDepth": 3              // Optional: Limit initial expansion depth
+  }
+}
+```
+
+### Publishing & Component Resolution
+Future versions will include enhanced metadata for Nostr event publishing and standardized component resolution mechanisms via Nostr identifiers.
+
+### Query Pipeline Extensions  
+The `queries` structure will expand to support multi-stage transformation pipelines with `extract`, `sort`, `filter`, and other jq-like operations.
+
+### Lightning Payment Integration
+New element types for Lightning Network payments ("zaps") will enable direct monetization within Hypernote interfaces.
+
+### Native UI Fallbacks
+The specification will include optional mechanisms for host applications to provide native UI overrides while maintaining cross-platform compatibility.

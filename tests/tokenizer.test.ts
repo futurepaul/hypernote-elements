@@ -117,31 +117,56 @@ test("should handle variable reference within text content", () => {
 });
 
 // Test with real examples
-test("should correctly tokenize and parse query-and-loop example", () => {
-  const example = loadExample("query-and-loop");
+test("should correctly tokenize and parse feed example query and loop", () => {
+  const example = loadExample("feed");
   const content = example.markdown.split('---')[2].trim(); // Get content after frontmatter
   
   const tokens = tokenize(content);
   const elements = parseTokens(tokens);
   
-  expect(elements.length).toBe(1);
-  expect(elements[0].type).toBe("loop");
-  expect(elements[0].source).toBe("$my_feed");
-  expect(elements[0].variable).toBe("$note");
-  expect(elements[0].elements?.length).toBe(1);
-  expect(elements[0].elements?.[0].type).toBe("p");
+  expect(elements.length).toBe(3); // h1, form, loop
+  expect(elements[2].type).toBe("loop");
+  expect(elements[2].source).toBe("$my_feed");
+  expect(elements[2].variable).toBe("$note");
+  expect(elements[2].elements?.length).toBe(4); // paragraph + 3 json elements
+  expect(elements[2].elements?.[0].type).toBe("p");
+  expect(elements[2].elements?.[1].type).toBe("json");
+  expect(elements[2].elements?.[2].type).toBe("json");
+  expect(elements[2].elements?.[3].type).toBe("json");
 });
 
-test("should correctly tokenize and parse form-with-input example", () => {
-  const example = loadExample("form-with-input");
+test("should correctly tokenize and parse feed example form", () => {
+  const example = loadExample("feed");
   const content = example.markdown.split('---')[2].trim(); // Get content after frontmatter
   
   const tokens = tokenize(content);
   const elements = parseTokens(tokens);
   
-  expect(elements.length).toBe(2); // heading + form
+  expect(elements.length).toBe(3); // heading + form + loop
   expect(elements[0].type).toBe("h1");
   expect(elements[1].type).toBe("form");
   expect(elements[1].event).toBe("@post_message");
   expect(elements[1].elements?.length).toBe(2); // input + button
+});
+
+test("should correctly tokenize json element with variable parameter", () => {
+  const testContent = '[json $note]';
+  const tokens = tokenize(testContent);
+  const elements = parseTokens(tokens);
+  
+  expect(elements.length).toBe(1);
+  expect(elements[0].type).toBe("json");
+  expect(elements[0].attributes).toBeDefined();
+  expect(elements[0].attributes.variable).toBe("$note");
+});
+
+test("should correctly tokenize json element with dot notation", () => {
+  const testContent = '[json $note.content]';
+  const tokens = tokenize(testContent);
+  const elements = parseTokens(tokens);
+  
+  expect(elements.length).toBe(1);
+  expect(elements[0].type).toBe("json");
+  expect(elements[0].attributes).toBeDefined();
+  expect(elements[0].attributes.variable).toBe("$note.content");
 }); 

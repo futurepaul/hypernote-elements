@@ -1,6 +1,14 @@
 {
   "version": "1.1.0",
   "component_kind": null,
+  "queries": {
+    "$my_feed": {
+      "authors": [
+        "user.pubkey"
+      ],
+      "limit": 20
+    }
+  },
   "events": {
     "@post_message": {
       "kind": 1,
@@ -17,7 +25,7 @@
     {
       "type": "h1",
       "content": [
-        "Post a Message"
+        "My Feed"
       ]
     },
     {
@@ -42,6 +50,40 @@
               ]
             }
           ]
+        }
+      ]
+    },
+    {
+      "type": "loop",
+      "source": "$my_feed",
+      "variable": "$note",
+      "elements": [
+        {
+          "type": "p",
+          "content": [
+            "{$note.content}"
+          ]
+        },
+        {
+          "type": "json",
+          "content": [],
+          "attributes": {
+            "variable": "$note"
+          }
+        },
+        {
+          "type": "json",
+          "content": [],
+          "attributes": {
+            "variable": "$note.content"
+          }
+        },
+        {
+          "type": "json",
+          "content": [],
+          "attributes": {
+            "variable": "$note.pubkey"
+          }
         }
       ]
     }
