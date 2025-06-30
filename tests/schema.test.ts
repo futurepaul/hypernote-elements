@@ -35,22 +35,14 @@ const validHypernoteExample = {
   },
   
   queries: {
-    "$following_feed": {
+    "$my_feed": {
+      kinds: [1],
+      authors: ["{user.pubkey}"],
+      limit: 20,
+      since: "{time.now - 86400000}",
       pipe: [
         {
-          kinds: [3],
-          authors: ["{user.pubkey}"],
-          limit: 1
-        },
-        {
-          extract: ".tags[] | select(.[0] == \"p\") | .[1]",
-          as: "$follows"
-        },
-        {
-          kinds: [1],
-          authors: "$follows",
-          limit: 20,
-          since: "{time.now - 86400000}"
+          operation: "reverse"
         }
       ]
     },
@@ -115,7 +107,7 @@ const validHypernoteExample = {
     },
     {
       type: "loop",
-      source: "$following_feed",
+      source: "$my_feed",
       variable: "note",
       elements: [
         {
@@ -261,16 +253,13 @@ test("should validate query structure", () => {
         authors: ["{user.pubkey}"],
         limit: 10
       },
-      // Pipeline query
+      // Pipeline query  
       "$pipeline_query": {
+        kinds: [0],
+        authors: ["{target.pubkey}"],
         pipe: [
           {
-            kinds: [0],
-            authors: ["{target.pubkey}"]
-          },
-          {
-            extract: ".tags[] | select(.[0] == \"i\") | .[1]",
-            as: "$image_urls"
+            operation: "reverse"
           }
         ]
       },

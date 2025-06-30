@@ -45,25 +45,17 @@ The `content` field contains a JSON string which, when parsed, results in the fo
 
   // Central query definitions. Keys are query names from HNMD ($query_name).
   "queries": {
-    "$following_feed": {
-      // The full query definition, potentially using variables like {user.pubkey} or {target.*}
-      // Note: Variables need context injection by the client during evaluation.
-      // Queries can be either a simple filter object or a pipeline with multiple steps
+    "$my_feed": {
+      // Base Nostr filter defines what data to fetch
+      "authors": ["{user.pubkey}"], // Client substitutes viewing user's pubkey
+      "kinds": [1],
+      "limit": 20,
+      "since": "{time.now - 86400000}", // Client substitutes current time
+      
+      // Optional pipe array for data transformations (applied after Nostr query)
       "pipe": [
         {
-          "kinds": [3],
-          "authors": ["{user.pubkey}"], // Client substitutes viewing user's pubkey
-          "limit": 1
-        },
-        {
-          "extract": ".tags[] | select(.[0] == \"p\") | .[1]",
-          "as": "$follows"
-        },
-        {
-          "kinds": [1],
-          "authors": "$follows", // Uses extracted variable
-          "limit": 20,
-          "since": "{time.now - 86400000}" // Client substitutes current time
+          "operation": "reverse" // Reverse the chronological order
         }
       ]
     },
@@ -71,6 +63,7 @@ The `content` field contains a JSON string which, when parsed, results in the fo
         "kinds": [0],
         "authors": ["{target.pubkey}"], // Needs target context from component argument
         "limit": 1
+        // No pipe - just a simple query
     }
     // ... other named queries
   },
@@ -151,7 +144,7 @@ The `content` field contains a JSON string which, when parsed, results in the fo
     {
       "type": "loop", // Iteration over data source
       // References a query name defined in the top-level "queries" map
-      "source": "$following_feed",
+      "source": "$my_feed",
       "variable": "note", // Name for the loop variable in the nested scope
       // Elements to render for each item in the source data
       "elements": [

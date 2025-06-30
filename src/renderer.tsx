@@ -157,7 +157,7 @@ function ElementRenderer({
       }
       
       // Invalidate related queries when an event is published
-      queryClient.invalidateQueries({ queryKey: ['hypernote'] });
+      queryClient.invalidateQueries({ queryKey: ['nostrEvents'] });
     } catch (error) {
       console.error(`Failed to publish event: ${error}`);
     }

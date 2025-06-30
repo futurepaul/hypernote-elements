@@ -150,17 +150,13 @@ HQL defines Nostr queries and minimal data transformations using YAML syntax in 
   limit: 10
   # ... other valid Nostr filter fields ...
 
-  # Optional pipeline for minimal transformation
+  # Optional pipeline for data transformations
   pipe:
     # Supported operations:
-    # - extract: ".jq.path.expression" as $variable_name
+    # - extract: ".jq.path.expression" as $variable_name (for data extraction)
+    # - operation: "reverse" (for reversing result order)
     # Limited jq syntax: .prop, .[index], .[], | (pipe), select()
     - extract: ".tags[] | select(.[0] == \"p\") | .[1]" as $followed_pubkeys
-
-    # Use extracted variables in subsequent filters
-    - kinds: [1]
-      authors: $followed_pubkeys # Use the variable defined above
-      limit: 50
 ---
 ```
 
@@ -168,7 +164,7 @@ HQL defines Nostr queries and minimal data transformations using YAML syntax in 
 
 * **Nostr Filters:** Directly uses standard Nostr filter syntax.
 * **Explicit Inputs:** Queries must explicitly define their parameters (like `authors`, `ids`, `limit`). There are no implicit global variables like `$last_day`. The rendering client *may* provide context (e.g., the viewing user's pubkey) that can be referenced if explicitly designed into the query structure, but this is implementation-dependent.
-* **Pipeline (`pipe`):** Allows chaining operations. The output of one step becomes the input for the next filter or `extract`.
+* **Pipeline (`pipe`):** Allows chaining data transformations. The output of one step becomes the input for the next transformation.
 * **Minimal Extraction (`extract`)**: Uses a *very limited subset* of `jq` syntax for pulling specific data points out of fetched events.
     * **Supported jq:**
         * Property access: `.property`
@@ -198,27 +194,19 @@ $my_feed:
 
 ```md
 ---
-# Use the user variable to access the current user's pubkey
-"$following_feed":
-  pubkey: user.pubkey # Use the user variable
+# Simple query with reverse transformation
+"$my_feed":
+  authors: [user.pubkey] # Current user's pubkey
+  kinds: [1]
+  limit: 20
+  since: time.now - 86400000 # 24 hours ago (in milliseconds)
   pipe:
-    # 1. Get follow list (Kind 3) for the viewing user
-    - kinds: [3]
-      authors: [$pubkey] # Refers to the 'pubkey' defined above
-      limit: 1
-    # 2. Extract followed pubkeys
-    - extract: ".tags[] | select(.[0] == \"p\") | .[1]" as $follows
-    # 3. Get recent notes (Kind 1) from followed pubkeys
-    - kinds: [1]
-      authors: $follows # Use extracted variable
-      limit: 20
-      # Use time directly with arithmetic
-      since: time.now - 86400000 # 24 hours ago
+    - operation: reverse # Reverse chronological order (newest first becomes oldest first)
 ---
 
-# Following Feed
+# My Feed (Oldest First)
 
-[each $following_feed as $note]
+[each $my_feed as $note]
   ## {$note.pubkey}
   {$note.content}
   Posted at {$note.created_at}

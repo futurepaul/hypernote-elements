@@ -213,42 +213,33 @@ const AnyElementSchema = z.union([
 // Style properties schema - REMOVED as it's now in style-schema.ts
 // const StylePropertiesSchema = z.record(z.string().min(1), z.string());
 
-// Query pipe step schema
+// Query pipe step schema - now only for transformations, no Nostr filters
 const QueryPipeStepSchema = z.union([
-  // Regular nostr filter
-  z.object({
-    kinds: z.array(z.int().nonnegative()).optional(),
-    authors: z.union([z.array(z.string().min(1)), z.string().min(1)]).optional(),
-    limit: z.int().positive().optional(),
-    since: z.union([z.int().nonnegative(), z.string()]).optional(),
-    until: z.union([z.int().nonnegative(), z.string()]).optional(),
-    ids: z.array(z.string().min(1)).optional(),
-    tags: z.record(z.string().min(1), z.array(z.string())).optional(),
-  }),
-  // Extract operation
+  // Extract operation (existing)
   z.object({
     extract: z.string().min(1),
     as: z.string().min(1),
   }),
+  // Reverse operation (new)
+  z.object({
+    operation: z.literal("reverse"),
+  }),
 ]);
 
-// Query schema
-const QuerySchema = z.union([
-  // Simple query
-  z.object({
-    kinds: z.array(z.int().nonnegative()).optional(),
-    authors: z.union([z.array(z.string().min(1)), z.string().min(1)]).optional(),
-    limit: z.int().positive().optional(),
-    since: z.union([z.int().nonnegative(), z.string()]).optional(),
-    until: z.union([z.int().nonnegative(), z.string()]).optional(),
-    ids: z.array(z.string().min(1)).optional(),
-    tags: z.record(z.string().min(1), z.array(z.string())).optional(),
-  }),
-  // Pipeline query
-  z.object({
-    pipe: z.array(QueryPipeStepSchema).min(1),
-  }),
-]);
+// Query schema - combines base Nostr filter with optional pipe transformations
+const QuerySchema = z.object({
+  // Base Nostr filter fields
+  kinds: z.array(z.int().nonnegative()).optional(),
+  authors: z.union([z.array(z.string().min(1)), z.string().min(1)]).optional(),
+  limit: z.int().positive().optional(),
+  since: z.union([z.int().nonnegative(), z.string()]).optional(),
+  until: z.union([z.int().nonnegative(), z.string()]).optional(),
+  ids: z.array(z.string().min(1)).optional(),
+  tags: z.record(z.string().min(1), z.array(z.string())).optional(),
+  
+  // Optional transformation pipeline
+  pipe: z.array(QueryPipeStepSchema).optional(),
+});
 
 // Event template schema
 const EventTemplateSchema = z.object({

@@ -3,10 +3,18 @@
   "component_kind": null,
   "queries": {
     "$my_feed": {
+      "kinds": [
+        1
+      ],
       "authors": [
         "user.pubkey"
       ],
-      "limit": 20
+      "limit": 20,
+      "pipe": [
+        {
+          "operation": "reverse"
+        }
+      ]
     }
   },
   "events": {
@@ -25,7 +33,7 @@
     {
       "type": "h1",
       "content": [
-        "My Feed"
+        "My Feed (Oldest First)"
       ]
     },
     {
