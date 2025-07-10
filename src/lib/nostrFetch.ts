@@ -26,7 +26,16 @@ export async function fetchNostrEvents(relayHandler: RelayHandler, queryConfig: 
   
   // Fetch events using the base Nostr filter
   const events = await relayHandler.subscribe([nostrFilter as Filter]);
-  let result = Array.isArray(events) ? events : [];
+  let result: Event[] = [];
+  
+  if (Array.isArray(events)) {
+    result = events;
+  } else {
+    // If subscribe returns a string (subscription ID), it means the subscription is ongoing
+    // but we need to handle this case differently for one-time queries
+    console.warn('Subscribe returned subscription ID instead of events:', events);
+    result = [];
+  }
   
   // Apply pipe transformations if present
   if (pipe && Array.isArray(pipe)) {

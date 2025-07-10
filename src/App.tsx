@@ -7,7 +7,8 @@ import {
   ResizablePanel, 
   ResizablePanelGroup 
 } from "@/components/ui/resizable";
-import { useNostrStore } from "./stores/nostrStore";
+import { useNostrStore, RELAY_SETS, type RelaySet } from "./stores/nostrStore";
+import "./utils/key-converter"; // Load key conversion utilities
 import { HypernoteRenderer } from "./renderer";
 import { HypernoteJsonOutput } from "./renderer";
 import {
@@ -50,7 +51,7 @@ export function App() {
   });
   const [template, setTemplate] = useState<TemplateKey>("basic-hello");
   
-  const { relayHandler, initialize, cleanup, logs } = useNostrStore();
+  const { relayHandler, initialize, cleanup, logs, currentRelaySet, switchRelaySet } = useNostrStore();
 
   // Debug logging
   console.log("App: Current template:", template);
@@ -58,7 +59,9 @@ export function App() {
   console.log("App: Type of markdown value:", typeof markdownStates[template]);
 
   useEffect(() => {
-    initialize();
+    initialize().catch(error => {
+      console.error('Failed to initialize Nostr store:', error);
+    });
     return () => {
       cleanup();
     };
@@ -73,7 +76,7 @@ export function App() {
 
   return (
     <div className="h-screen p-4 flex flex-col">
-      <div className="mb-4">
+      <div className="mb-4 flex gap-4">
         <Select
           value={template}
           onValueChange={(value: TemplateKey) => {
@@ -90,6 +93,22 @@ export function App() {
                 {formatExampleName(name)}
               </SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        
+        <Select
+          value={currentRelaySet}
+          onValueChange={(value: RelaySet) => {
+            switchRelaySet(value);
+          }}
+        >
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Select relays" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="local">Local</SelectItem>
+            <SelectItem value="test">Test</SelectItem>
+            <SelectItem value="real">Real</SelectItem>
           </SelectContent>
         </Select>
       </div>

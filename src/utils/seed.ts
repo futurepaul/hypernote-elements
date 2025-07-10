@@ -22,8 +22,14 @@ async function seedTestNotes(count: number = 10) {
   // Initialize the relay handler with the test key
   const relayHandler = new RelayHandler([RELAY_URL], secretKey, logger);
 
-  // Wait a moment to ensure connection
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  // Explicitly connect to relay
+  try {
+    await relayHandler.connect();
+    console.log('Connected to relay for seeding');
+  } catch (error) {
+    console.error('Failed to connect to relay:', error);
+    throw error;
+  }
 
   console.log(`Publishing ${count} test notes...`);
   const publishedIds = [];
@@ -38,13 +44,9 @@ async function seedTestNotes(count: number = 10) {
         ['i', `${i}`]
       ];
 
-      const eventId = await relayHandler.publishEvent(1, content, tags);
-      if (eventId) {
-        publishedIds.push(eventId);
-        console.log(`Published test note ${i} with ID: ${eventId}`);
-      } else {
-        console.error(`Failed to publish test note ${i}`);
-      }
+      const result = await relayHandler.publishEvent(1, content, tags);
+      publishedIds.push(result.eventId);
+      console.log(`Published test note ${i} with ID: ${result.eventId} to ${result.successCount} relays`);
 
       // Small delay between publications
       await new Promise(resolve => setTimeout(resolve, 100));

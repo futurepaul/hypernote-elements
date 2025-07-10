@@ -22,9 +22,11 @@ beforeAll(async () => {
   // Create relay handler with required parameters
   relayHandler = new RelayHandler([RELAY_URL], testSecretKey, console.log);
   
-  // Test relay connectivity by trying to publish some test events
+  // Explicitly connect to relay
   try {
-    console.log('🔌 Testing relay connectivity...');
+    console.log('🔌 Connecting to relay...');
+    await relayHandler.connect();
+    console.log('✅ Relay connected, seeding test events...');
     
     // Seed some test events with explicitly distinct timestamps
     const baseTime = Math.floor(Date.now() / 1000) - 1000; // Start from 1000 seconds ago
@@ -91,12 +93,9 @@ afterAll(() => {
 // Helper to check if relay is available
 async function isRelayAvailable(): Promise<boolean> {
   try {
-    // Try a simple query to test connectivity
-    const testResult = await relayHandler.subscribe([{
-      kinds: [1],
-      limit: 1
-    }]);
-    return Array.isArray(testResult);
+    // Check if we have any connected relays
+    const connectedRelays = relayHandler.getConnectedRelays();
+    return connectedRelays.length > 0;
   } catch {
     return false;
   }

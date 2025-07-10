@@ -3,13 +3,30 @@ import { getEventHash, SimplePool } from 'nostr-tools';
 import { finalizeEvent, getPublicKey, generateSecretKey } from 'nostr-tools/pure';
 import { verifyEvent } from 'nostr-tools';
 
+export interface RelayStatus {
+  url: string;
+  connected: boolean;
+  lastConnected?: number;
+  lastError?: string;
+}
+
+export interface PublishResult {
+  relay: string;
+  success: boolean;
+  error?: string;
+}
+
 export class RelayHandler {
   private pool: SimplePool;
   private relays: string[];
-  private connections: Map<string, boolean> = new Map();
   private privateKey: Uint8Array;
   private logger: (message: string) => void;
   private subscriptions: Map<string, any> = new Map();
+  private relayStatuses: Map<string, RelayStatus> = new Map();
+  private connectionPromise: Promise<void> | null = null;
+  private isConnecting = false;
+  private connectionTimeout = 10000; // 10 seconds
+  private subscriptionTimeout = 10000; // 10 seconds
 
   constructor(urls: string[], privateKey: Uint8Array, logger: (message: string) => void) {
     this.privateKey = privateKey;
@@ -17,46 +34,282 @@ export class RelayHandler {
     this.relays = urls;
     this.pool = new SimplePool();
     
+    // Initialize relay statuses
     this.relays.forEach(url => {
-      this.connections.set(url, false);
-      this.logger(`Initializing relay ${url}`);
+      this.relayStatuses.set(url, {
+        url,
+        connected: false
+      });
     });
+    
+    // Set up connection monitoring
+    this.setupConnectionMonitoring();
   }
 
-  public getConnectionStatus(url: string): boolean {
-    return this.connections.get(url) || false;
+  private setupConnectionMonitoring() {
+    // Note: nostr-tools SimplePool doesn't expose connection events
+    // This would be where we'd monitor connection status in a production system
+    // For now, we'll track connection attempts manually
   }
 
-  public async publishEvent(kind: number, content: string, tags: string[][] = []): Promise<string | null> {
+  /**
+   * Explicitly connect to all relays
+   * Should be called early in application lifecycle
+   */
+  public async connect(): Promise<void> {
+    if (this.isConnecting && this.connectionPromise) {
+      return this.connectionPromise;
+    }
+
+    this.isConnecting = true;
+    this.logger('Connecting to relays...');
+
+    this.connectionPromise = this.performConnection();
+    
     try {
-      const pubkey = getPublicKey(this.privateKey);
-      
-      const event: any = {
-        kind,
-        created_at: Math.floor(Date.now() / 1000),
-        tags,
-        content,
-        pubkey,
-      };
-      
-      // Use finalizeEvent to compute the ID and generate a signature
-      const signedEvent = finalizeEvent(event, this.privateKey);
-      
-      const pubs = this.pool.publish(this.relays, signedEvent);
-      this.logger(`Publishing event to ${this.relays.length} relays`);
-      
-      await Promise.allSettled(pubs);
-      
-      return signedEvent.id;
+      await this.connectionPromise;
+      this.logger('Successfully connected to relays');
     } catch (error) {
-      this.logger(`Error publishing event: ${error}`);
-      return null;
+      this.logger(`Connection failed: ${error}`);
+      throw error;
+    } finally {
+      this.isConnecting = false;
+    }
+  }
+
+  private async performConnection(): Promise<void> {
+    // Test connectivity by performing a simple query on each relay
+    const connectionTests = this.relays.map(async (relay) => {
+      try {
+        const testFilter: Filter = { kinds: [1], limit: 1 };
+        
+        // Use a timeout for the connection test
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Connection timeout')), this.connectionTimeout);
+        });
+
+        const testPromise = new Promise<void>((resolve) => {
+          const sub = this.pool.subscribeMany(
+            [relay],
+            [testFilter],
+            {
+              onevent: () => {
+                // Got an event, connection works
+                resolve();
+              },
+              oneose: () => {
+                // Got EOSE, connection works
+                resolve();
+              }
+            }
+          );
+
+          // Clean up subscription after test
+          setTimeout(() => {
+            if (typeof sub === 'function') sub();
+          }, 1000);
+        });
+
+        await Promise.race([testPromise, timeoutPromise]);
+        
+        this.updateRelayStatus(relay, true);
+        this.logger(`✅ Connected to relay: ${relay}`);
+        
+      } catch (error) {
+        this.updateRelayStatus(relay, false, error.message);
+        this.logger(`❌ Failed to connect to relay: ${relay} - ${error.message}`);
+      }
+    });
+
+    // Wait for all connection attempts
+    await Promise.allSettled(connectionTests);
+    
+    const connectedCount = Array.from(this.relayStatuses.values())
+      .filter(status => status.connected).length;
+    
+    if (connectedCount === 0) {
+      throw new Error('Failed to connect to any relays');
+    }
+    
+    this.logger(`Connected to ${connectedCount}/${this.relays.length} relays`);
+  }
+
+  private updateRelayStatus(url: string, connected: boolean, error?: string) {
+    const status = this.relayStatuses.get(url);
+    if (status) {
+      status.connected = connected;
+      status.lastConnected = connected ? Date.now() : status.lastConnected;
+      status.lastError = error;
+    }
+  }
+
+  public getRelayStatuses(): RelayStatus[] {
+    return Array.from(this.relayStatuses.values());
+  }
+
+  public getConnectedRelays(): string[] {
+    return this.relays.filter(relay => 
+      this.relayStatuses.get(relay)?.connected
+    );
+  }
+
+  /**
+   * Publish event with detailed per-relay results
+   */
+  public async publishEvent(kind: number, content: string, tags: string[][] = []): Promise<{
+    eventId: string;
+    results: PublishResult[];
+    successCount: number;
+  }> {
+    const pubkey = getPublicKey(this.privateKey);
+    
+    const event: any = {
+      kind,
+      created_at: Math.floor(Date.now() / 1000),
+      tags,
+      content,
+      pubkey,
+    };
+    
+    const signedEvent = finalizeEvent(event, this.privateKey);
+    
+    // Only publish to connected relays
+    const connectedRelays = this.getConnectedRelays();
+    
+    if (connectedRelays.length === 0) {
+      throw new Error('No connected relays available for publishing');
+    }
+    
+    this.logger(`Publishing event to ${connectedRelays.length} connected relays`);
+    
+    const publishPromises = this.pool.publish(connectedRelays, signedEvent);
+    const results = await Promise.allSettled(publishPromises);
+    
+    const publishResults: PublishResult[] = results.map((result, index) => ({
+      relay: connectedRelays[index],
+      success: result.status === 'fulfilled',
+      error: result.status === 'rejected' ? result.reason?.message : undefined
+    }));
+    
+    const successCount = publishResults.filter(r => r.success).length;
+    
+    // Log results
+    publishResults.forEach(result => {
+      if (result.success) {
+        this.logger(`✅ Published to ${result.relay}`);
+      } else {
+        this.logger(`❌ Failed to publish to ${result.relay}: ${result.error}`);
+      }
+    });
+    
+    if (successCount === 0) {
+      throw new Error('Failed to publish to any relays');
+    }
+    
+    return {
+      eventId: signedEvent.id,
+      results: publishResults,
+      successCount
+    };
+  }
+
+  /**
+   * Subscribe with better error handling and timeout management
+   */
+  public async subscribe(
+    filters: Filter[], 
+    onEvent?: (event: Event) => void,
+    options: {
+      timeout?: number;
+      requireMinRelays?: number;
+    } = {}
+  ): Promise<string | Event[]> {
+    const subscriptionId = Math.random().toString(36).substring(2, 15);
+    const timeout = options.timeout || this.subscriptionTimeout;
+    const minRelays = options.requireMinRelays || 1;
+    
+    const connectedRelays = this.getConnectedRelays();
+    
+    if (connectedRelays.length < minRelays) {
+      throw new Error(`Need at least ${minRelays} connected relays, have ${connectedRelays.length}`);
+    }
+    
+    this.logger(`Subscribing to events on ${connectedRelays.length} relays with filters: ${JSON.stringify(filters)}`);
+    
+    try {
+      // If no callback is provided, collect events and return them
+      if (!onEvent) {
+        const events: Event[] = [];
+        let eoseCount = 0;
+        const targetEoseCount = connectedRelays.length;
+        
+        await new Promise<void>((resolve, reject) => {
+          const timeoutId = setTimeout(() => {
+            this.logger(`Subscription timeout after ${timeout}ms. Collected ${events.length} events from ${eoseCount}/${targetEoseCount} relays.`);
+            resolve();
+          }, timeout);
+
+          const sub = this.pool.subscribeMany(
+            connectedRelays,
+            filters,
+            {
+              onevent: (event) => {
+                if (this.validateEvent(event)) {
+                  this.logger(`Received event: ${event.id}`);
+                  events.push(event);
+                } else {
+                  this.logger(`Received invalid event: ${event.id}`);
+                }
+              },
+              oneose: () => {
+                eoseCount++;
+                this.logger(`EOSE from relay (${eoseCount}/${targetEoseCount}). Total events: ${events.length}`);
+                
+                // Resolve when we get EOSE from all relays or timeout
+                if (eoseCount >= targetEoseCount) {
+                  clearTimeout(timeoutId);
+                  resolve();
+                }
+              }
+            }
+          );
+          
+          this.subscriptions.set(subscriptionId, sub);
+        });
+        
+        return events;
+      }
+      
+      // Callback-based subscription
+      const unsub = this.pool.subscribeMany(
+        connectedRelays,
+        filters,
+        {
+          onevent: (event) => {
+            if (this.validateEvent(event)) {
+              this.logger(`Received event: ${event.id}`);
+              onEvent(event);
+            } else {
+              this.logger(`Received invalid event, ignoring: ${event.id}`);
+            }
+          },
+          oneose: () => {
+            this.logger(`End of stored events for subscription ${subscriptionId}`);
+          }
+        }
+      );
+      
+      this.subscriptions.set(subscriptionId, unsub);
+      return subscriptionId;
+      
+    } catch (error) {
+      this.logger(`Error subscribing: ${error}`);
+      throw error;
     }
   }
 
   public validateEvent(event: Event): boolean {
     try {
-      // Use the standard verifyEvent function from nostr-tools
       return verifyEvent(event);
     } catch (error) {
       this.logger(`Error validating event: ${error}`);
@@ -64,83 +317,9 @@ export class RelayHandler {
     }
   }
 
-  public async subscribe(filters: Filter[], onEvent?: (event: Event) => void): Promise<string | Event[]> {
-    const subscriptionId = Math.random().toString(36).substring(2, 15);
-    
-    try {
-      this.logger(`Subscribing to events with filters: ${JSON.stringify(filters)}`);
-      
-      // If no callback is provided, collect events and return them
-      if (!onEvent) {
-        const events: Event[] = [];
-        
-        await new Promise<void>((resolve) => {
-          const sub = this.pool.subscribeMany(
-            this.relays,
-            filters,
-            {
-              onevent: (event) => {
-                this.logger(`Received event: ${event.id}`);
-                  events.push(event);
-              },
-              oneose: () => {
-                this.logger(`End of stored events. Collected ${events.length} events.`);
-                resolve();
-              }
-            }
-          );
-          
-          // Store the subscription for cleanup
-          this.subscriptions.set(subscriptionId, sub);
-          
-          // Set a timeout in case EOSE never comes
-          setTimeout(() => {
-            this.logger(`Timeout reached. Collected ${events.length} events.`);
-            resolve();
-          }, 5000);
-        });
-        
-        // Return the collected events
-        return events;
-      }
-      
-      // Original behavior with callback
-      const unsub = this.pool.subscribeMany(
-        this.relays,
-        filters,
-        {
-          onevent: (event) => {
-            this.logger(`Received event: ${event.id}`);
-            // Verify the event before passing it to the callback
-            if (this.validateEvent(event)) {
-              onEvent(event);
-            } else {
-              this.logger(`Received invalid event, ignoring`);
-            }
-          },
-          oneose: () => {
-            this.logger(`End of stored events`);
-          }
-        }
-      );
-      
-      // Store the unsubscribe function
-      this.subscriptions.set(subscriptionId, unsub);
-      
-      return subscriptionId;
-    } catch (error) {
-      this.logger(`Error subscribing: ${error}`);
-      if (onEvent) {
-        return subscriptionId;
-      } else {
-        return [];
-      }
-    }
-  }
-
   public unsubscribe(subscriptionId: string): void {
     const unsub = this.subscriptions.get(subscriptionId);
-    if (unsub) {
+    if (unsub && typeof unsub === 'function') {
       unsub();
       this.subscriptions.delete(subscriptionId);
       this.logger(`Unsubscribed from ${subscriptionId}`);
@@ -149,22 +328,26 @@ export class RelayHandler {
 
   public cleanup() {
     try {
-      // First unsubscribe from all subscriptions
+      // Unsubscribe from all subscriptions
       const subEntries = Array.from(this.subscriptions.values());
       for (const unsub of subEntries) {
-        // Make sure unsub is a function before calling it
         if (typeof unsub === 'function') {
           unsub();
         }
       }
       this.subscriptions.clear();
       
+      // Close pool connections
       this.pool.close(this.relays);
       this.logger('Closed all relay connections');
+      
+      // Reset connection states
+      this.relayStatuses.forEach(status => {
+        status.connected = false;
+      });
+      
     } catch (error) {
-      this.logger(`Error closing connections: ${error}`);
+      this.logger(`Error during cleanup: ${error}`);
     }
-    
-    this.connections.clear();
   }
-} 
+}

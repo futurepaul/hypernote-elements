@@ -88,6 +88,34 @@ This forces React Query to re-fetch all Nostr queries, ensuring new events appea
 - **With `reverse` pipe**: Oldest-first (chronological)
 - **Critical**: Cache invalidation ensures new events are inserted in correct position, not appended
 
+## Nostr Relay Connection Architecture
+
+### RelayHandler Implementation
+The `RelayHandler` (`src/lib/relayHandler.ts`) implements NDK best practices for reliable Nostr relay connections:
+
+**Key Features:**
+- **Explicit connection** via `connect()` method (called automatically in app initialization)
+- **Connection status tracking** with `getRelayStatuses()` and `getConnectedRelays()`
+- **Detailed publish results** showing success/failure per relay
+- **Better subscription management** with configurable timeouts and minimum relay requirements
+- **Graceful error handling** with comprehensive logging
+
+**Connection Flow:**
+1. `nostrStore.initialize()` creates RelayHandler instance
+2. Calls `relayHandler.connect()` to establish connections to all configured relays
+3. Tests each relay with a simple query to verify connectivity
+4. Tracks connection status for intelligent publishing/subscription routing
+
+**Publishing Results:**
+```typescript
+const result = await relayHandler.publishEvent(1, "Hello world");
+// Returns: { eventId: string, results: PublishResult[], successCount: number }
+console.log(`Published to ${result.successCount} relays`);
+```
+
+**Relay Configuration:**
+Default relays in `src/stores/nostrStore.ts` include `nos.lol`, `relay.damus.io`, and `nostr.wine`.
+
 ## Testing
 
 Run `bun test` to execute the full test suite. Tests cover:

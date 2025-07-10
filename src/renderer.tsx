@@ -38,7 +38,9 @@ function useNostrEventsQuery(relayHandler: RelayHandler, filter: any) {
   return useQuery({
     queryKey: ['nostrEvents', JSON.stringify(filter)],
     queryFn: () => fetchNostrEvents(relayHandler, filter),
-    enabled: !!relayHandler && !!filter,
+    enabled: !!relayHandler && !!filter && relayHandler.getConnectedRelays().length > 0,
+    retry: 2, // Retry failed queries up to 2 times
+    retryDelay: 1000, // Wait 1 second between retries
   });
 }
 
@@ -110,10 +112,10 @@ function ElementRenderer({
   console.log(`Processed query config for ${querySourceName}:`, processedQueryConfig);
 
   // Use the new React Query hook for fetching events
-  const { data: loopData, isLoading, isError } =
+  const { data: loopData, isLoading, isError, error } =
     querySourceName && processedQueryConfig
       ? useNostrEventsQuery(relayHandler, processedQueryConfig)
-      : { data: undefined, isLoading: false, isError: false };
+      : { data: undefined, isLoading: false, isError: false, error: null };
 
   // Process form submission
   const handleFormSubmit = async (e: React.FormEvent, eventName?: string) => {
@@ -143,13 +145,13 @@ function ElementRenderer({
     
     // Publish the event
     try {
-      const eventId = await relayHandler.publishEvent(
+      const result = await relayHandler.publishEvent(
         eventTemplate.kind,
         content,
         eventTemplate.tags || []
       );
       
-      console.log(`Published event: ${eventId}`);
+      console.log(`Published event: ${result.eventId} to ${result.successCount} relays`);
       
       // Reset form if successful
       if (setFormData) {
@@ -425,8 +427,15 @@ function ElementRenderer({
       }
       
       if (isError) {
-        console.log(`Error loading data for loop with source ${element.source}`);
-        return <div>Error loading data</div>;
+        console.log(`Error loading data for loop with source ${element.source}:`, error);
+        return (
+          <div style={{ color: 'red', padding: '10px', border: '1px solid red', borderRadius: '4px' }}>
+            Error loading data from {element.source}
+            {error && <div style={{ fontSize: '12px', marginTop: '5px' }}>
+              {error instanceof Error ? error.message : String(error)}
+            </div>}
+          </div>
+        );
       }
       
       // Get the data from query results
