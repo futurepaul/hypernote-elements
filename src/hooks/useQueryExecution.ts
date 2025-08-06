@@ -67,7 +67,8 @@ export function useQueryExecution(
           }
           
           console.log('Fetching events with filters:', processedFilters);
-          return await snstrClient.fetchEvents(processedFilters);
+          // SNSTRClient.fetchEvents expects an array of filters, so wrap in array
+          return await snstrClient.fetchEvents([processedFilters]);
         };
         
         // Create and run executor
