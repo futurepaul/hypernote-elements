@@ -239,9 +239,45 @@ function ElementRenderer({
 
   // Process content and replace variable references
   const processContent = (content: string): string => {
-    // Replace variable references like {$note.content} with actual values
-    return content.replace(/\{(\$[^}]+)\}/g, (match, variableName) => {
-      return resolveVariable(variableName);
+    // Replace all variable references: {$variable}, {user.pubkey}, {time.now}, {form.field}, etc.
+    return content.replace(/\{([^}]+)\}/g, (match, variableName) => {
+      // Handle user.pubkey
+      if (variableName === 'user.pubkey' && userContext.pubkey) {
+        return userContext.pubkey;
+      }
+      // Handle time.now
+      if (variableName === 'time.now') {
+        return Date.now().toString();
+      }
+      // Handle time expressions like "time.now - 86400000"
+      if (variableName.includes('time.now')) {
+        try {
+          const timeNow = Date.now();
+          const result = variableName.replace(/time\.now/g, timeNow.toString());
+          return new Function('return ' + result)().toString();
+        } catch (e) {
+          console.warn(`Failed to evaluate time expression: ${variableName}`);
+          return match;
+        }
+      }
+      // Handle form variables
+      if (variableName.startsWith('form.')) {
+        const fieldName = variableName.substring(5);
+        return formData[fieldName] || '';
+      }
+      // Handle extracted variables
+      if (variableName in extractedVariables) {
+        const value = extractedVariables[variableName];
+        return Array.isArray(value) ? value.join(', ') : String(value);
+      }
+      // Handle loop variables (like $note.content)
+      if (variableName.startsWith('$')) {
+        return resolveVariable(variableName);
+      }
+      
+      // If nothing matches, return the original
+      console.warn(`Unknown variable in content: ${variableName}`);
+      return match;
     });
   };
 
