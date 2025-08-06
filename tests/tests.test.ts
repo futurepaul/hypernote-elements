@@ -55,6 +55,53 @@ test("should parse frontmatter with event using variable", () => {
   });
 });
 
+test("should parse client example with pipe operations and query dependencies", () => {
+  const example = loadExample("client");
+  const result = compileHypernoteToContent(example.markdown);
+  
+  expect(result.version).toBe("1.1.0");
+  expect(result.component_kind).toBe(null);
+  
+  // Check that queries are parsed correctly
+  expect(result.queries).toBeDefined();
+  expect(result.queries?.$contact_list).toEqual({
+    kinds: [3],
+    authors: ["user.pubkey"],
+    limit: 1,
+    pipe: [{
+      operation: "extract",
+      expression: ".tags[] | select(.[0] == \"p\") | .[1]",
+      as: "followed_pubkeys"
+    }]
+  });
+  
+  expect(result.queries?.$following_feed).toEqual({
+    kinds: [1],
+    authors: "$followed_pubkeys",
+    limit: 100,
+    since: "time.now - 86400000",
+    pipe: [{
+      operation: "reverse"
+    }]
+  });
+  
+  // Check that events are parsed correctly
+  expect(result.events).toEqual({
+    "@post_note": {
+      kind: 1,
+      content: "{form.message}",
+      tags: [["client", "hypernote-client"]],
+    },
+  });
+  
+  // Check that elements contain the expected loops
+  expect(result.elements).toBeDefined();
+  const feedLoop = result.elements?.find(el => el.type === 'div' && el.elementId === 'feed');
+  expect(feedLoop).toBeDefined();
+  expect(feedLoop?.elements?.[0]?.type).toBe('loop');
+  expect(feedLoop?.elements?.[0]?.source).toBe('$following_feed');
+});
+
 // --- FULL ELEMENT PARSING TESTS ---
 
 test("should parse basic H1 and a form triggering a hardcoded event", () => {

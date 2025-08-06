@@ -6,6 +6,7 @@ import feedMd from "../examples/feed.md";
 import divContainerMd from "../examples/div-container.md";
 import zapCloudMd from "../examples/zap-cloud.md";
 import imageTestMd from "../examples/image-test.md";
+import clientMd from "../examples/client.md";
 
 // Import all JSON examples directly using Bun's built-in JSON loader
 import basicHelloJson from "../examples/basic-hello.json";
@@ -13,6 +14,7 @@ import feedJson from "../examples/feed.json";
 import divContainerJson from "../examples/div-container.json";
 import zapCloudJson from "../examples/zap-cloud.json";
 import imageTestJson from "../examples/image-test.json";
+import clientJson from "../examples/client.json";
 
 // Map of example names to their imported content
 const EXAMPLE_MAP = {
@@ -21,6 +23,7 @@ const EXAMPLE_MAP = {
   "div-container": { markdown: divContainerMd, json: divContainerJson },
   "zap-cloud": { markdown: zapCloudMd, json: zapCloudJson },
   "image-test": { markdown: imageTestMd, json: imageTestJson },
+  "client": { markdown: clientMd, json: clientJson },
 } as const;
 
 export interface ExampleData {
@@ -62,6 +65,7 @@ export const AVAILABLE_EXAMPLES = [
   "div-container",
   "zap-cloud",
   "image-test",
+  "client",
 ] as const;
 
 export type ExampleName = typeof AVAILABLE_EXAMPLES[number]; 
