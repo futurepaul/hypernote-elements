@@ -17,8 +17,6 @@
  * @returns The result of the evaluation
  */
 export function evaluateJqExpression(expression: string, data: any): any {
-  console.log('[JQ] Evaluating expression:', expression, 'on data:', data);
-  
   // Remove whitespace
   expression = expression.trim();
   
@@ -29,17 +27,27 @@ export function evaluateJqExpression(expression: string, data: any): any {
   
   // Split by pipe operator
   const pipes = expression.split('|').map(s => s.trim());
-  console.log('[JQ] Pipe steps:', pipes);
   
   let result = data;
+  let isIterating = false; // Track if we're in array iteration mode
+  
   for (let i = 0; i < pipes.length; i++) {
     const pipe = pipes[i];
-    console.log(`[JQ] Step ${i}: "${pipe}" on:`, result);
-    result = evaluateSingleExpression(pipe, result);
-    console.log(`[JQ] Step ${i} result:`, result);
+    
+    // Check if this step contains array iteration
+    if (pipe.includes('[]')) {
+      isIterating = true;
+      result = evaluateSingleExpression(pipe, result);
+      // After array iteration, we now have an array to iterate over
+    } else if (isIterating && Array.isArray(result)) {
+      // If we're iterating and have an array, apply the operation to each element
+      result = result.map(item => evaluateSingleExpression(pipe, item)).filter(item => item !== undefined);
+    } else {
+      // Normal single expression evaluation
+      result = evaluateSingleExpression(pipe, result);
+    }
   }
   
-  console.log('[JQ] Final result:', result);
   return result;
 }
 
@@ -55,13 +63,13 @@ function evaluateSingleExpression(expr: string, data: any): any {
   
   // Handle property/index access chain
   const parts = parseAccessChain(expr);
-  
   let result = data;
   for (const part of parts) {
     if (part === '[]') {
-      // Array iteration - flatten one level
+      // Array iteration - return each element of the array
       if (Array.isArray(result)) {
-        result = result.flat();
+        // Return the array unchanged so pipe processing can iterate over elements
+        result = result;
       } else {
         result = [];
       }
@@ -91,6 +99,11 @@ function evaluateSingleExpression(expr: string, data: any): any {
  * Parse an access chain like ".tags[]" or ".tags[0].value"
  */
 function parseAccessChain(expr: string): string[] {
+  // Special case: if expression starts with .[, treat it as a single index access
+  if (expr.startsWith('.[') && expr.endsWith(']')) {
+    return [expr.substring(1)]; // Return [0] instead of [".", "[0]"]
+  }
+  
   const parts: string[] = [];
   let current = '';
   let inBrackets = false;
@@ -118,7 +131,7 @@ function parseAccessChain(expr: string): string[] {
     }
   }
   
-  if (current) {
+  if (current && current !== '.') {  // Don't add empty '.' parts
     parts.push(current);
   }
   
@@ -129,12 +142,8 @@ function parseAccessChain(expr: string): string[] {
  * Evaluate a select() condition
  */
 function evaluateSelect(condition: string, data: any): any {
-  // Handle array filtering
-  if (Array.isArray(data)) {
-    return data.filter(item => evaluateCondition(condition, item));
-  }
-  
-  // Handle single item
+  // Always treat the data as a single item to evaluate the condition on
+  // In jq iteration context, each item (even if it's an array) should be tested as a single unit
   return evaluateCondition(condition, data) ? data : undefined;
 }
 
@@ -185,18 +194,12 @@ export function extractFollowedPubkeys(contactListEvent: any): string[] {
  * Apply a pipe operation to data
  */
 export function applyPipeOperation(operation: any, data: any, context?: any): any {
-  console.log('[PIPE] Applying operation:', operation.operation, 'to data:', data);
-  
   switch (operation.operation) {
     case 'extract':
       // Extract data and store in context if provided
-      console.log('[EXTRACT] Expression:', operation.expression);
-      console.log('[EXTRACT] Input data:', data);
       const extracted = evaluateJqExpression(operation.expression, data);
-      console.log('[EXTRACT] Extracted result:', extracted);
       if (context && operation.as) {
         context[operation.as] = extracted;
-        console.log('[EXTRACT] Stored in context as:', operation.as, '=', extracted);
       }
       return extracted;
       

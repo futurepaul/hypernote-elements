@@ -12,9 +12,6 @@
   kinds: [1]
   authors: $followed_pubkeys
   limit: 100
-  since: time.now - 86400000
-  pipe:
-    - operation: reverse
 
 "@post_note":
   kind: 1
@@ -41,14 +38,6 @@ This shows posts from people you follow, extracted from your contact list.
   [input name="message" placeholder="What's happening?" class="w-full p-2 border rounded"]
   [button class="bg-blue-500 text-white px-4 py-2 rounded mt-2"]Post[/button]
 [/form]
-[/div]
-
-{#contact-debug}
-[div class="bg-white p-4 rounded-lg shadow mb-4"]
-### Your Contact List (Debug)
-[each $contact_list as $contact]
-[json $contact]
-[/each]
 [/div]
 
 {#feed}

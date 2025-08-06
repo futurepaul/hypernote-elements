@@ -32,7 +32,7 @@ interface RendererProps {
   setFormData?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   events?: Record<string, any>;
   queries?: Record<string, any>;
-  queryResults?: Map<string, NostrEvent[]>;
+  queryResults?: Record<string, NostrEvent[]>;
   extractedVariables?: Record<string, any>;
   userContext: {
     pubkey: string | null;
@@ -53,7 +53,7 @@ function ElementRenderer({
   setFormData, 
   events = {}, 
   queries = {},
-  queryResults = new Map(),
+  queryResults = {},
   extractedVariables = {},
   userContext,
   loopVariables = {}
@@ -120,12 +120,13 @@ function ElementRenderer({
   
   if (element.type === 'loop' && element.source) {
     // Get data from pre-fetched query results
-    const sourceData = queryResults.get(element.source);
+    const sourceData = queryResults[element.source];
+    console.log(`Getting loop data for ${element.source}:`, sourceData?.length, 'items from queryResults');
     if (sourceData) {
       loopData = sourceData;
     } else {
-      // Query might not have been executed yet or had an error
-      console.warn(`No data found for query: ${element.source}`);
+      // Query hasn't finished executing yet - this is normal during initial load
+      loopData = [];
     }
   }
   
@@ -218,7 +219,7 @@ function ElementRenderer({
 
   // Parse variable references and replace with actual values
   const resolveVariable = (variableName: string): string => {
-    console.log(`Resolving variable: ${variableName}, available variables:`, loopVariables);
+    // console.log(`Resolving variable: ${variableName}, available variables:`, loopVariables);
     
     if (variableName.startsWith('$') && variableName.includes('.')) {
       const [varName, ...path] = variableName.split('.');
@@ -227,7 +228,7 @@ function ElementRenderer({
       if (variable) {
         // Access nested properties
         const result = path.reduce((obj, prop) => obj?.[prop], variable) || '';
-        console.log(`Resolved ${variableName} to:`, result);
+        // console.log(`Resolved ${variableName} to:`, result);
         return String(result);
       } else {
         console.log(`Variable ${varName} not found in loop variables`);
@@ -525,7 +526,6 @@ function ElementRenderer({
       
       // Get the data from query results
       const sourceData = loopData || [];
-      console.log(`Loop data for ${element.source}:`, sourceData);
       const variableName = element.variable || '$item';
       
       // Render the loop elements for each item in the data
@@ -540,11 +540,12 @@ function ElementRenderer({
                 ...loopVariables,
                 [variableName]: item 
               };
-              console.log(`Rendering loop item ${index} with variable ${variableName}:`, item);
               
               // Render each child element with the updated loop variables
+              // Use item.id if available for better React reconciliation
+              const itemKey = item?.id || index;
               return (
-                <div key={index}>
+                <div key={itemKey}>
                   {element.elements?.map((child, childIndex) => (
                     <ElementRenderer
                       key={childIndex}
@@ -637,10 +638,38 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
   
   const userContext = { pubkey };
   
+  // Create a hash of the queries to detect actual changes
+  const [queriesHash, setQueriesHash] = useState<string>('');
+  
+  useEffect(() => {
+    const hashQueries = async () => {
+      const queriesJson = JSON.stringify(content.queries || {});
+      const encoder = new TextEncoder();
+      const data = encoder.encode(queriesJson);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      console.log('[Renderer] Queries hash:', hashHex.substring(0, 16) + '...');
+      setQueriesHash(hashHex);
+    };
+    hashQueries();
+  }, [content.queries]);
+  
+  // Memoize queries based on their hash to prevent unnecessary re-fetches
+  const memoizedQueries = useMemo(() => {
+    console.log('[Renderer] Using memoized queries with hash:', queriesHash.substring(0, 16) + '...');
+    return content.queries || {};
+  }, [queriesHash]);
+  
   // Execute all queries with dependency resolution
   const { queryResults, extractedVariables, loading: queriesLoading, error: queryError } = useQueryExecution(
-    content.queries || {}
+    memoizedQueries
   );
+  
+  // Debug: Log when queryResults changes
+  useEffect(() => {
+    console.log('[Renderer] queryResults changed:', Object.keys(queryResults).map(k => `${k}: ${queryResults[k]?.length} items`));
+  }, [queryResults]);
   
   // Show loading state while queries are executing
   if (queriesLoading) {

@@ -26,13 +26,7 @@
         1
       ],
       "authors": "$followed_pubkeys",
-      "limit": 100,
-      "since": "time.now - 86400000",
-      "pipe": [
-        {
-          "operation": "reverse"
-        }
-      ]
+      "limit": 100
     }
   },
   "events": {
@@ -130,39 +124,6 @@
                   ]
                 }
               ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "type": "div",
-      "elementId": "contact-debug",
-      "style": {
-        "marginBottom": "1rem",
-        "padding": "1rem",
-        "backgroundColor": "rgb(255,255,255)",
-        "borderRadius": "0.5rem",
-        "boxShadow": "0 0 #0000, 0 0 #0000, 0 1px 3px 0 rgb(0,0,0,0.1), 0 1px 2px -1px rgb(0,0,0,0.1)"
-      },
-      "elements": [
-        {
-          "type": "h3",
-          "content": [
-            "Your Contact List (Debug)"
-          ]
-        },
-        {
-          "type": "loop",
-          "source": "$contact_list",
-          "variable": "$contact",
-          "elements": [
-            {
-              "type": "json",
-              "content": [],
-              "attributes": {
-                "variable": "$contact"
-              }
             }
           ]
         }

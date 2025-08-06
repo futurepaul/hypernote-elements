@@ -9,7 +9,7 @@ import { useNostrStore } from '../stores/nostrStore';
 import { NostrEvent } from '../lib/snstr/nip07';
 
 interface UseQueryExecutionResult {
-  queryResults: Map<string, NostrEvent[]>;
+  queryResults: Record<string, NostrEvent[]>;
   extractedVariables: Record<string, any>;
   loading: boolean;
   error: Error | null;
@@ -21,7 +21,7 @@ interface UseQueryExecutionResult {
 export function useQueryExecution(
   queries: Record<string, any>
 ): UseQueryExecutionResult {
-  const [queryResults, setQueryResults] = useState<Map<string, NostrEvent[]>>(new Map());
+  const [queryResults, setQueryResults] = useState<Record<string, NostrEvent[]>>({});
   const [extractedVariables, setExtractedVariables] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -29,16 +29,31 @@ export function useQueryExecution(
   const { pubkey } = useAuthStore();
   const { snstrClient } = useNostrStore();
   
-  // Memoize the context to prevent unnecessary re-executions
-  const context = useMemo<QueryContext>(() => ({
-    user: { pubkey },
-    time: { now: Date.now() },
-    extracted: {},
-    results: new Map()
-  }), [pubkey]);
-  
   // Memoize queries to prevent re-execution on every render
   const queriesJson = JSON.stringify(queries);
+  
+  // Create a hash of the queries for change detection
+  const [queriesHash, setQueriesHash] = useState<string>('');
+  
+  useEffect(() => {
+    const hashQueries = async () => {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(queriesJson);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      setQueriesHash(hashHex);
+    };
+    hashQueries();
+  }, [queriesJson]);
+  
+  // Memoize context but include queriesHash in dependencies so it updates when queries change
+  const context = useMemo<QueryContext>(() => ({
+    user: { pubkey },
+    time: { now: 0 }, // Will be set during query execution
+    extracted: {},
+    results: new Map()
+  }), [pubkey, queriesHash]); // Re-create context when queries actually change
   
   useEffect(() => {
     if (!snstrClient) {
@@ -49,6 +64,7 @@ export function useQueryExecution(
     let cancelled = false;
     
     const executeQueries = async () => {
+      console.log('[useQueryExecution] Re-executing queries, SHA-256 hash:', queriesHash.substring(0, 16) + '...');
       try {
         setLoading(true);
         setError(null);
@@ -71,13 +87,25 @@ export function useQueryExecution(
           return await snstrClient.fetchEvents([processedFilters]);
         };
         
+        // Update context with current time
+        context.time.now = Date.now();
+        
         // Create and run executor
         const executor = new QueryExecutor(queries, context, fetchEvents);
         const results = await executor.executeAll();
         
+        // console.log('Query results from executor:', results);
+        // console.log('Extracted variables:', executor.getExtractedVariables());
+        
         if (!cancelled) {
-          setQueryResults(results);
-          setExtractedVariables(executor.getExtractedVariables());
+          // Convert Map to object for better React change detection
+          const resultsObject: Record<string, NostrEvent[]> = {};
+          results.forEach((value, key) => {
+            resultsObject[key] = value;
+          });
+          console.log('[useQueryExecution] Setting results:', Object.keys(resultsObject).map(k => `${k}: ${resultsObject[k].length} items`));
+          setQueryResults(resultsObject);
+          setExtractedVariables({ ...executor.getExtractedVariables() });
         }
       } catch (err) {
         if (!cancelled) {
@@ -96,7 +124,7 @@ export function useQueryExecution(
     return () => {
       cancelled = true;
     };
-  }, [queriesJson, context, snstrClient]);
+  }, [queriesHash, context, snstrClient]); // Use hash instead of full JSON
   
   return {
     queryResults,

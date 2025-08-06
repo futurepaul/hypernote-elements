@@ -287,7 +287,10 @@ export class QueryExecutor {
               extractedResults.push(extracted);
             }
           }
-          processed = extractedResults;
+          // Store extracted data in context but DON'T replace the query results
+          // The extraction is stored via applyPipeOperation's context parameter
+          // Keep the original events for loops to iterate over
+          // processed = extractedResults; // DON'T DO THIS - it replaces the events!
         } else {
           // For other operations, apply to the entire array
           processed = applyPipeOperation(step, processed, this.context.extracted);
@@ -295,8 +298,9 @@ export class QueryExecutor {
       }
     }
     
-    // Cache results
+    // Cache the original events (or transformed events for non-extract operations)
     this.context.results.set(name, processed);
+    // console.log(`Query ${name} returning ${processed.length} results`);
     
     return processed;
   }
@@ -343,7 +347,7 @@ export class QueryExecutor {
           return this.context.results.get(value);
         }
         
-        console.warn(`Variable ${value} not found in context`);
+        console.warn(`Variable ${value} not found in context. Available extracted variables:`, Object.keys(this.context.extracted));
         return value;
       }
       

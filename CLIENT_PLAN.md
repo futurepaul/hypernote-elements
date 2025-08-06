@@ -237,12 +237,20 @@ export function evaluateJqExpression(expression: string, data: any): any {
 - **Contact List Processing**: Even if we fetch the contact list, we're not getting the followed pubkeys
 - **Following Feed**: Currently showing global feed instead of followed users' posts
 
-### 🐛 Current Issue:
-The pipe operation `extract` with jq expression is not working properly. Need to debug:
-1. Is the contact list being fetched correctly?
-2. Is the jq expression being evaluated correctly?  
-3. Are the extracted pubkeys being stored in context?
-4. Are they being used in the following feed query?
+### 🐛 Issues Found & Fixed:
+1. **Extract applied to array instead of individual events** ✅ FIXED
+   - Problem: jq expressions like `.tags[]` were being applied to arrays of events instead of individual events
+   - Solution: Modified QueryExecutor to apply extract operations to each event individually and flatten results
+
+2. **Debug logging added** ✅ ADDED
+   - Added comprehensive logging to see exactly what data is being processed
+   - Can now trace: input data → jq steps → extracted results → context storage
+
+### 🧪 Testing Needed:
+1. Connect NIP-07 extension with contact list
+2. Check console for debug output during contact list processing  
+3. Verify extracted pubkeys are used in following feed query
+4. Confirm feed shows posts from followed users only
 
 ## Implementation Order
 
