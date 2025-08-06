@@ -5,9 +5,11 @@ import { compileHypernoteToContent } from './lib/compiler';
 import { useNostrStore } from './stores/nostrStore';
 import { useAuthStore } from './stores/authStore';
 import { useNostrSubscription } from './lib/snstr/hooks';
+import { useQueryExecution } from './hooks/useQueryExecution';
 import type { Hypernote, AnyElement } from './lib/schema';
 import { toast } from 'sonner';
 import { applyPipeOperation } from './lib/jq-parser';
+import { NostrEvent } from './lib/snstr/nip07';
 
 // Define the structure of elements based on compiler output
 interface HypernoteElement {
@@ -30,6 +32,8 @@ interface RendererProps {
   setFormData?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   events?: Record<string, any>;
   queries?: Record<string, any>;
+  queryResults?: Map<string, NostrEvent[]>;
+  extractedVariables?: Record<string, any>;
   userContext: {
     pubkey: string | null;
   };
@@ -49,6 +53,8 @@ function ElementRenderer({
   setFormData, 
   events = {}, 
   queries = {},
+  queryResults = new Map(),
+  extractedVariables = {},
   userContext,
   loopVariables = {}
 }: RendererProps) {
@@ -106,55 +112,25 @@ function ElementRenderer({
     return substituteInValue(processedConfig);
   };
 
-  // If this is a loop element, fetch the data for its source using reactive subscription
-  const querySourceName = element.type === 'loop' ? element.source : undefined;
-  const queryConfig = querySourceName ? queries[querySourceName] : undefined;
+  // Get loop data from pre-fetched query results if this is a loop element
+  let loopData: NostrEvent[] = [];
+  let isLoading = false;
+  let isError = false;
+  let error: Error | null = null;
   
-  // Memoize the processed query config to prevent recreating it on every render
-  const processedQueryConfig = useMemo(
-    () => substituteQueryVariables(queryConfig),
-    [queryConfig, userContext.pubkey] // Only reprocess if query or user changes
-  );
-  
-  // Memoize filters extraction to keep stable reference
-  const { pipe, ...filters } = useMemo(
-    () => processedQueryConfig || {},
-    [processedQueryConfig]
-  );
-  
-  // Debug logging - only log if this is actually a loop element
-  if (element.type === 'loop') {
-    console.log(`[LOOP] Query source: ${querySourceName}`, {
-      queryConfig,
-      processedQueryConfig,
-      filters,
-      timestamp: Date.now()
-    });
-  }
-  
-  // Only use the subscription hook if this is actually a loop element
-  const isLoopElement = element.type === 'loop';
-  
-  // Use the reactive subscription hook for fetching events (only for loops)
-  const { events: rawEvents, loading: isLoading, error } = useNostrSubscription(
-    isLoopElement && querySourceName && filters ? [filters] : null,
-    querySourceName // Use query source as stable subscription ID
-  );
-  
-  // Apply pipe transformations if present
-  let loopData = rawEvents;
-  const pipeContext: Record<string, any> = {}; // Store extracted variables
-  
-  if (pipe && Array.isArray(pipe) && rawEvents.length > 0) {
-    for (const step of pipe) {
-      loopData = executePipeStep(loopData, step, pipeContext);
+  if (element.type === 'loop' && element.source) {
+    // Get data from pre-fetched query results
+    const sourceData = queryResults.get(element.source);
+    if (sourceData) {
+      loopData = sourceData;
+    } else {
+      // Query might not have been executed yet or had an error
+      console.warn(`No data found for query: ${element.source}`);
     }
   }
   
   // Make extracted variables available in loop variables
-  const extractedVars = { ...loopVariables, ...pipeContext };
-  
-  const isError = !!error;
+  const extractedVars = { ...loopVariables, ...extractedVariables };
 
   // Get auth store for NIP-07 signing
   const { isAuthenticated, signEvent, login } = useAuthStore();
@@ -309,6 +285,8 @@ function ElementRenderer({
               setFormData={setFormData}
               events={events}
               queries={queries}
+              queryResults={queryResults}
+              extractedVariables={extractedVariables}
               userContext={userContext}
               loopVariables={loopVariables}
             />
@@ -332,6 +310,8 @@ function ElementRenderer({
               setFormData={setFormData}
               events={events}
               queries={queries}
+              queryResults={queryResults}
+              extractedVariables={extractedVariables}
               userContext={userContext}
               loopVariables={loopVariables}
             />
@@ -355,6 +335,8 @@ function ElementRenderer({
               setFormData={setFormData}
               events={events}
               queries={queries}
+              queryResults={queryResults}
+              extractedVariables={extractedVariables}
               userContext={userContext}
               loopVariables={loopVariables}
             />
@@ -377,6 +359,8 @@ function ElementRenderer({
               setFormData={setFormData}
               events={events}
               queries={queries}
+              queryResults={queryResults}
+              extractedVariables={extractedVariables}
               userContext={userContext}
               loopVariables={loopVariables}
             />
@@ -399,6 +383,8 @@ function ElementRenderer({
               setFormData={setFormData}
               events={events}
               queries={queries}
+              queryResults={queryResults}
+              extractedVariables={extractedVariables}
               userContext={userContext}
               loopVariables={loopVariables}
             />
@@ -532,6 +518,8 @@ function ElementRenderer({
                       setFormData={setFormData}
                       events={events}
                       queries={queries}
+                      queryResults={queryResults}
+                      extractedVariables={extractedVariables}
                       userContext={userContext}
                       loopVariables={newLoopVariables}
                     />
@@ -561,6 +549,8 @@ function ElementRenderer({
                   setFormData={setFormData}
                   events={events}
                   queries={queries}
+                  queryResults={queryResults}
+                  extractedVariables={extractedVariables}
                   userContext={userContext}
                   loopVariables={loopVariables}
                 />
@@ -574,6 +564,8 @@ function ElementRenderer({
               setFormData={setFormData}
               events={events}
               queries={queries}
+              queryResults={queryResults}
+              extractedVariables={extractedVariables}
               userContext={userContext}
               loopVariables={loopVariables}
             />
@@ -609,6 +601,27 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
   
   const userContext = { pubkey };
   
+  // Execute all queries with dependency resolution
+  const { queryResults, extractedVariables, loading: queriesLoading, error: queryError } = useQueryExecution(
+    content.queries || {}
+  );
+  
+  // Show loading state while queries are executing
+  if (queriesLoading) {
+    return (
+      <div>Loading queries...</div>
+    );
+  }
+  
+  // Show error if query execution failed
+  if (queryError) {
+    return (
+      <div style={{ color: 'red' }}>
+        Error executing queries: {queryError.message}
+      </div>
+    );
+  }
+  
   // If there are no elements, show a placeholder
   if (!content.elements || content.elements.length === 0) {
     return (
@@ -639,6 +652,8 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
           setFormData={setFormData}
           events={content.events}
           queries={content.queries}
+          queryResults={queryResults}
+          extractedVariables={extractedVariables}
           userContext={userContext}
           loopVariables={{}}
         />

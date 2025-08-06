@@ -8,8 +8,9 @@
       expression: '.tags[] | select(.[0] == "p") | .[1]'
       as: followed_pubkeys
 
-"$global_feed":
+"$following_feed":
   kinds: [1]
+  authors: $followed_pubkeys
   limit: 100
   since: time.now - 86400000
   pipe:
@@ -27,11 +28,11 @@ style: bg-gray-100
 
 {#user-info}
 [div class="bg-white p-4 rounded-lg shadow mb-4"]
-## Global Timeline
+## Your Following Feed
 
 Connected as: {user.pubkey}
 
-Note: This shows a global feed. The contact list extraction is implemented but query dependencies (using extracted variables in other queries) is still in development.
+This shows posts from people you follow, extracted from your contact list.
 [/div]
 
 {#post-form}
@@ -52,7 +53,7 @@ Note: This shows a global feed. The contact list extraction is implemented but q
 
 {#feed}
 [div]
-[each $global_feed as $note]
+[each $following_feed as $note]
   [div class="bg-white p-4 rounded-lg shadow mb-4"]
     {#author}
     [div class="font-bold text-gray-800"]

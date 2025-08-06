@@ -21,10 +21,11 @@
         }
       ]
     },
-    "$global_feed": {
+    "$following_feed": {
       "kinds": [
         1
       ],
+      "authors": "$followed_pubkeys",
       "limit": 100,
       "since": "time.now - 86400000",
       "pipe": [
@@ -67,7 +68,7 @@
         {
           "type": "h2",
           "content": [
-            "Global Timeline"
+            "Your Following Feed"
           ]
         },
         {
@@ -75,7 +76,7 @@
           "content": [
             "Connected as: ",
             "{user.pubkey}",
-            "Note: This shows a global feed. The contact list extraction is implemented but query dependencies (using extracted variables in other queries) is still in development."
+            "This shows posts from people you follow, extracted from your contact list."
           ]
         }
       ]
@@ -173,7 +174,7 @@
       "elements": [
         {
           "type": "loop",
-          "source": "$global_feed",
+          "source": "$following_feed",
           "variable": "$note",
           "elements": [
             {
