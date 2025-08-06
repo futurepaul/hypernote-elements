@@ -8,7 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Production server**: `bun run start` - Runs production build
 - **Build**: `bun run build` - Builds the project to dist/
 - **Tests**: `bun test` - Runs all tests (Bun's built-in test runner)
-- **Seed data**: `bun run seed` - Populates test data
+- **Run single test**: `bun test tests/[filename].test.ts` - Run specific test file
+- **Seed data**: `bun run seed` - Populates test data in local relay
 - **Update examples**: `bun run update-examples` - Regenerates example JSON files from markdown
 
 ## Project Architecture
@@ -29,7 +30,7 @@ This is a **Hypernote language compiler and renderer** - a declarative system fo
    - Uses React Query for data fetching from Nostr relays
 
 3. **Nostr Integration** (`src/lib/`):
-   - `relayHandler.ts`: Manages Nostr relay connections
+   - `relayHandler.ts`: Manages Nostr relay connections with NDK best practices
    - `nostrFetch.ts`: Fetches events from relays with React Query
    - `nostrStore.ts`: Zustand store for Nostr state management
 
@@ -53,14 +54,6 @@ Hypernote extends Markdown with:
 - **Tailwind Plugin**: `bun-plugin-tailwind` for CSS processing
 - **Custom Loaders**: `scripts/md-loader.ts` for markdown file processing
 - **TypeScript**: Full TypeScript support with strict configuration
-
-## Development Notes
-
-- The project uses Bun extensively - ensure you have Bun installed rather than npm/yarn
-- Examples in `examples/` directory serve as both documentation and test fixtures
-- The compiler produces validation errors rather than throwing, returning fallback structures
-- Styling system converts Tailwind classes to CSS-in-JS objects for cross-platform compatibility
-- All Nostr operations are handled through the RelayHandler abstraction layer
 
 ## Important Architecture: Event Subscription & Cache Management
 
@@ -114,7 +107,7 @@ console.log(`Published to ${result.successCount} relays`);
 ```
 
 **Relay Configuration:**
-Default relays in `src/stores/nostrStore.ts` include `nos.lol`, `relay.damus.io`, and `nostr.wine`.
+Default relays in `src/stores/nostrStore.ts` include `nos.lol`, `relay.damus.io`, and `relay.primal.net`.
 
 ## Testing
 

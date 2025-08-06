@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Toaster } from "sonner";
 import { AVAILABLE_EXAMPLES, loadExample, type ExampleName } from "../tests/example-loader";
+import { UserProfile } from "./components/UserProfile";
 
 // Load all examples at build time
 const EXAMPLES = Object.fromEntries(
@@ -76,41 +77,45 @@ export function App() {
 
   return (
     <div className="h-screen p-4 flex flex-col">
-      <div className="mb-4 flex gap-4">
-        <Select
-          value={template}
-          onValueChange={(value: TemplateKey) => {
-            setTemplate(value);
-          }}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Select an example" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="blank">Blank</SelectItem>
-            {AVAILABLE_EXAMPLES.map(name => (
-              <SelectItem key={name} value={name}>
-                {formatExampleName(name)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex gap-4">
+          <Select
+            value={template}
+            onValueChange={(value: TemplateKey) => {
+              setTemplate(value);
+            }}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select an example" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="blank">Blank</SelectItem>
+              {AVAILABLE_EXAMPLES.map(name => (
+                <SelectItem key={name} value={name}>
+                  {formatExampleName(name)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
+          <Select
+            value={currentRelaySet}
+            onValueChange={(value: RelaySet) => {
+              switchRelaySet(value);
+            }}
+          >
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Select relays" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="local">Local</SelectItem>
+              <SelectItem value="test">Test</SelectItem>
+              <SelectItem value="real">Real</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         
-        <Select
-          value={currentRelaySet}
-          onValueChange={(value: RelaySet) => {
-            switchRelaySet(value);
-          }}
-        >
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Select relays" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="local">Local</SelectItem>
-            <SelectItem value="test">Test</SelectItem>
-            <SelectItem value="real">Real</SelectItem>
-          </SelectContent>
-        </Select>
+        <UserProfile />
       </div>
       <ResizablePanelGroup direction="vertical" className="flex-1 rounded-lg border">
         <ResizablePanel defaultSize={75}>

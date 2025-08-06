@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, QueryClientProvider } from '@tanstack/react-query';
+import { useDebounce } from 'use-debounce';
 import { RelayHandler } from './lib/relayHandler';
 import { compileHypernoteToContent } from './lib/compiler';
-import { queryClient } from './stores/nostrStore';
+import { queryClient, useNostrStore } from './stores/nostrStore';
+import { useAuthStore } from './stores/authStore';
 import { fetchNostrEvents } from './lib/nostrFetch';
 import type { Hypernote, AnyElement } from './lib/schema';
+import { toast } from 'sonner';
 
 // Define the structure of elements based on compiler output
 interface HypernoteElement {
@@ -117,7 +120,11 @@ function ElementRenderer({
       ? useNostrEventsQuery(relayHandler, processedQueryConfig)
       : { data: undefined, isLoading: false, isError: false, error: null };
 
-  // Process form submission
+  // Get auth store for NIP-07 signing
+  const { isAuthenticated, signEvent, login } = useAuthStore();
+  const { snstrClient } = useNostrStore();
+  
+  // Process form submission with NIP-07 signing
   const handleFormSubmit = async (e: React.FormEvent, eventName?: string) => {
     e.preventDefault();
     
@@ -132,6 +139,19 @@ function ElementRenderer({
       return;
     }
     
+    // Check if user is authenticated
+    if (!isAuthenticated) {
+      toast.error('Please connect your wallet to publish events');
+      // Optionally trigger login
+      login();
+      return;
+    }
+    
+    if (!snstrClient) {
+      toast.error('Relay client not initialized');
+      return;
+    }
+    
     const eventTemplate = events[eventName];
     
     // Process template variables
@@ -143,15 +163,24 @@ function ElementRenderer({
       });
     }
     
-    // Publish the event
+    // Create event template for signing
+    const unsignedEvent = {
+      kind: eventTemplate.kind,
+      content: content,
+      tags: eventTemplate.tags || [],
+      created_at: Math.floor(Date.now() / 1000)
+    };
+    
+    // Sign and publish the event
     try {
-      const result = await relayHandler.publishEvent(
-        eventTemplate.kind,
-        content,
-        eventTemplate.tags || []
-      );
+      // Sign with NIP-07
+      const signedEvent = await signEvent(unsignedEvent);
+      
+      // Publish to relays
+      const result = await snstrClient.publishEvent(signedEvent);
       
       console.log(`Published event: ${result.eventId} to ${result.successCount} relays`);
+      toast.success(`Event published to ${result.successCount} relays!`);
       
       // Reset form if successful
       if (setFormData) {
@@ -162,6 +191,7 @@ function ElementRenderer({
       queryClient.invalidateQueries({ queryKey: ['nostrEvents'] });
     } catch (error) {
       console.error(`Failed to publish event: ${error}`);
+      toast.error(`Failed to publish: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -522,8 +552,11 @@ function ElementRenderer({
 
 // Main renderer function that takes markdown and returns React node
 export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string, relayHandler: RelayHandler }) {
+  // Debounce the markdown input to prevent re-rendering on every keystroke
+  const [debouncedMarkdown] = useDebounce(markdown, 300);
+  
   // Guard against undefined or null markdown
-  if (!markdown || typeof markdown !== 'string') {
+  if (!debouncedMarkdown || typeof debouncedMarkdown !== 'string') {
     return (
       <QueryClientProvider client={queryClient}>
         <div>No content to display. Please select an example or enter markdown content.</div>
@@ -531,15 +564,18 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
     );
   }
 
-  // Compile markdown to content object
-  const content: Hypernote = compileHypernoteToContent(markdown);
+  // Compile markdown to content object - memoize to prevent unnecessary recompilation
+  const content: Hypernote = useMemo(
+    () => compileHypernoteToContent(debouncedMarkdown),
+    [debouncedMarkdown]
+  );
   
   // Set up form data state
   const [formData, setFormData] = useState<Record<string, string>>({});
   
-  // Get user pubkey from local storage
-  const pubkey = localStorage.getItem("pubkey");
-  console.log("Current user pubkey from localStorage:", pubkey);
+  // Get user pubkey from auth store (NIP-07)
+  const { pubkey } = useAuthStore();
+  console.log("Current user pubkey from NIP-07:", pubkey);
   
   const userContext = { pubkey };
   
@@ -591,8 +627,11 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
 
 // Component to output the compiled JSON from markdown
 export function HypernoteJsonOutput({ markdown }: { markdown: string }) {
+  // Debounce the markdown input to match the renderer
+  const [debouncedMarkdown] = useDebounce(markdown, 300);
+  
   // Guard against undefined or null markdown
-  if (!markdown || typeof markdown !== 'string') {
+  if (!debouncedMarkdown || typeof debouncedMarkdown !== 'string') {
     return (
       <pre className="bg-slate-100 text-red-900 text-xs p-4 rounded overflow-auto">
         No markdown content provided
@@ -600,7 +639,12 @@ export function HypernoteJsonOutput({ markdown }: { markdown: string }) {
     );
   }
 
-  const content: Hypernote = compileHypernoteToContent(markdown);
+  // Memoize the compilation to prevent unnecessary recompilation
+  const content: Hypernote = useMemo(
+    () => compileHypernoteToContent(debouncedMarkdown),
+    [debouncedMarkdown]
+  );
+  
   return (
     <pre className="bg-slate-100 text-green-900 text-xs p-4 rounded overflow-auto">
       {JSON.stringify(content, null, 2)}
