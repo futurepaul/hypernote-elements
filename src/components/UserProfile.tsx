@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import { useAuthStore } from "../stores/authStore";
 import { Button } from "./ui/button";
-import { User, LogOut, Wallet } from "lucide-react";
+import { User, LogOut, Key } from "lucide-react";
 
 export function UserProfile() {
   const { 
@@ -96,8 +96,8 @@ export function UserProfile() {
         onClick={login}
         className="bg-primary text-primary-foreground hover:bg-primary/90"
       >
-        <Wallet className="h-4 w-4 mr-2" />
-        Connect Wallet
+        <Key className="h-4 w-4 mr-2" />
+        Connect NIP-07
       </Button>
     );
   }

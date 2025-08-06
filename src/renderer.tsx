@@ -141,7 +141,7 @@ function ElementRenderer({
     
     // Check if user is authenticated
     if (!isAuthenticated) {
-      toast.error('Please connect your wallet to publish events');
+      toast.error('Please connect NIP-07 to publish events');
       // Optionally trigger login
       login();
       return;

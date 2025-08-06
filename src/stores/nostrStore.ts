@@ -65,9 +65,11 @@ export const useNostrStore = create<NostrStore>((set, get) => ({
         cleanup: () => client.disconnect(),
         getRelayStatuses: () => client.getRelayStatuses(),
         getConnectedRelays: () => client.getConnectedRelays(),
-        // These will be replaced when we update the renderer
-        subscribe: (filters: any, onEvent: any, onEose: any) => 
-          client.subscribe(filters, onEvent, onEose),
+        // For compatibility with existing nostrFetch code
+        subscribe: async (filters: any) => {
+          // Use fetchEvents which returns a Promise<NostrEvent[]>
+          return await client.fetchEvents(filters);
+        },
         publishEvent: async (kind: number, content: string) => {
           // This will be updated to use NIP-07 signing
           throw new Error("Publishing requires NIP-07 authentication");
@@ -118,8 +120,11 @@ export const useNostrStore = create<NostrStore>((set, get) => ({
         cleanup: () => client.disconnect(),
         getRelayStatuses: () => client.getRelayStatuses(),
         getConnectedRelays: () => client.getConnectedRelays(),
-        subscribe: (filters: any, onEvent: any, onEose: any) => 
-          client.subscribe(filters, onEvent, onEose),
+        // For compatibility with existing nostrFetch code
+        subscribe: async (filters: any) => {
+          // Use fetchEvents which returns a Promise<NostrEvent[]>
+          return await client.fetchEvents(filters);
+        },
         publishEvent: async (kind: number, content: string) => {
           throw new Error("Publishing requires NIP-07 authentication");
         }

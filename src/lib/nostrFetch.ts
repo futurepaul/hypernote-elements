@@ -1,5 +1,10 @@
-import type { Filter, Event } from 'nostr-tools';
-import { RelayHandler } from './relayHandler';
+// Using our SNSTR types instead of nostr-tools
+import type { NostrEvent } from './snstr/nip07';
+import type { Filter } from './snstr/client';
+
+// Type alias for compatibility
+type Event = NostrEvent;
+type RelayHandler = any; // Compatibility type
 
 /**
  * Execute a pipe transformation step on the given data
