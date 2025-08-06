@@ -277,12 +277,12 @@ export class SNSTRClient {
       .map(([url, _]) => url);
   }
 
-  // Subscribe to events from all connected relays
+  // Subscribe to events from all connected relays (live subscription)
   async subscribe(
     filters: Filter[],
     onEvent: (event: NostrEvent, relay: string) => void,
     onEose?: (relay: string) => void,
-    timeout: number = 30000
+    timeout: number = 0 // Default to no timeout for live subscriptions
   ): Promise<string[]> {
     const subIds: string[] = [];
     const connectedRelays = this.getConnectedRelays();
@@ -297,23 +297,29 @@ export class SNSTRClient {
 
       const subId = relay.subscribe(filters, {
         onEvent: (event) => onEvent(event, url),
-        onEose: () => onEose?.(url)
+        onEose: () => onEose?.(url),
+        onClose: () => console.log(`Subscription closed on ${url}`)
       });
 
       subIds.push(subId);
     }
 
-    // Set up timeout
+    // Set up timeout if specified (0 means no timeout - keep alive)
     if (timeout > 0) {
       setTimeout(() => {
-        subIds.forEach((subId, index) => {
-          const relay = this.relays.get(connectedRelays[index]);
-          relay?.unsubscribe(subId);
-        });
+        this.unsubscribeAll(subIds, connectedRelays);
       }, timeout);
     }
 
     return subIds;
+  }
+  
+  // Unsubscribe from specific subscriptions
+  unsubscribeAll(subIds: string[], relayUrls: string[]) {
+    subIds.forEach((subId, index) => {
+      const relay = this.relays.get(relayUrls[index]);
+      relay?.unsubscribe(subId);
+    });
   }
 
   // Fetch events with EOSE (End of Stored Events) handling

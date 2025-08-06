@@ -26,16 +26,8 @@ export function UserProfile() {
       checkExtension();
     }, 1000);
     
-    // Check periodically in case extension is installed while page is open
-    const interval = setInterval(() => {
-      if (!hasExtension) {
-        checkExtension();
-      }
-    }, 5000);
-    
     return () => {
       clearTimeout(timeout);
-      clearInterval(interval);
     };
   }, []);
   

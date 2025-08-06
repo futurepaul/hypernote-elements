@@ -1,11 +1,10 @@
-import React, { useState, useMemo } from 'react';
-import { useQuery, QueryClientProvider } from '@tanstack/react-query';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useDebounce } from 'use-debounce';
 import { RelayHandler } from './lib/relayHandler';
 import { compileHypernoteToContent } from './lib/compiler';
-import { queryClient, useNostrStore } from './stores/nostrStore';
+import { useNostrStore } from './stores/nostrStore';
 import { useAuthStore } from './stores/authStore';
-import { fetchNostrEvents } from './lib/nostrFetch';
+import { useNostrSubscription } from './lib/snstr/hooks';
 import type { Hypernote, AnyElement } from './lib/schema';
 import { toast } from 'sonner';
 
@@ -36,15 +35,13 @@ interface RendererProps {
   loopVariables?: Record<string, any>;
 }
 
-// Custom hook to fetch data for a specific query using React Query
-function useNostrEventsQuery(relayHandler: RelayHandler, filter: any) {
-  return useQuery({
-    queryKey: ['nostrEvents', JSON.stringify(filter)],
-    queryFn: () => fetchNostrEvents(relayHandler, filter),
-    enabled: !!relayHandler && !!filter && relayHandler.getConnectedRelays().length > 0,
-    retry: 2, // Retry failed queries up to 2 times
-    retryDelay: 1000, // Wait 1 second between retries
-  });
+// Process pipe transformations on event data
+function executePipeStep(data: any[], step: any): any[] {
+  if (step.operation === 'reverse') {
+    return [...data].reverse();
+  }
+  console.warn(`Unsupported pipe operation:`, step);
+  return data;
 }
 
 // Component to render a single element based on its type
@@ -104,21 +101,50 @@ function ElementRenderer({
     return substituteInValue(processedConfig);
   };
 
-  // If this is a loop element, fetch the data for its source using React Query
+  // If this is a loop element, fetch the data for its source using reactive subscription
   const querySourceName = element.type === 'loop' ? element.source : undefined;
   const queryConfig = querySourceName ? queries[querySourceName] : undefined;
   
-  // Substitute variables in the query config before using it
-  const processedQueryConfig = substituteQueryVariables(queryConfig);
+  // Memoize the processed query config to prevent recreating it on every render
+  const processedQueryConfig = useMemo(
+    () => substituteQueryVariables(queryConfig),
+    [queryConfig, userContext.pubkey] // Only reprocess if query or user changes
+  );
   
-  console.log(`Original query config for ${querySourceName}:`, queryConfig);
-  console.log(`Processed query config for ${querySourceName}:`, processedQueryConfig);
-
-  // Use the new React Query hook for fetching events
-  const { data: loopData, isLoading, isError, error } =
-    querySourceName && processedQueryConfig
-      ? useNostrEventsQuery(relayHandler, processedQueryConfig)
-      : { data: undefined, isLoading: false, isError: false, error: null };
+  // Memoize filters extraction to keep stable reference
+  const { pipe, ...filters } = useMemo(
+    () => processedQueryConfig || {},
+    [processedQueryConfig]
+  );
+  
+  // Debug logging - only log if this is actually a loop element
+  if (element.type === 'loop') {
+    console.log(`[LOOP] Query source: ${querySourceName}`, {
+      queryConfig,
+      processedQueryConfig,
+      filters,
+      timestamp: Date.now()
+    });
+  }
+  
+  // Only use the subscription hook if this is actually a loop element
+  const isLoopElement = element.type === 'loop';
+  
+  // Use the reactive subscription hook for fetching events (only for loops)
+  const { events: rawEvents, loading: isLoading, error } = useNostrSubscription(
+    isLoopElement && querySourceName && filters ? [filters] : null,
+    querySourceName // Use query source as stable subscription ID
+  );
+  
+  // Apply pipe transformations if present
+  let loopData = rawEvents;
+  if (pipe && Array.isArray(pipe) && rawEvents.length > 0) {
+    for (const step of pipe) {
+      loopData = executePipeStep(loopData, step);
+    }
+  }
+  
+  const isError = !!error;
 
   // Get auth store for NIP-07 signing
   const { isAuthenticated, signEvent, login } = useAuthStore();
@@ -187,8 +213,7 @@ function ElementRenderer({
         setFormData({});
       }
       
-      // Invalidate related queries when an event is published
-      queryClient.invalidateQueries({ queryKey: ['nostrEvents'] });
+      // No need to invalidate - subscriptions are reactive and will auto-update!
     } catch (error) {
       console.error(`Failed to publish event: ${error}`);
       toast.error(`Failed to publish: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -237,8 +262,6 @@ function ElementRenderer({
   // Get the element's inline styles (direct mapping from style property)
   const elementStyles = element.style || {};
 
-  // Debugging log
-  console.log("Rendering element:", element);
 
   // Render element based on its type
   switch (element.type) {
@@ -558,9 +581,7 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
   // Guard against undefined or null markdown
   if (!debouncedMarkdown || typeof debouncedMarkdown !== 'string') {
     return (
-      <QueryClientProvider client={queryClient}>
-        <div>No content to display. Please select an example or enter markdown content.</div>
-      </QueryClientProvider>
+      <div>No content to display. Please select an example or enter markdown content.</div>
     );
   }
 
@@ -575,20 +596,13 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
   
   // Get user pubkey from auth store (NIP-07)
   const { pubkey } = useAuthStore();
-  console.log("Current user pubkey from NIP-07:", pubkey);
   
   const userContext = { pubkey };
-  
-  // Debugging logs
-  console.log("Compiled content:", content);
-  console.log("Elements:", content.elements);
   
   // If there are no elements, show a placeholder
   if (!content.elements || content.elements.length === 0) {
     return (
-      <QueryClientProvider client={queryClient}>
-        <div>No content to display. Try adding some markdown!</div>
-      </QueryClientProvider>
+      <div>No content to display. Try adding some markdown!</div>
     );
   }
 
@@ -602,26 +616,24 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
   }
   
   return (
-    <QueryClientProvider client={queryClient}>
-      <div 
-        className={`hypernote-content ${themeClass}`.trim()} 
-        style={rootStyles as React.CSSProperties}
-      >
-        {content.elements.map((element, index) => (
-          <ElementRenderer
-            key={index}
-            element={element}
-            relayHandler={relayHandler}
-            formData={formData}
-            setFormData={setFormData}
-            events={content.events}
-            queries={content.queries}
-            userContext={userContext}
-            loopVariables={{}}
-          />
-        ))}
-      </div>
-    </QueryClientProvider>
+    <div 
+      className={`hypernote-content ${themeClass}`.trim()} 
+      style={rootStyles as React.CSSProperties}
+    >
+      {content.elements.map((element, index) => (
+        <ElementRenderer
+          key={index}
+          element={element}
+          relayHandler={relayHandler}
+          formData={formData}
+          setFormData={setFormData}
+          events={content.events}
+          queries={content.queries}
+          userContext={userContext}
+          loopVariables={{}}
+        />
+      ))}
+    </div>
   );
 }
 

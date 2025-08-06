@@ -33,20 +33,24 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   
   // Check if extension is available
   checkExtension: () => {
-    const hasExtension = hasNip07Support();
-    console.log("Checking for NIP-07 extension:", {
-      hasExtension,
-      windowNostr: typeof window !== "undefined" ? window.nostr : "window undefined",
-      windowType: typeof window
-    });
-    set({ hasExtension });
+    const currentHasExtension = get().hasExtension;
+    const newHasExtension = hasNip07Support();
     
-    if (!hasExtension) {
-      console.log("No extension found. window.nostr:", window?.nostr);
-    } else {
-      console.log("Extension found!");
-      // Clear any previous error when extension is detected
-      set({ error: null });
+    // Only update state if the value actually changed
+    if (currentHasExtension !== newHasExtension) {
+      console.log("NIP-07 extension status changed:", {
+        oldValue: currentHasExtension,
+        newValue: newHasExtension
+      });
+      set({ hasExtension: newHasExtension });
+      
+      if (newHasExtension) {
+        console.log("Extension found!");
+        // Clear any previous error when extension is detected
+        set({ error: null });
+      } else {
+        console.log("No extension found. window.nostr:", window?.nostr);
+      }
     }
   },
   
