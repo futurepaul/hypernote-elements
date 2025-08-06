@@ -275,7 +275,23 @@ export class QueryExecutor {
     let processed = events;
     if (pipe && Array.isArray(pipe)) {
       for (const step of pipe) {
-        processed = applyPipeOperation(step, processed, this.context.extracted);
+        // For extract operations, apply to each individual event if we have an array
+        if (step.operation === 'extract' && Array.isArray(processed)) {
+          // Apply extract to each event and flatten results
+          const extractedResults = [];
+          for (const event of processed) {
+            const extracted = applyPipeOperation(step, event, this.context.extracted);
+            if (Array.isArray(extracted)) {
+              extractedResults.push(...extracted);
+            } else if (extracted !== undefined) {
+              extractedResults.push(extracted);
+            }
+          }
+          processed = extractedResults;
+        } else {
+          // For other operations, apply to the entire array
+          processed = applyPipeOperation(step, processed, this.context.extracted);
+        }
       }
     }
     

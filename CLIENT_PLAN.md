@@ -211,13 +211,38 @@ export function evaluateJqExpression(expression: string, data: any): any {
 ## Success Criteria
 
 1. ✅ Successfully fetches user's contact list
-2. ✅ Extracts all followed pubkeys from tags
-3. ✅ Creates subscription for all followed users' posts
-4. ✅ Displays combined feed in chronological order
+2. ❌ Extracts all followed pubkeys from tags (NOT WORKING - filter issue)
+3. ❌ Creates subscription for all followed users' posts (blocked by #2)
+4. ✅ Displays combined feed in chronological order (shows global feed)
 5. ✅ Allows posting new notes
 6. ✅ Updates feed in real-time with new posts
 7. ✅ Compiles to valid JSON structure
 8. ✅ Renders correctly in the app
+9. ✅ Added to frontend dropdown
+10. ✅ Variable resolution working ({user.pubkey} displays correctly)
+
+## Current Status: PARTIAL SUCCESS ⚠️
+
+### ✅ Working:
+- Query dependency system
+- Topological execution order
+- Variable substitution in text content
+- Frontend integration
+- Basic query execution
+- User pubkey display
+- Form posting with NIP-07
+
+### ❌ Not Working:
+- **jq Expression Evaluation**: The `.tags[] | select(.[0] == "p") | .[1]` expression is not extracting pubkeys
+- **Contact List Processing**: Even if we fetch the contact list, we're not getting the followed pubkeys
+- **Following Feed**: Currently showing global feed instead of followed users' posts
+
+### 🐛 Current Issue:
+The pipe operation `extract` with jq expression is not working properly. Need to debug:
+1. Is the contact list being fetched correctly?
+2. Is the jq expression being evaluated correctly?  
+3. Are the extracted pubkeys being stored in context?
+4. Are they being used in the following feed query?
 
 ## Implementation Order
 

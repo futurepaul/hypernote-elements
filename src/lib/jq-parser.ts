@@ -17,6 +17,8 @@
  * @returns The result of the evaluation
  */
 export function evaluateJqExpression(expression: string, data: any): any {
+  console.log('[JQ] Evaluating expression:', expression, 'on data:', data);
+  
   // Remove whitespace
   expression = expression.trim();
   
@@ -27,12 +29,17 @@ export function evaluateJqExpression(expression: string, data: any): any {
   
   // Split by pipe operator
   const pipes = expression.split('|').map(s => s.trim());
+  console.log('[JQ] Pipe steps:', pipes);
   
   let result = data;
-  for (const pipe of pipes) {
+  for (let i = 0; i < pipes.length; i++) {
+    const pipe = pipes[i];
+    console.log(`[JQ] Step ${i}: "${pipe}" on:`, result);
     result = evaluateSingleExpression(pipe, result);
+    console.log(`[JQ] Step ${i} result:`, result);
   }
   
+  console.log('[JQ] Final result:', result);
   return result;
 }
 
@@ -178,12 +185,18 @@ export function extractFollowedPubkeys(contactListEvent: any): string[] {
  * Apply a pipe operation to data
  */
 export function applyPipeOperation(operation: any, data: any, context?: any): any {
+  console.log('[PIPE] Applying operation:', operation.operation, 'to data:', data);
+  
   switch (operation.operation) {
     case 'extract':
       // Extract data and store in context if provided
+      console.log('[EXTRACT] Expression:', operation.expression);
+      console.log('[EXTRACT] Input data:', data);
       const extracted = evaluateJqExpression(operation.expression, data);
+      console.log('[EXTRACT] Extracted result:', extracted);
       if (context && operation.as) {
         context[operation.as] = extracted;
+        console.log('[EXTRACT] Stored in context as:', operation.as, '=', extracted);
       }
       return extracted;
       
