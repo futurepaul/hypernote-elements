@@ -122,22 +122,34 @@ export function tokenize(content: string): Token[] {
       continue;
     }
     
-    // Handle variable reference (e.g., {$variable})
-    if (char === '{' && content[pos + 1] === '$') {
-      let variableName = '{';
-      pos++; // Skip '{'
-      while (pos < content.length && content[pos] !== '}') {
-        variableName += content[pos];
-        pos++;
-      }
-      variableName += '}'; // Include closing brace
-      pos++; // Skip '}'
+    // Handle variable reference (e.g., {$variable}, {user.pubkey}, {time.now}, {target.id}, {form.message})
+    if (char === '{' && pos + 1 < content.length) {
+      const nextChar = content[pos + 1];
+      // Check if this looks like a variable reference
+      // Variables can start with $, or be one of our special contexts (user, time, target, form)
+      const restOfContent = content.slice(pos + 1);
+      const isVariable = nextChar === '$' || 
+                        restOfContent.startsWith('user.') ||
+                        restOfContent.startsWith('time.') ||
+                        restOfContent.startsWith('target.') ||
+                        restOfContent.startsWith('form.');
       
-      tokens.push({ 
-        type: TokenType.VARIABLE_REFERENCE, 
-        value: variableName
-      });
-      continue;
+      if (isVariable) {
+        let variableName = '{';
+        pos++; // Skip '{'
+        while (pos < content.length && content[pos] !== '}') {
+          variableName += content[pos];
+          pos++;
+        }
+        variableName += '}'; // Include closing brace
+        pos++; // Skip '}'
+        
+        tokens.push({ 
+          type: TokenType.VARIABLE_REFERENCE, 
+          value: variableName
+        });
+        continue;
+      }
     }
     
     // Handle image syntax (e.g., ![alt text](src))

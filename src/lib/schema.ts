@@ -215,14 +215,41 @@ const AnyElementSchema = z.union([
 
 // Query pipe step schema - now only for transformations, no Nostr filters
 const QueryPipeStepSchema = z.union([
-  // Extract operation (existing)
+  // Extract operation - jq-style data extraction with variable assignment
   z.object({
-    extract: z.string().min(1),
-    as: z.string().min(1),
+    operation: z.literal("extract"),
+    expression: z.string().min(1), // jq expression like ".tags[] | select(.[0] == \"p\") | .[1]"
+    as: z.string().min(1), // variable name to store result
   }),
-  // Reverse operation (new)
+  // Reverse operation - reverses array order
   z.object({
     operation: z.literal("reverse"),
+  }),
+  // Flatten operation - flattens nested arrays
+  z.object({
+    operation: z.literal("flatten"),
+    depth: z.number().positive().optional(), // optional depth limit
+  }),
+  // Unique operation - removes duplicate values
+  z.object({
+    operation: z.literal("unique"),
+    by: z.string().optional(), // optional property to determine uniqueness
+  }),
+  // Sort operation - sorts array by property
+  z.object({
+    operation: z.literal("sort"),
+    by: z.string().optional(), // property to sort by (e.g., "created_at")
+    order: z.enum(["asc", "desc"]).optional().default("asc"),
+  }),
+  // Map operation - transforms each item
+  z.object({
+    operation: z.literal("map"),
+    expression: z.string().min(1), // jq expression to apply to each item
+  }),
+  // Filter operation - filters items based on condition
+  z.object({
+    operation: z.literal("filter"),
+    expression: z.string().min(1), // jq expression that returns boolean
   }),
 ]);
 

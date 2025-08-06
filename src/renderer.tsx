@@ -7,6 +7,7 @@ import { useAuthStore } from './stores/authStore';
 import { useNostrSubscription } from './lib/snstr/hooks';
 import type { Hypernote, AnyElement } from './lib/schema';
 import { toast } from 'sonner';
+import { applyPipeOperation } from './lib/jq-parser';
 
 // Define the structure of elements based on compiler output
 interface HypernoteElement {
@@ -36,12 +37,8 @@ interface RendererProps {
 }
 
 // Process pipe transformations on event data
-function executePipeStep(data: any[], step: any): any[] {
-  if (step.operation === 'reverse') {
-    return [...data].reverse();
-  }
-  console.warn(`Unsupported pipe operation:`, step);
-  return data;
+function executePipeStep(data: any, step: any, context?: any): any {
+  return applyPipeOperation(step, data, context);
 }
 
 // Component to render a single element based on its type
@@ -84,6 +81,14 @@ function ElementRenderer({
             console.warn(`Failed to evaluate time expression: ${value}`);
             return value;
           }
+        }
+        // Handle extracted variable references (e.g., "followed_pubkeys")
+        // These are passed through as-is and will be resolved later
+        // when we have access to the extraction results
+        if (value.match(/^[a-zA-Z_][a-zA-Z0-9_]*$/)) {
+          // Check if this might be a variable reference
+          // For now, pass it through unchanged
+          return value;
         }
         return value;
       } else if (Array.isArray(value)) {
@@ -138,11 +143,16 @@ function ElementRenderer({
   
   // Apply pipe transformations if present
   let loopData = rawEvents;
+  const pipeContext: Record<string, any> = {}; // Store extracted variables
+  
   if (pipe && Array.isArray(pipe) && rawEvents.length > 0) {
     for (const step of pipe) {
-      loopData = executePipeStep(loopData, step);
+      loopData = executePipeStep(loopData, step, pipeContext);
     }
   }
+  
+  // Make extracted variables available in loop variables
+  const extractedVars = { ...loopVariables, ...pipeContext };
   
   const isError = !!error;
 

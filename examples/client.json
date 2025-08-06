@@ -1,0 +1,249 @@
+{
+  "version": "1.1.0",
+  "component_kind": null,
+  "style": {
+    "backgroundColor": "rgb(243,244,246)"
+  },
+  "queries": {
+    "$contact_list": {
+      "kinds": [
+        3
+      ],
+      "authors": [
+        "user.pubkey"
+      ],
+      "limit": 1,
+      "pipe": [
+        {
+          "operation": "extract",
+          "expression": ".tags[] | select(.[0] == \"p\") | .[1]",
+          "as": "followed_pubkeys"
+        }
+      ]
+    },
+    "$global_feed": {
+      "kinds": [
+        1
+      ],
+      "limit": 100,
+      "since": "time.now - 86400000",
+      "pipe": [
+        {
+          "operation": "reverse"
+        }
+      ]
+    }
+  },
+  "events": {
+    "@post_note": {
+      "kind": 1,
+      "content": "{form.message}",
+      "tags": [
+        [
+          "client",
+          "hypernote-client"
+        ]
+      ]
+    }
+  },
+  "elements": [
+    {
+      "type": "h1",
+      "content": [
+        "Nostr Client"
+      ]
+    },
+    {
+      "type": "div",
+      "elementId": "user-info",
+      "style": {
+        "marginBottom": "1rem",
+        "padding": "1rem",
+        "backgroundColor": "rgb(255,255,255)",
+        "borderRadius": "0.5rem",
+        "boxShadow": "0 0 #0000, 0 0 #0000, 0 1px 3px 0 rgb(0,0,0,0.1), 0 1px 2px -1px rgb(0,0,0,0.1)"
+      },
+      "elements": [
+        {
+          "type": "h2",
+          "content": [
+            "Global Timeline"
+          ]
+        },
+        {
+          "type": "p",
+          "content": [
+            "Connected as: ",
+            "{user.pubkey}",
+            "Note: This shows a global feed. The contact list extraction is implemented but query dependencies (using extracted variables in other queries) is still in development."
+          ]
+        }
+      ]
+    },
+    {
+      "type": "div",
+      "elementId": "post-form",
+      "style": {
+        "marginBottom": "1rem",
+        "padding": "1rem",
+        "backgroundColor": "rgb(255,255,255)",
+        "borderRadius": "0.5rem",
+        "boxShadow": "0 0 #0000, 0 0 #0000, 0 1px 3px 0 rgb(0,0,0,0.1), 0 1px 2px -1px rgb(0,0,0,0.1)"
+      },
+      "elements": [
+        {
+          "type": "form",
+          "event": "@post_note",
+          "elements": [
+            {
+              "type": "input",
+              "style": {
+                "width": "100%",
+                "padding": "0.5rem",
+                "borderWidth": "1px",
+                "borderRadius": "0.25rem"
+              },
+              "content": [],
+              "attributes": {
+                "name": "message",
+                "placeholder": "What's happening?"
+              }
+            },
+            {
+              "type": "button",
+              "style": {
+                "marginTop": "0.5rem",
+                "paddingTop": "0.5rem",
+                "paddingRight": "1rem",
+                "paddingBottom": "0.5rem",
+                "paddingLeft": "1rem",
+                "color": "rgb(255,255,255)",
+                "backgroundColor": "rgb(59,130,246)",
+                "borderRadius": "0.25rem"
+              },
+              "elements": [
+                {
+                  "type": "p",
+                  "content": [
+                    "Post"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "div",
+      "elementId": "contact-debug",
+      "style": {
+        "marginBottom": "1rem",
+        "padding": "1rem",
+        "backgroundColor": "rgb(255,255,255)",
+        "borderRadius": "0.5rem",
+        "boxShadow": "0 0 #0000, 0 0 #0000, 0 1px 3px 0 rgb(0,0,0,0.1), 0 1px 2px -1px rgb(0,0,0,0.1)"
+      },
+      "elements": [
+        {
+          "type": "h3",
+          "content": [
+            "Your Contact List (Debug)"
+          ]
+        },
+        {
+          "type": "loop",
+          "source": "$contact_list",
+          "variable": "$contact",
+          "elements": [
+            {
+              "type": "json",
+              "content": [],
+              "attributes": {
+                "variable": "$contact"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "div",
+      "elementId": "feed",
+      "elements": [
+        {
+          "type": "loop",
+          "source": "$global_feed",
+          "variable": "$note",
+          "elements": [
+            {
+              "type": "div",
+              "style": {
+                "marginBottom": "1rem",
+                "padding": "1rem",
+                "backgroundColor": "rgb(255,255,255)",
+                "borderRadius": "0.5rem",
+                "boxShadow": "0 0 #0000, 0 0 #0000, 0 1px 3px 0 rgb(0,0,0,0.1), 0 1px 2px -1px rgb(0,0,0,0.1)"
+              },
+              "elements": [
+                {
+                  "type": "div",
+                  "style": {
+                    "color": "rgb(31,41,55)",
+                    "fontWeight": 700
+                  },
+                  "elements": [
+                    {
+                      "type": "p",
+                      "content": [
+                        "      ",
+                        "{$note.pubkey}",
+                        "    "
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "div",
+                  "style": {
+                    "marginTop": "0.5rem",
+                    "color": "rgb(55,65,81)"
+                  },
+                  "elements": [
+                    {
+                      "type": "p",
+                      "content": [
+                        "      ",
+                        "{$note.content}",
+                        "    "
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "div",
+                  "style": {
+                    "marginTop": "0.5rem",
+                    "color": "rgb(107,114,128)",
+                    "fontSize": "0.875rem",
+                    "lineHeight": "1.25rem"
+                  },
+                  "elements": [
+                    {
+                      "type": "p",
+                      "content": [
+                        "      Posted at: ",
+                        "{$note.created_at}",
+                        "    "
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
