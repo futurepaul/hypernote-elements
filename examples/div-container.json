@@ -21,13 +21,13 @@
     },
     {
       "type": "p",
-      "elementId": "card-container",
       "content": [
         "This shows how div elements can contain nested content and be styled."
       ]
     },
     {
       "type": "div",
+      "elementId": "card-container",
       "style": {
         "padding": "1.5rem",
         "backgroundColor": "rgb(255,255,255)",
@@ -47,6 +47,7 @@
           "content": [
             "  ",
             "  This is some content inside a styled div container.",
+            " ",
             "  ",
             "  ",
             "  "
@@ -69,7 +70,12 @@
                 {
                   "type": "p",
                   "content": [
-                    "**Important note:**"
+                    {
+                      "type": "strong",
+                      "content": [
+                        "Important note:"
+                      ]
+                    }
                   ]
                 }
               ]
@@ -78,6 +84,7 @@
               "type": "p",
               "content": [
                 " Div elements can contain any nested content including text, headers, forms, and other divs.",
+                " ",
                 "  "
               ]
             }

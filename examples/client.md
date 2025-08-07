@@ -11,14 +11,14 @@
 "$following_feed":
   kinds: [1]
   authors: $followed_pubkeys
-  limit: 100
+  limit: 20 
+  live: true
+  since: 0
 
 "@post_note":
   kind: 1
   content: "{form.message}"
   tags: [["client", "hypernote-client"]]
-
-style: bg-gray-100
 ---
 
 # Nostr Client

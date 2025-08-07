@@ -11,7 +11,8 @@
     {
       "type": "p",
       "content": [
-        "Basic image:"
+        "Basic image:",
+        " "
       ]
     },
     {
@@ -24,7 +25,8 @@
     {
       "type": "p",
       "content": [
-        "Styled image:"
+        "Styled image:",
+        " "
       ]
     },
     {
@@ -38,4 +40,4 @@
       }
     }
   ]
-} 
+}

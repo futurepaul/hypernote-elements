@@ -8,7 +8,7 @@ import zapCloudMd from "../examples/zap-cloud.md";
 import imageTestMd from "../examples/image-test.md";
 import clientMd from "../examples/client.md";
 import profileMd from "../examples/profile.md";
-import blankMd from "../examples/blank.md";
+import textFormattingMd from "../examples/text-formatting.md";
 import imageVariablesMd from "../examples/image-variables.md";
 
 // Import all JSON examples directly using Bun's built-in JSON loader
@@ -19,7 +19,7 @@ import zapCloudJson from "../examples/zap-cloud.json";
 import imageTestJson from "../examples/image-test.json";
 import clientJson from "../examples/client.json";
 import profileJson from "../examples/profile.json";
-import blankJson from "../examples/blank.json";
+import textFormattingJson from "../examples/text-formatting.json";
 import imageVariablesJson from "../examples/image-variables.json";
 
 // Map of example names to their imported content
@@ -31,8 +31,8 @@ const EXAMPLE_MAP = {
   "image-test": { markdown: imageTestMd, json: imageTestJson },
   "client": { markdown: clientMd, json: clientJson },
   "profile": { markdown: profileMd, json: profileJson },
-  "blank": { markdown: blankMd, json: blankJson },
   "image-variables": { markdown: imageVariablesMd, json: imageVariablesJson },
+  "text-formatting": { markdown: textFormattingMd, json: textFormattingJson },
 } as const;
 
 export interface ExampleData {
@@ -70,14 +70,14 @@ export function loadExamples(names: string[]): ExampleData[] {
  */
 export const AVAILABLE_EXAMPLES = [
   "basic-hello",
+  "profile",
+  "client",
   "feed",
   "div-container",
   "zap-cloud",
   "image-test",
-  "client",
-  "profile",
-  "blank",
   "image-variables",
+  "text-formatting",
 ] as const;
 
 export type ExampleName = typeof AVAILABLE_EXAMPLES[number]; 

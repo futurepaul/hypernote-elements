@@ -1,9 +1,6 @@
 {
   "version": "1.1.0",
   "component_kind": null,
-  "style": {
-    "backgroundColor": "rgb(243,244,246)"
-  },
   "queries": {
     "$contact_list": {
       "kinds": [
@@ -26,7 +23,9 @@
         1
       ],
       "authors": "$followed_pubkeys",
-      "limit": 100
+      "limit": 20,
+      "since": 0,
+      "live": true
     }
   },
   "events": {
@@ -69,8 +68,14 @@
           "type": "p",
           "content": [
             "Connected as: ",
-            "{user.pubkey}",
-            "This shows posts from people you follow, extracted from your contact list."
+            "{user.pubkey}"
+          ]
+        },
+        {
+          "type": "p",
+          "content": [
+            "This shows posts from people you follow, extracted from your contact list.",
+            " "
           ]
         }
       ]
@@ -160,6 +165,7 @@
                       "content": [
                         "      ",
                         "{$note.pubkey}",
+                        " ",
                         "    "
                       ]
                     }
@@ -177,6 +183,7 @@
                       "content": [
                         "      ",
                         "{$note.content}",
+                        " ",
                         "    "
                       ]
                     }
@@ -196,6 +203,7 @@
                       "content": [
                         "      Posted at: ",
                         "{$note.created_at}",
+                        " ",
                         "    "
                       ]
                     }
