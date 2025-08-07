@@ -122,13 +122,32 @@ export function useQueryExecution(
               // Extract filters for subscription
               const { pipe, live, ...filters } = queryConfig;
               
-              // Process filters to handle extracted variables
+              // Process filters to handle extracted variables and time expressions
               const processedFilters = { ...filters };
-              // Substitute extracted variables in filters
+              // Substitute extracted variables and evaluate expressions in filters
               Object.keys(processedFilters).forEach(key => {
                 const value = processedFilters[key];
-                if (typeof value === 'string' && executor.getExtractedVariables()[value]) {
-                  processedFilters[key] = executor.getExtractedVariables()[value];
+                if (typeof value === 'string') {
+                  // Check for extracted variables
+                  if (executor.getExtractedVariables()[value]) {
+                    processedFilters[key] = executor.getExtractedVariables()[value];
+                  }
+                  // Handle time expressions like "time.now - 86400000"
+                  else if (value.includes('time.now')) {
+                    try {
+                      const timeNow = Date.now();
+                      const result = value.replace(/time\.now/g, timeNow.toString());
+                      const evaluated = new Function('return ' + result)();
+                      // Convert to seconds if this is a 'since' or 'until' field (Nostr uses seconds)
+                      if (key === 'since' || key === 'until') {
+                        processedFilters[key] = Math.floor(evaluated / 1000);
+                      } else {
+                        processedFilters[key] = evaluated;
+                      }
+                    } catch (e) {
+                      console.warn(`Failed to evaluate time expression: ${value}`);
+                    }
+                  }
                 }
               });
               
@@ -140,7 +159,7 @@ export function useQueryExecution(
                 processedFilters.authors = processedFilters.authors[0];
               }
               
-              console.log(`[LIVE] Starting live subscription for ${queryName}`);
+              console.log(`[LIVE] Starting live subscription for ${queryName} with filters:`, processedFilters);
               
               // Create live subscription
               const cleanup = snstrClient.subscribeLive(
