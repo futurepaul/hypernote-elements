@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { QueryExecutor, QueryContext } from '../lib/query-executor';
 import { useAuthStore } from '../stores/authStore';
 import { useNostrStore } from '../stores/nostrStore';
-import { NostrEvent } from '../lib/snstr/nip07';
+import type { NostrEvent } from '../lib/snstr/nip07';
 
 interface UseQueryExecutionResult {
   queryResults: Record<string, NostrEvent[]>;
@@ -14,6 +14,9 @@ interface UseQueryExecutionResult {
   loading: boolean;
   error: Error | null;
 }
+
+// Track active live subscriptions
+const liveSubscriptions = new Map<string, () => void>();
 
 /**
  * Hook that executes all queries in dependency order
@@ -106,6 +109,58 @@ export function useQueryExecution(
           console.log('[useQueryExecution] Setting results:', Object.keys(resultsObject).map(k => `${k}: ${resultsObject[k].length} items`));
           setQueryResults(resultsObject);
           setExtractedVariables({ ...executor.getExtractedVariables() });
+          
+          // Set up live subscriptions for queries marked as live
+          Object.entries(queries).forEach(([queryName, queryConfig]) => {
+            if (queryConfig.live === true) {
+              // Clean up any existing subscription for this query
+              const existingSub = liveSubscriptions.get(queryName);
+              if (existingSub) {
+                existingSub();
+              }
+              
+              // Extract filters for subscription
+              const { pipe, live, ...filters } = queryConfig;
+              
+              // Process filters to handle extracted variables
+              const processedFilters = { ...filters };
+              // Substitute extracted variables in filters
+              Object.keys(processedFilters).forEach(key => {
+                const value = processedFilters[key];
+                if (typeof value === 'string' && executor.getExtractedVariables()[value]) {
+                  processedFilters[key] = executor.getExtractedVariables()[value];
+                }
+              });
+              
+              // Flatten nested arrays in authors field if needed
+              if (processedFilters.authors && 
+                  Array.isArray(processedFilters.authors) && 
+                  processedFilters.authors.length === 1 && 
+                  Array.isArray(processedFilters.authors[0])) {
+                processedFilters.authors = processedFilters.authors[0];
+              }
+              
+              console.log(`[LIVE] Starting live subscription for ${queryName}`);
+              
+              // Create live subscription
+              const cleanup = snstrClient.relayHandler.subscribeLive(
+                [processedFilters],
+                (event: NostrEvent) => {
+                  console.log(`[LIVE] New event for ${queryName}:`, event.id);
+                  // Add new event to the beginning of the array (newest first)
+                  setQueryResults(prev => ({
+                    ...prev,
+                    [queryName]: [event, ...(prev[queryName] || [])]
+                  }));
+                },
+                () => {
+                  console.log(`[LIVE] EOSE for ${queryName}`);
+                }
+              );
+              
+              liveSubscriptions.set(queryName, cleanup);
+            }
+          });
         }
       } catch (err) {
         if (!cancelled) {
@@ -123,6 +178,12 @@ export function useQueryExecution(
     
     return () => {
       cancelled = true;
+      // Clean up all live subscriptions when component unmounts
+      liveSubscriptions.forEach((cleanup, queryName) => {
+        console.log(`[LIVE] Cleaning up subscription for ${queryName}`);
+        cleanup();
+      });
+      liveSubscriptions.clear();
     };
   }, [queriesHash, context, snstrClient]); // Use hash instead of full JSON
   
