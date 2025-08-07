@@ -1,0 +1,58 @@
+{
+  "version": "1.1.0",
+  "component_kind": null,
+  "queries": {
+    "$timeline": {
+      "kinds": [
+        1
+      ],
+      "limit": 20,
+      "since": "time.now - 86400000",
+      "live": true
+    }
+  },
+  "elements": [
+    {
+      "type": "h1",
+      "content": [
+        "Live Nostr Feed"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "This shows live updates from Nostr relays!"
+      ]
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Latest Posts (Live!)"
+      ]
+    },
+    {
+      "type": "loop",
+      "source": "$timeline",
+      "variable": "$post",
+      "elements": [
+        {
+          "type": "h3",
+          "content": [
+            "Post from {$post.pubkey}..."
+          ]
+        },
+        {
+          "type": "p",
+          "content": [
+            "  ",
+            "{$post.content}",
+            " ",
+            "  ",
+            "---",
+            " "
+          ]
+        }
+      ]
+    }
+  ]
+}

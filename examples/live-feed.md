@@ -3,6 +3,7 @@
   kinds: [1]
   limit: 20
   live: true
+  since: "time.now - 86400000"
 ---
 
 # Live Nostr Feed

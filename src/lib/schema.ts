@@ -268,6 +268,9 @@ const QuerySchema = z.object({
   ids: z.array(z.string().min(1)).optional(),
   tags: z.record(z.string().min(1), z.array(z.string())).optional(),
   
+  // Live subscription flag - keeps WebSocket connection open for real-time updates
+  live: z.boolean().optional(),
+  
   // Optional transformation pipeline
   pipe: z.array(QueryPipeStepSchema).optional(),
 });
