@@ -2,7 +2,7 @@
  * React hook for executing Hypernote queries with dependency resolution
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { QueryExecutor, QueryContext } from '../lib/query-executor';
 import { useAuthStore } from '../stores/authStore';
 import { useNostrStore } from '../stores/nostrStore';
@@ -14,9 +14,6 @@ interface UseQueryExecutionResult {
   loading: boolean;
   error: Error | null;
 }
-
-// Track active live subscriptions
-const liveSubscriptions = new Map<string, () => void>();
 
 /**
  * Hook that executes all queries in dependency order
@@ -31,6 +28,9 @@ export function useQueryExecution(
   
   const { pubkey } = useAuthStore();
   const { snstrClient } = useNostrStore();
+  
+  // Track active live subscriptions for this component instance
+  const liveSubscriptions = useRef<Map<string, () => void>>(new Map());
   
   // Memoize queries to prevent re-execution on every render
   const queriesJson = JSON.stringify(queries);
@@ -114,31 +114,48 @@ export function useQueryExecution(
           Object.entries(queries).forEach(([queryName, queryConfig]) => {
             if (queryConfig.live === true) {
               // Clean up any existing subscription for this query
-              const existingSub = liveSubscriptions.get(queryName);
+              const existingSub = liveSubscriptions.current.get(queryName);
               if (existingSub) {
                 existingSub();
               }
               
-              // Extract filters for subscription
-              const { pipe, live, ...filters } = queryConfig;
+              // Recreate the context and re-process the query config with current extracted variables
+              // This ensures we use the same logic as the initial query
+              const currentContext = {
+                user: { pubkey },
+                time: { now: Date.now() },
+                extracted: executor.getExtractedVariables(),
+                results: new Map()
+              };
               
-              // Process filters to handle extracted variables and time expressions
-              const processedFilters = { ...filters };
-              // Substitute extracted variables and evaluate expressions in filters
+              // Create a minimal executor just to process the variables
+              const tempExecutor = new QueryExecutor({ [queryName]: queryConfig }, currentContext, fetchEvents);
+              
+              // Process the query config to substitute all variables
+              const { pipe, live, ...filters } = queryConfig;
+              const processedFilters = JSON.parse(JSON.stringify(filters)); // Deep clone
+              
+              // Substitute all variables in the filters
               Object.keys(processedFilters).forEach(key => {
                 const value = processedFilters[key];
                 if (typeof value === 'string') {
-                  // Check for extracted variables
-                  if (executor.getExtractedVariables()[value]) {
-                    processedFilters[key] = executor.getExtractedVariables()[value];
+                  // Check for extracted variables (try both with and without $ prefix)
+                  if (currentContext.extracted[value]) {
+                    processedFilters[key] = currentContext.extracted[value];
+                  } else if (value.startsWith('$') && currentContext.extracted[value.substring(1)]) {
+                    processedFilters[key] = currentContext.extracted[value.substring(1)];
                   }
-                  // Handle time expressions like "time.now - 86400000"
+                  // Handle user.pubkey
+                  else if (value === 'user.pubkey') {
+                    processedFilters[key] = currentContext.user.pubkey;
+                  }
+                  // Handle time expressions
                   else if (value.includes('time.now')) {
                     try {
-                      const timeNow = Date.now();
+                      const timeNow = currentContext.time.now;
                       const result = value.replace(/time\.now/g, timeNow.toString());
                       const evaluated = new Function('return ' + result)();
-                      // Convert to seconds if this is a 'since' or 'until' field (Nostr uses seconds)
+                      // Convert to seconds for since/until
                       if (key === 'since' || key === 'until') {
                         processedFilters[key] = Math.floor(evaluated / 1000);
                       } else {
@@ -161,23 +178,32 @@ export function useQueryExecution(
               
               console.log(`[LIVE] Starting live subscription for ${queryName} with filters:`, processedFilters);
               
-              // Create live subscription
+              // Create live subscription with the same filters used for initial fetch
               const cleanup = snstrClient.subscribeLive(
                 [processedFilters],
                 (event: NostrEvent) => {
                   console.log(`[LIVE] New event for ${queryName}:`, event.id);
                   // Add new event to the beginning of the array (newest first)
-                  setQueryResults(prev => ({
-                    ...prev,
-                    [queryName]: [event, ...(prev[queryName] || [])]
-                  }));
+                  // But check for duplicates first
+                  setQueryResults(prev => {
+                    const existing = prev[queryName] || [];
+                    // Check if this event already exists
+                    if (existing.some(e => e.id === event.id)) {
+                      console.log(`[LIVE] Skipping duplicate event ${event.id}`);
+                      return prev;
+                    }
+                    return {
+                      ...prev,
+                      [queryName]: [event, ...existing]
+                    };
+                  });
                 },
                 () => {
                   console.log(`[LIVE] EOSE for ${queryName}`);
                 }
               );
               
-              liveSubscriptions.set(queryName, cleanup);
+              liveSubscriptions.current.set(queryName, cleanup);
             }
           });
         }
@@ -197,12 +223,12 @@ export function useQueryExecution(
     
     return () => {
       cancelled = true;
-      // Clean up all live subscriptions when component unmounts
-      liveSubscriptions.forEach((cleanup, queryName) => {
+      // Clean up all live subscriptions when component unmounts or queries change
+      liveSubscriptions.current.forEach((cleanup, queryName) => {
         console.log(`[LIVE] Cleaning up subscription for ${queryName}`);
         cleanup();
       });
-      liveSubscriptions.clear();
+      liveSubscriptions.current.clear();
     };
   }, [queriesHash, context, snstrClient]); // Use hash instead of full JSON
   

@@ -168,6 +168,9 @@ class SimpleRelay {
 
     const message = JSON.stringify(["REQ", subId, ...filters]);
     
+    console.log(`[SimpleRelay] Sending subscription to ${this.url}:`, message);
+    console.log(`[SimpleRelay] Filters object:`, filters);
+    
     if (this.connected && this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(message);
     } else {
@@ -335,6 +338,7 @@ export class SNSTRClient {
     }
     
     this.logger(`[LIVE] Starting live subscription with ${connectedRelays.length} relays`);
+    this.logger(`[LIVE] Filters:`, JSON.stringify(filters));
     
     const subIds: string[] = [];
     const seenIds = new Set<string>();
