@@ -9,7 +9,27 @@ import { useQueryExecution } from './hooks/useQueryExecution';
 import type { Hypernote, AnyElement } from './lib/schema';
 import { toast } from 'sonner';
 import { applyPipeOperation } from './lib/jq-parser';
-import { NostrEvent } from './lib/snstr/nip07';
+import type { NostrEvent } from './lib/snstr/nip07';
+
+// Pure render context - all data needed for rendering
+interface RenderContext {
+  // Data
+  queryResults: Record<string, NostrEvent[]>;
+  extractedVariables: Record<string, any>;
+  formData: Record<string, string>;
+  events: Record<string, any>;
+  userPubkey: string | null;
+  
+  // Current scope
+  loopVariables: Record<string, any>;
+  
+  // Loading hints
+  loadingQueries?: Set<string>; // Which queries are still loading
+  
+  // Callbacks (pure functions passed from parent)
+  onFormSubmit: (eventName: string) => void;
+  onInputChange: (name: string, value: string) => void;
+}
 
 // Define the structure of elements based on compiler output
 interface HypernoteElement {
@@ -25,710 +45,9 @@ interface HypernoteElement {
   style?: Record<string, any>; // CSS-in-JS style object
 }
 
-interface RendererProps {
-  element: HypernoteElement;
-  relayHandler: RelayHandler;
-  formData?: Record<string, string>;
-  setFormData?: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  events?: Record<string, any>;
-  queries?: Record<string, any>;
-  queryResults?: Record<string, NostrEvent[]>;
-  extractedVariables?: Record<string, any>;
-  userContext: {
-    pubkey: string | null;
-  };
-  loopVariables?: Record<string, any>;
-}
+// (Old RendererProps interface removed - using RenderContext instead)
 
-// Process pipe transformations on event data
-function executePipeStep(data: any, step: any, context?: any): any {
-  return applyPipeOperation(step, data, context);
-}
-
-// Component to render a single element based on its type
-function ElementRenderer({ 
-  element, 
-  relayHandler, 
-  formData = {}, 
-  setFormData, 
-  events = {}, 
-  queries = {},
-  queryResults = {},
-  extractedVariables = {},
-  userContext,
-  loopVariables = {}
-}: RendererProps) {
-  // Helper function to substitute variables in query configurations
-  const substituteQueryVariables = (queryConfig: any): any => {
-    if (!queryConfig) return queryConfig;
-    
-    // Deep clone the query config to avoid mutations
-    const processedConfig = JSON.parse(JSON.stringify(queryConfig));
-    
-    // Recursively substitute variables in the query config
-    const substituteInValue = (value: any): any => {
-      if (typeof value === 'string') {
-        // Handle user.pubkey substitution
-        if (value === 'user.pubkey' && userContext.pubkey) {
-          return userContext.pubkey;
-        }
-        // Handle time.now substitution
-        if (value === 'time.now') {
-          return Date.now();
-        }
-        // Handle time expressions like "time.now - 86400000"
-        if (value.includes('time.now')) {
-          try {
-            // Simple arithmetic evaluation for time expressions
-            const timeNow = Date.now();
-            const result = value.replace(/time\.now/g, timeNow.toString());
-            return eval(result); // Note: In production, use a safer expression evaluator
-          } catch (e) {
-            console.warn(`Failed to evaluate time expression: ${value}`);
-            return value;
-          }
-        }
-        // Handle extracted variable references (e.g., "followed_pubkeys")
-        // These are passed through as-is and will be resolved later
-        // when we have access to the extraction results
-        if (value.match(/^[a-zA-Z_][a-zA-Z0-9_]*$/)) {
-          // Check if this might be a variable reference
-          // For now, pass it through unchanged
-          return value;
-        }
-        return value;
-      } else if (Array.isArray(value)) {
-        return value.map(substituteInValue);
-      } else if (value && typeof value === 'object') {
-        const result: any = {};
-        for (const [key, val] of Object.entries(value)) {
-          result[key] = substituteInValue(val);
-        }
-        return result;
-      }
-      return value;
-    };
-    
-    return substituteInValue(processedConfig);
-  };
-
-  // Get loop data from pre-fetched query results if this is a loop element
-  let loopData: NostrEvent[] = [];
-  let isLoading = false;
-  let isError = false;
-  let error: Error | null = null;
-  
-  if (element.type === 'loop' && element.source) {
-    // Get data from pre-fetched query results
-    const sourceData = queryResults[element.source];
-    console.log(`Getting loop data for ${element.source}:`, sourceData?.length, 'items from queryResults');
-    if (sourceData) {
-      loopData = sourceData;
-    } else {
-      // Query hasn't finished executing yet - this is normal during initial load
-      loopData = [];
-    }
-  }
-  
-  // Make extracted variables available in loop variables
-  const extractedVars = { ...loopVariables, ...extractedVariables };
-
-  // Get auth store for NIP-07 signing
-  const { isAuthenticated, signEvent, login } = useAuthStore();
-  const { snstrClient } = useNostrStore();
-  
-  // Process form submission with NIP-07 signing
-  const handleFormSubmit = async (e: React.FormEvent, eventName?: string) => {
-    e.preventDefault();
-    
-    // If no event name is provided, just prevent default
-    if (!eventName) {
-      console.log('Form submitted but no event is specified');
-      return;
-    }
-    
-    if (!events || !events[eventName]) {
-      console.error(`Event ${eventName} not found`);
-      return;
-    }
-    
-    // Check if user is authenticated
-    if (!isAuthenticated) {
-      toast.error('Please connect NIP-07 to publish events');
-      // Optionally trigger login
-      login();
-      return;
-    }
-    
-    if (!snstrClient) {
-      toast.error('Relay client not initialized');
-      return;
-    }
-    
-    const eventTemplate = events[eventName];
-    
-    // Process template variables
-    let content = eventTemplate.content;
-    if (typeof content === 'string' && content.includes('{form.')) {
-      // Replace {form.fieldName} with actual form values
-      Object.keys(formData).forEach(key => {
-        content = content.replace(`{form.${key}}`, formData[key] || '');
-      });
-    }
-    
-    // Create event template for signing
-    const unsignedEvent = {
-      kind: eventTemplate.kind,
-      content: content,
-      tags: eventTemplate.tags || [],
-      created_at: Math.floor(Date.now() / 1000)
-    };
-    
-    // Sign and publish the event
-    try {
-      // Sign with NIP-07
-      const signedEvent = await signEvent(unsignedEvent);
-      
-      // Publish to relays
-      const result = await snstrClient.publishEvent(signedEvent);
-      
-      console.log(`Published event: ${result.eventId} to ${result.successCount} relays`);
-      toast.success(`Event published to ${result.successCount} relays!`);
-      
-      // Reset form if successful
-      if (setFormData) {
-        setFormData({});
-      }
-      
-      // No need to invalidate - subscriptions are reactive and will auto-update!
-    } catch (error) {
-      console.error(`Failed to publish event: ${error}`);
-      toast.error(`Failed to publish: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  };
-
-  // Handle input changes in forms
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>, name: string) => {
-    if (setFormData) {
-      setFormData(prev => ({
-        ...prev,
-        [name]: e.target.value
-      }));
-    }
-  };
-
-  // Parse variable references and replace with actual values
-  const resolveVariable = (variableName: string): string => {
-    // console.log(`Resolving variable: ${variableName}, available variables:`, loopVariables);
-    
-    if (variableName.startsWith('$') && variableName.includes('.')) {
-      const [varName, ...path] = variableName.split('.');
-      
-      // First check loop variables
-      let variable = loopVariables[varName];
-      
-      // If not in loop variables, check query results
-      if (!variable && queryResults[varName]) {
-        const queryData = queryResults[varName];
-        // If it's an array, automatically take the first item
-        variable = Array.isArray(queryData) && queryData.length > 0 ? queryData[0] : queryData;
-      }
-      
-      if (variable) {
-        // Access nested properties
-        const result = path.reduce((obj, prop) => obj?.[prop], variable);
-        console.log(`Resolved ${variableName} to:`, result);
-        // Return empty string if undefined/null, otherwise convert to string
-        return result !== undefined && result !== null ? String(result) : '';
-      } else {
-        console.log(`Variable ${varName} not found in loop variables or query results. Available queries:`, Object.keys(queryResults));
-      }
-    }
-    
-    // Handle simple $variable without property access
-    if (variableName.startsWith('$')) {
-      const varName = variableName;
-      
-      // Check loop variables first
-      if (loopVariables[varName]) {
-        return String(loopVariables[varName]);
-      }
-      
-      // Check query results
-      if (queryResults[varName]) {
-        const queryData = queryResults[varName];
-        // If it's an array, return JSON stringified
-        return Array.isArray(queryData) ? JSON.stringify(queryData) : String(queryData);
-      }
-    }
-    
-    return variableName;
-  };
-
-  // Process content and replace variable references
-  const processContent = (content: string): string => {
-    // Replace all variable references: {$variable}, {user.pubkey}, {time.now}, {form.field}, etc.
-    return content.replace(/\{([^}]+)\}/g, (match, variableName) => {
-      // Handle user.pubkey
-      if (variableName === 'user.pubkey' && userContext.pubkey) {
-        return userContext.pubkey;
-      }
-      // Handle time.now
-      if (variableName === 'time.now') {
-        return Date.now().toString();
-      }
-      // Handle time expressions like "time.now - 86400000"
-      if (variableName.includes('time.now')) {
-        try {
-          const timeNow = Date.now();
-          const result = variableName.replace(/time\.now/g, timeNow.toString());
-          return new Function('return ' + result)().toString();
-        } catch (e) {
-          console.warn(`Failed to evaluate time expression: ${variableName}`);
-          return match;
-        }
-      }
-      // Handle form variables
-      if (variableName.startsWith('form.')) {
-        const fieldName = variableName.substring(5);
-        return formData[fieldName] || '';
-      }
-      // Handle extracted variables
-      if (variableName in extractedVariables) {
-        const value = extractedVariables[variableName];
-        return Array.isArray(value) ? value.join(', ') : String(value);
-      }
-      // Handle query variables and loop variables (like $note.content or $profile.pubkey)
-      if (variableName.startsWith('$')) {
-        return resolveVariable(variableName);
-      }
-      
-      // If nothing matches, return the original
-      console.warn(`Unknown variable in content: ${variableName}`);
-      return match;
-    });
-  };
-
-  // Get the element's inline styles (direct mapping from style property)
-  const elementStyles = element.style || {};
-
-
-  // Render element based on its type
-  switch (element.type) {
-    case 'h1':
-    case 'h2':
-    case 'h3':
-    case 'p':
-      // Process all content items in order, preserving inline elements
-      const processedContent = element.content?.map((item, idx) => {
-        if (typeof item === 'string') {
-          return processContent(item);
-        } else {
-          // Render nested elements inline
-          return (
-            <ElementRenderer 
-              key={`nested-${idx}`}
-              element={item as HypernoteElement}
-              relayHandler={relayHandler}
-              formData={formData}
-              setFormData={setFormData}
-              events={events}
-              queries={queries}
-              queryResults={queryResults}
-              extractedVariables={extractedVariables}
-              userContext={userContext}
-              loopVariables={loopVariables}
-            />
-          );
-        }
-      });
-      
-      return React.createElement(
-        element.type,
-        { 
-          id: element.elementId, 
-          style: elementStyles 
-        },
-        processedContent
-      );
-      
-    case 'form':
-      return (
-        <form 
-          id={element.elementId} 
-          onSubmit={(e) => handleFormSubmit(e, element.event)}
-          style={elementStyles}
-        >
-          {element.elements && element.elements.map((child, index) => (
-            <ElementRenderer 
-              key={index} 
-              element={child} 
-              relayHandler={relayHandler}
-              formData={formData}
-              setFormData={setFormData}
-              events={events}
-              queries={queries}
-              queryResults={queryResults}
-              extractedVariables={extractedVariables}
-              userContext={userContext}
-              loopVariables={loopVariables}
-            />
-          ))}
-        </form>
-      );
-      
-    case 'button':
-      return (
-        <button 
-          id={element.elementId} 
-          type="submit"
-          style={elementStyles}
-        >
-          {element.elements && element.elements.map((child, index) => (
-            <ElementRenderer 
-              key={index} 
-              element={child} 
-              relayHandler={relayHandler}
-              formData={formData}
-              setFormData={setFormData}
-              events={events}
-              queries={queries}
-              queryResults={queryResults}
-              extractedVariables={extractedVariables}
-              userContext={userContext}
-              loopVariables={loopVariables}
-            />
-          ))}
-        </button>
-      );
-      
-    case 'span':
-      return (
-        <span 
-          id={element.elementId} 
-          style={elementStyles}
-        >
-          {element.elements && element.elements.map((child, index) => (
-            <ElementRenderer 
-              key={index} 
-              element={child} 
-              relayHandler={relayHandler}
-              formData={formData}
-              setFormData={setFormData}
-              events={events}
-              queries={queries}
-              queryResults={queryResults}
-              extractedVariables={extractedVariables}
-              userContext={userContext}
-              loopVariables={loopVariables}
-            />
-          ))}
-        </span>
-      );
-      
-    case 'strong':
-      return (
-        <strong id={element.elementId} style={elementStyles}>
-          {element.content?.map((item, idx) => 
-            typeof item === 'string' 
-              ? processContent(item)
-              : <ElementRenderer 
-                  key={idx}
-                  element={item as HypernoteElement}
-                  relayHandler={relayHandler}
-                  formData={formData}
-                  setFormData={setFormData}
-                  events={events}
-                  queries={queries}
-                  queryResults={queryResults}
-                  extractedVariables={extractedVariables}
-                  userContext={userContext}
-                  loopVariables={loopVariables}
-                />
-          )}
-        </strong>
-      );
-      
-    case 'em':
-      return (
-        <em id={element.elementId} style={elementStyles}>
-          {element.content?.map((item, idx) => 
-            typeof item === 'string' 
-              ? processContent(item)
-              : <ElementRenderer 
-                  key={idx}
-                  element={item as HypernoteElement}
-                  relayHandler={relayHandler}
-                  formData={formData}
-                  setFormData={setFormData}
-                  events={events}
-                  queries={queries}
-                  queryResults={queryResults}
-                  extractedVariables={extractedVariables}
-                  userContext={userContext}
-                  loopVariables={loopVariables}
-                />
-          )}
-        </em>
-      );
-      
-    case 'div':
-      return (
-        <div 
-          id={element.elementId} 
-          style={elementStyles}
-        >
-          {element.elements && element.elements.map((child, index) => (
-            <ElementRenderer 
-              key={index} 
-              element={child} 
-              relayHandler={relayHandler}
-              formData={formData}
-              setFormData={setFormData}
-              events={events}
-              queries={queries}
-              queryResults={queryResults}
-              extractedVariables={extractedVariables}
-              userContext={userContext}
-              loopVariables={loopVariables}
-            />
-          ))}
-        </div>
-      );
-      
-    case 'input':
-      const name = element.attributes?.name || '';
-      return (
-        <input
-          id={element.elementId}
-          name={name}
-          placeholder={element.attributes?.placeholder || ''}
-          value={formData[name] || ''}
-          onChange={(e) => handleInputChange(e, name)}
-          style={elementStyles}
-        />
-      );
-      
-    case 'img':
-      // Process src attribute for variable references
-      let imgSrc = element.attributes?.src || '';
-      
-      // Only process if it contains variables
-      if (imgSrc.includes('{')) {
-        const processed = processContent(imgSrc);
-        // If variable resolution failed (returned original with braces), don't render broken src
-        imgSrc = processed.includes('{') ? '' : processed;
-      }
-      
-      // Process alt attribute for variable references too
-      let imgAlt = element.attributes?.alt || '';
-      if (imgAlt.includes('{')) {
-        imgAlt = processContent(imgAlt);
-      }
-      
-      // Don't render img with empty src (causes browser to re-download page)
-      if (!imgSrc) {
-        return (
-          <div 
-            id={element.elementId}
-            style={{ 
-              ...elementStyles, 
-              display: 'inline-block',
-              padding: '1rem',
-              backgroundColor: '#f3f4f6',
-              borderRadius: '0.25rem',
-              color: '#6b7280',
-              fontSize: '0.875rem'
-            }}
-          >
-            [Image: {element.attributes?.alt || 'No image available'}]
-          </div>
-        );
-      }
-      
-      return (
-        <img
-          id={element.elementId}
-          src={imgSrc}
-          alt={imgAlt}
-          style={elementStyles}
-        />
-      );
-      
-    case 'json':
-      // Get the variable path from attributes (e.g., "$note" or "$note.content" or "$profile")
-      const variablePath = element.attributes?.variable || '$data';
-      
-      // Parse the variable path to handle dot notation
-      let actualData: any;
-      let displayVariableName = variablePath;
-      
-      if (variablePath.includes('.')) {
-        // Handle dot notation like "$note.content" or "$profile.pubkey"
-        const [varName, ...propertyPath] = variablePath.split('.');
-        
-        // First check loop variables
-        let baseData = loopVariables[varName];
-        
-        // If not in loop variables, check query results
-        if (baseData === undefined && queryResults[varName]) {
-          baseData = queryResults[varName];
-        }
-        
-        if (baseData !== undefined) {
-          // Navigate the property path
-          actualData = propertyPath.reduce((obj, prop) => obj?.[prop], baseData);
-        }
-      } else {
-        // Simple variable reference like "$note" or "$profile"
-        // Check loop variables first
-        actualData = loopVariables[variablePath];
-        
-        // If not in loop variables, check query results
-        if (actualData === undefined && queryResults[variablePath]) {
-          actualData = queryResults[variablePath];
-        }
-      }
-      
-      // Pretty-print the JSON
-      let displayContent: string;
-      
-      if (actualData !== undefined) {
-        try {
-          // Stringify the actual data with pretty formatting
-          displayContent = JSON.stringify(actualData, null, 2);
-        } catch (e) {
-          // If stringify fails, convert to string
-          displayContent = String(actualData);
-        }
-      } else {
-        // If no data found, show a helpful message
-        displayContent = `No data found for variable: ${variablePath}`;
-      }
-      
-      return (
-        <details 
-          id={element.elementId} 
-          className="bg-gray-100 rounded border border-gray-300 p-1 flex flex-col"
-          style={elementStyles}
-          open={element.attributes?.open === 'true'}
-        >
-          <summary className="bg-gray-300 self-start rounded p-1 cursor-pointer">
-            {displayVariableName}
-          </summary>
-          <pre className="whitespace-pre-wrap text-sm overflow-auto">
-            {displayContent}
-          </pre>
-        </details>
-      );
-      
-    case 'loop':
-      if (isLoading) {
-        console.log(`Loop data for ${element.source} is still loading...`);
-        return <div>Loading data...</div>;
-      }
-      
-      if (isError) {
-        console.log(`Error loading data for loop with source ${element.source}:`, error);
-        return (
-          <div style={{ color: 'red', padding: '10px', border: '1px solid red', borderRadius: '4px' }}>
-            Error loading data from {element.source}
-            {error && <div style={{ fontSize: '12px', marginTop: '5px' }}>
-              {error instanceof Error ? error.message : String(error)}
-            </div>}
-          </div>
-        );
-      }
-      
-      // Get the data from query results
-      const sourceData = loopData || [];
-      const variableName = element.variable || '$item';
-      
-      // Render the loop elements for each item in the data
-      return (
-        <div id={element.elementId} style={elementStyles}>
-          {sourceData.length === 0 ? (
-            <div>No data found</div>
-          ) : (
-            sourceData.map((item, index) => {
-              // Create a new loop variables object with the current item
-              const newLoopVariables = { 
-                ...loopVariables,
-                [variableName]: item 
-              };
-              
-              // Render each child element with the updated loop variables
-              // Use item.id if available for better React reconciliation
-              const itemKey = item?.id || index;
-              return (
-                <div key={itemKey}>
-                  {element.elements?.map((child, childIndex) => (
-                    <ElementRenderer
-                      key={childIndex}
-                      element={child}
-                      relayHandler={relayHandler}
-                      formData={formData}
-                      setFormData={setFormData}
-                      events={events}
-                      queries={queries}
-                      queryResults={queryResults}
-                      extractedVariables={extractedVariables}
-                      userContext={userContext}
-                      loopVariables={newLoopVariables}
-                    />
-                  ))}
-                </div>
-              );
-            })
-          )}
-        </div>
-      );
-      
-    case 'variable':
-      // Render a variable reference
-      return <>{resolveVariable(element.name || '')}</>;
-      
-    default:
-      return (
-        <div id={element.elementId} style={elementStyles}>
-          {element.content?.map((item, idx) => 
-            typeof item === 'string' 
-              ? processContent(item)
-              : <ElementRenderer 
-                  key={idx}
-                  element={item as HypernoteElement}
-                  relayHandler={relayHandler}
-                  formData={formData}
-                  setFormData={setFormData}
-                  events={events}
-                  queries={queries}
-                  queryResults={queryResults}
-                  extractedVariables={extractedVariables}
-                  userContext={userContext}
-                  loopVariables={loopVariables}
-                />
-          )}
-          {element.elements && element.elements.map((child, index) => (
-            <ElementRenderer 
-              key={index} 
-              element={child} 
-              relayHandler={relayHandler}
-              formData={formData}
-              setFormData={setFormData}
-              events={events}
-              queries={queries}
-              queryResults={queryResults}
-              extractedVariables={extractedVariables}
-              userContext={userContext}
-              loopVariables={loopVariables}
-            />
-          ))}
-        </div>
-      );
-  }
-}
-
-// Main renderer function that takes markdown and returns React node
+// (Old ElementRenderer removed - using pure render functions below)
 export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string, relayHandler: RelayHandler }) {
   // Debounce the markdown input to prevent re-rendering on every keystroke
   const [debouncedMarkdown] = useDebounce(markdown || '', 300);
@@ -780,21 +99,85 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
     console.log('[Renderer] queryResults changed:', Object.keys(queryResults).map(k => `${k}: ${queryResults[k]?.length} items`));
   }, [queryResults]);
   
-  // Show loading state while queries are executing
-  if (queriesLoading) {
-    return (
-      <div>Loading queries...</div>
-    );
-  }
+  // Get auth store for NIP-07 signing
+  const { isAuthenticated, signEvent, login } = useAuthStore();
+  const { snstrClient } = useNostrStore();
   
-  // Show error if query execution failed
-  if (queryError) {
-    return (
-      <div style={{ color: 'red' }}>
-        Error executing queries: {queryError.message}
-      </div>
-    );
-  }
+  // Process form submission with NIP-07 signing
+  const handleFormSubmit = async (eventName: string) => {
+    if (!eventName) {
+      console.log('Form submitted but no event is specified');
+      return;
+    }
+    
+    if (!content.events || !content.events[eventName]) {
+      console.error(`Event ${eventName} not found`);
+      return;
+    }
+    
+    // Check if user is authenticated
+    if (!isAuthenticated) {
+      toast.error('Please connect NIP-07 to publish events');
+      // Optionally trigger login
+      login();
+      return;
+    }
+    
+    if (!snstrClient) {
+      toast.error('Relay client not initialized');
+      return;
+    }
+    
+    const eventTemplate = content.events[eventName];
+    
+    // Process template variables
+    let eventContent = eventTemplate.content;
+    if (typeof eventContent === 'string' && eventContent.includes('{form.')) {
+      // Replace {form.fieldName} with actual form values
+      Object.keys(formData).forEach(key => {
+        eventContent = eventContent.replace(`{form.${key}}`, formData[key] || '');
+      });
+    }
+    
+    // Create event template for signing
+    const unsignedEvent = {
+      kind: eventTemplate.kind,
+      content: eventContent,
+      tags: eventTemplate.tags || [],
+      created_at: Math.floor(Date.now() / 1000)
+    };
+    
+    // Sign and publish the event
+    try {
+      // Sign with NIP-07
+      const signedEvent = await signEvent(unsignedEvent);
+      
+      // Publish to relays
+      const result = await snstrClient.publishEvent(signedEvent);
+      
+      console.log(`Published event: ${result.eventId} to ${result.successCount} relays`);
+      toast.success(`Event published to ${result.successCount} relays!`);
+      
+      // Reset form if successful
+      setFormData({});
+      
+      // No need to invalidate - subscriptions are reactive and will auto-update!
+    } catch (error) {
+      console.error(`Failed to publish event: ${error}`);
+      toast.error(`Failed to publish: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  // Handle input changes in forms
+  const handleInputChange = (name: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
+  // Don't block on loading - render progressively!
+  // Queries will populate as they resolve
   
   // If there are no elements, show an empty container (allow editing)
   if (!content.elements || content.elements.length === 0) {
@@ -814,27 +197,57 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
     themeClass = 'hypernote-dark';
   }
   
-  return (
-    <div 
-      className={`hypernote-content ${themeClass}`.trim()} 
-      style={rootStyles as React.CSSProperties}
-    >
-      {content.elements.map((element, index) => (
-        <ElementRenderer
-          key={index}
-          element={element}
-          relayHandler={relayHandler}
-          formData={formData}
-          setFormData={setFormData}
-          events={content.events}
-          queries={content.queries}
-          queryResults={queryResults}
-          extractedVariables={extractedVariables}
-          userContext={userContext}
-          loopVariables={{}}
-        />
-      ))}
+  // Build context for pure renderer
+  // Track which queries are still loading
+  const loadingQueries = new Set<string>();
+  if (queriesLoading && content.queries) {
+    // If we're still loading, check which queries don't have results yet
+    Object.keys(content.queries).forEach(queryName => {
+      if (!queryResults[queryName]) {
+        loadingQueries.add(queryName);
+      }
+    });
+  }
+  
+  const context: RenderContext = {
+    queryResults: queryResults || {},  // Empty initially, populates progressively
+    extractedVariables: extractedVariables || {},
+    formData,
+    events: content.events || {},
+    userPubkey: pubkey,
+    loopVariables: {},
+    loadingQueries,
+    onFormSubmit: handleFormSubmit,
+    onInputChange: handleInputChange
+  };
+  
+  // Show error banner if there was a query error, but still render the page
+  const errorBanner = queryError ? (
+    <div style={{ backgroundColor: '#fee', color: '#c00', padding: '10px', marginBottom: '10px', borderRadius: '4px' }}>
+      ⚠️ Some data failed to load: {queryError.message}
     </div>
+  ) : null;
+  
+  return (
+    <>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+      `}</style>
+      {errorBanner}
+      <div 
+        className={`hypernote-content ${themeClass}`.trim()} 
+        style={rootStyles as React.CSSProperties}
+      >
+        {content.elements.map((element, index) => (
+          <React.Fragment key={index}>
+            {renderElement(element, context)}
+          </React.Fragment>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -859,5 +272,305 @@ export function HypernoteJsonOutput({ markdown }: { markdown: string }) {
     <pre className="bg-slate-100 text-green-900 text-xs p-4 rounded overflow-auto">
       {JSON.stringify(content, null, 2)}
     </pre>
+  );
+}
+
+// ============================================================================
+// PURE RENDERER FUNCTIONS - No hooks, no side effects
+// ============================================================================
+
+// Single pure function for ALL variable resolution
+function resolveExpression(expr: string, ctx: RenderContext): any {
+  // Priority order (first match wins):
+  // 1. Loop variables: $item.field
+  // 2. Query results: $queryName.field  
+  // 3. Extracted variables: extractedVarName
+  // 4. Form fields: form.fieldName
+  // 5. User context: user.pubkey
+  // 6. Time: time.now
+  // 7. Return original if no match
+  
+  if (expr.startsWith('$')) {
+    // Handle $varName or $varName.field
+    const [varName, ...path] = expr.split('.');
+    
+    // Check loop variables first
+    let variable = ctx.loopVariables[varName];
+    
+    // If not in loop variables, check query results
+    if (!variable && ctx.queryResults[varName]) {
+      const queryData = ctx.queryResults[varName];
+      // If it's an array, automatically take the first item
+      variable = Array.isArray(queryData) && queryData.length > 0 ? queryData[0] : queryData;
+    }
+    
+    if (variable) {
+      // Access nested properties
+      if (path.length > 0) {
+        const result = path.reduce((obj, prop) => obj?.[prop], variable);
+        return result !== undefined && result !== null ? result : '';
+      }
+      return variable;
+    }
+  }
+  
+  if (expr.startsWith('form.')) {
+    return ctx.formData[expr.slice(5)] || '';
+  }
+  
+  if (expr === 'user.pubkey') {
+    return ctx.userPubkey || '';
+  }
+  
+  if (expr === 'time.now') {
+    return Date.now();
+  }
+  
+  // Handle time expressions like "time.now - 86400000"
+  if (expr.includes('time.now')) {
+    try {
+      const timeNow = Date.now();
+      const result = expr.replace(/time\.now/g, timeNow.toString());
+      return new Function('return ' + result)();
+    } catch (e) {
+      console.warn(`Failed to evaluate time expression: ${expr}`);
+      return expr;
+    }
+  }
+  
+  if (ctx.extractedVariables[expr]) {
+    return ctx.extractedVariables[expr];
+  }
+  
+  return expr;
+}
+
+// Pure string processor - replaces {expressions} with values
+function processString(str: string, ctx: RenderContext): string {
+  return str.replace(/\{([^}]+)\}/g, (_, expr) => 
+    String(resolveExpression(expr, ctx))
+  );
+}
+
+// Pure content renderer - handles mixed string/element arrays
+function renderContent(content: any[] | undefined, ctx: RenderContext): React.ReactNode[] {
+  if (!content) return [];
+  
+  return content.map((item, i) => {
+    if (typeof item === 'string') {
+      return processString(item, ctx);
+    }
+    return <React.Fragment key={i}>{renderElement(item, ctx)}</React.Fragment>;
+  });
+}
+
+// Pure element renderer - main rendering logic
+function renderElement(element: HypernoteElement, ctx: RenderContext): React.ReactNode {
+  const props = {
+    id: element.elementId,
+    style: element.style || {}
+  };
+
+  // Text elements with content array
+  if (['h1', 'h2', 'h3', 'p', 'strong', 'em'].includes(element.type)) {
+    return React.createElement(
+      element.type,
+      props,
+      renderContent(element.content, ctx)
+    );
+  }
+
+  // Container elements with children
+  if (['div', 'span'].includes(element.type)) {
+    return React.createElement(
+      element.type,
+      props,
+      element.elements?.map((child, i) => 
+        <React.Fragment key={i}>{renderElement(child, ctx)}</React.Fragment>
+      )
+    );
+  }
+
+  // Special elements
+  switch (element.type) {
+    case 'form':
+      return (
+        <form
+          {...props}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (element.event) {
+              ctx.onFormSubmit(element.event);
+            }
+          }}
+        >
+          {element.elements?.map((child, i) => 
+            <React.Fragment key={i}>{renderElement(child, ctx)}</React.Fragment>
+          )}
+        </form>
+      );
+
+    case 'button':
+      return (
+        <button {...props} type="submit">
+          {element.elements?.map((child, i) => 
+            <React.Fragment key={i}>{renderElement(child, ctx)}</React.Fragment>
+          )}
+        </button>
+      );
+
+    case 'input':
+      const name = element.attributes?.name || '';
+      return (
+        <input
+          {...props}
+          name={name}
+          placeholder={element.attributes?.placeholder || ''}
+          value={ctx.formData[name] || ''}
+          onChange={(e) => ctx.onInputChange(name, e.target.value)}
+        />
+      );
+
+    case 'img':
+      const src = processString(element.attributes?.src || '', ctx);
+      const alt = processString(element.attributes?.alt || '', ctx);
+      
+      // Check if src contains unresolved variables (still has braces)
+      const hasUnresolvedVars = src.includes('{') && src.includes('}');
+      
+      if (!src || hasUnresolvedVars) {
+        // Show placeholder while variables are resolving
+        return (
+          <div style={{
+            ...props.style,
+            padding: '1rem', 
+            backgroundColor: '#f3f4f6', 
+            borderRadius: '0.25rem', 
+            color: '#6b7280', 
+            fontSize: '0.875rem',
+            minHeight: '100px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            {hasUnresolvedVars ? '🖼️ Loading image...' : `[Image: ${alt || 'No image available'}]`}
+          </div>
+        );
+      }
+      
+      return <img {...props} src={src} alt={alt} />;
+
+    case 'loop':
+      return renderLoop(element, ctx);
+
+    case 'json':
+      return renderJson(element, ctx);
+
+    default:
+      // Unknown element type - render children if any
+      return (
+        <div {...props}>
+          {element.elements?.map((child, i) => 
+            <React.Fragment key={i}>{renderElement(child, ctx)}</React.Fragment>
+          )}
+        </div>
+      );
+  }
+}
+
+// Pure loop renderer
+function renderLoop(element: HypernoteElement, ctx: RenderContext): React.ReactNode {
+  const source = element.source || '';
+  const data = ctx.queryResults[source];
+  const varName = element.variable || '$item';
+  const isLoading = ctx.loadingQueries?.has(source);
+  
+  return (
+    <div id={element.elementId} style={element.style}>
+      {isLoading ? (
+        // Show skeleton loader while query is loading
+        <div style={{ padding: '1rem' }}>
+          <div style={{ 
+            backgroundColor: '#e2e8f0', 
+            borderRadius: '0.25rem', 
+            height: '1rem', 
+            marginBottom: '0.5rem',
+            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+          }} />
+          <div style={{ 
+            backgroundColor: '#e2e8f0', 
+            borderRadius: '0.25rem', 
+            height: '1rem', 
+            width: '75%',
+            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+          }} />
+        </div>
+      ) : !data || data.length === 0 ? (
+        <div style={{ color: '#6b7280', padding: '1rem' }}>No data found</div>
+      ) : (
+        data.map((item, i) => {
+          const loopCtx = {
+            ...ctx,
+            loopVariables: { ...ctx.loopVariables, [varName]: item }
+          };
+          return (
+            <div key={item.id || i}>
+              {element.elements?.map((child, j) => 
+                <React.Fragment key={j}>{renderElement(child, loopCtx)}</React.Fragment>
+              )}
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+// Pure JSON renderer
+function renderJson(element: HypernoteElement, ctx: RenderContext): React.ReactNode {
+  const variablePath = element.attributes?.variable || '$data';
+  
+  let actualData: any;
+  
+  if (variablePath.includes('.')) {
+    const [varName, ...propertyPath] = variablePath.split('.');
+    
+    // Check loop variables first
+    let baseData = ctx.loopVariables[varName];
+    
+    // If not in loop variables, check query results
+    if (baseData === undefined && ctx.queryResults[varName]) {
+      baseData = ctx.queryResults[varName];
+    }
+    
+    if (baseData !== undefined) {
+      actualData = propertyPath.reduce((obj, prop) => obj?.[prop], baseData);
+    }
+  } else {
+    // Simple variable reference
+    actualData = ctx.loopVariables[variablePath] ?? ctx.queryResults[variablePath];
+  }
+  
+  let displayContent: string;
+  
+  if (actualData !== undefined) {
+    try {
+      displayContent = JSON.stringify(actualData, null, 2);
+    } catch (e) {
+      displayContent = String(actualData);
+    }
+  } else {
+    displayContent = `No data found for variable: ${variablePath}`;
+  }
+  
+  return (
+    <details id={element.elementId} style={element.style}>
+      <summary style={{ cursor: 'pointer', padding: '0.5rem', backgroundColor: '#e2e8f0', borderRadius: '0.25rem', fontSize: '0.875rem' }}>
+        {variablePath} (JSON)
+      </summary>
+      <pre style={{ backgroundColor: '#f1f5f9', padding: '1rem', borderRadius: '0.25rem', overflow: 'auto', fontSize: '0.75rem', lineHeight: '1rem', fontFamily: 'monospace', marginTop: '0.5rem' }}>
+        {displayContent}
+      </pre>
+    </details>
   );
 } 
