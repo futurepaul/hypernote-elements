@@ -7,6 +7,9 @@ import divContainerMd from "../examples/div-container.md";
 import zapCloudMd from "../examples/zap-cloud.md";
 import imageTestMd from "../examples/image-test.md";
 import clientMd from "../examples/client.md";
+import profileMd from "../examples/profile.md";
+import blankMd from "../examples/blank.md";
+import imageVariablesMd from "../examples/image-variables.md";
 
 // Import all JSON examples directly using Bun's built-in JSON loader
 import basicHelloJson from "../examples/basic-hello.json";
@@ -15,6 +18,9 @@ import divContainerJson from "../examples/div-container.json";
 import zapCloudJson from "../examples/zap-cloud.json";
 import imageTestJson from "../examples/image-test.json";
 import clientJson from "../examples/client.json";
+import profileJson from "../examples/profile.json";
+import blankJson from "../examples/blank.json";
+import imageVariablesJson from "../examples/image-variables.json";
 
 // Map of example names to their imported content
 const EXAMPLE_MAP = {
@@ -24,6 +30,9 @@ const EXAMPLE_MAP = {
   "zap-cloud": { markdown: zapCloudMd, json: zapCloudJson },
   "image-test": { markdown: imageTestMd, json: imageTestJson },
   "client": { markdown: clientMd, json: clientJson },
+  "profile": { markdown: profileMd, json: profileJson },
+  "blank": { markdown: blankMd, json: blankJson },
+  "image-variables": { markdown: imageVariablesMd, json: imageVariablesJson },
 } as const;
 
 export interface ExampleData {
@@ -66,6 +75,9 @@ export const AVAILABLE_EXAMPLES = [
   "zap-cloud",
   "image-test",
   "client",
+  "profile",
+  "blank",
+  "image-variables",
 ] as const;
 
 export type ExampleName = typeof AVAILABLE_EXAMPLES[number]; 

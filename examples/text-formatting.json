@@ -1,0 +1,135 @@
+{
+  "version": "1.1.0",
+  "component_kind": null,
+  "style": {
+    "padding": "2rem",
+    "backgroundColor": "rgb(255,255,255)"
+  },
+  "elements": [
+    {
+      "type": "h1",
+      "content": [
+        "Text Formatting Demo"
+      ]
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Basic Formatting"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "This is ",
+        {
+          "type": "strong",
+          "content": [
+            "bold text"
+          ]
+        },
+        " and this is ",
+        {
+          "type": "em",
+          "content": [
+            "italic text"
+          ]
+        },
+        ".",
+        "You can combine them: ",
+        {
+          "type": "strong",
+          "content": [
+            "bold with *italic* inside"
+          ]
+        },
+        " or ",
+        {
+          "type": "em",
+          "content": [
+            "italic with *"
+          ]
+        },
+        "bold",
+        {
+          "type": "strong",
+          "content": [
+            " inside*.\n\n## In Variables\n\nLet's say we have a user named "
+          ]
+        },
+        "{user.pubkey}",
+        {
+          "type": "strong",
+          "content": [
+            ".\n\nThe current time is *{time.now}*.\n\n## In Lists\n\n- "
+          ]
+        },
+        "Bold item",
+        {
+          "type": "strong",
+          "content": [
+            "\n- *Italic item*\n- Normal item with "
+          ]
+        },
+        "bold",
+        {
+          "type": "strong",
+          "content": [
+            " and *italic* words\n\n## In Complex Elements\n\n[div class=\"bg-gray-100 p-4 rounded\"]\n"
+          ]
+        },
+        "Important Notice:",
+        {
+          "type": "strong",
+          "content": [
+            " This is a *styled* div with "
+          ]
+        },
+        "bold",
+        {
+          "type": "strong",
+          "content": [
+            " and *italic* text.\n\nYou can use formatting with variables too: "
+          ]
+        },
+        "User:",
+        {
+          "type": "strong",
+          "content": [
+            " {user.pubkey}\n[/div]\n\n## Edge Cases\n\n"
+          ]
+        },
+        "Bold at start",
+        {
+          "type": "strong",
+          "content": [
+            " of paragraph.\n\nParagraph ending with "
+          ]
+        },
+        "bold at end",
+        {
+          "type": "strong",
+          "content": [
+            ".\n\n*Italic at start* of paragraph.\n\nParagraph ending with *italic at end*.\n\nMultiple "
+          ]
+        },
+        "bold",
+        {
+          "type": "strong",
+          "content": [
+            " words "
+          ]
+        },
+        "scattered",
+        {
+          "type": "strong",
+          "content": [
+            " throughout "
+          ]
+        },
+        "the",
+        "."
+      ]
+    }
+  ]
+}

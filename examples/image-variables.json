@@ -1,0 +1,99 @@
+{
+  "version": "1.1.0",
+  "component_kind": null,
+  "style": {
+    "backgroundColor": "rgb(243,244,246)"
+  },
+  "elements": [
+    {
+      "type": "h1",
+      "content": [
+        "Image Variable Resolution Test"
+      ]
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Static image (should work):"
+      ]
+    },
+    {
+      "type": "img",
+      "style": {
+        "width": "8rem",
+        "height": "8rem"
+      },
+      "attributes": {
+        "alt": "Static Test",
+        "src": "https://via.placeholder.com/150"
+      }
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Image with time variable:"
+      ]
+    },
+    {
+      "type": "img",
+      "style": {
+        "width": "8rem",
+        "height": "8rem"
+      },
+      "attributes": {
+        "alt": "Dynamic timestamp",
+        "src": "https://via.placeholder.com/150?text={time.now}"
+      }
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Image with user pubkey:"
+      ]
+    },
+    {
+      "type": "img",
+      "style": {
+        "width": "8rem",
+        "height": "8rem"
+      },
+      "attributes": {
+        "alt": "User avatar",
+        "src": "https://robohash.org/{user.pubkey}?size=150x150"
+      }
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Testing with a hardcoded URL in a variable-like format:"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "This tests if the variable resolution is working at all."
+      ]
+    },
+    {
+      "type": "div",
+      "style": {
+        "padding": "1rem",
+        "backgroundColor": "rgb(255,255,255)",
+        "borderRadius": "0.25rem"
+      },
+      "elements": [
+        {
+          "type": "img",
+          "style": {
+            "width": "6rem",
+            "height": "6rem"
+          },
+          "attributes": {
+            "alt": "test image",
+            "src": "https://via.placeholder.com/100"
+          }
+        }
+      ]
+    }
+  ]
+}

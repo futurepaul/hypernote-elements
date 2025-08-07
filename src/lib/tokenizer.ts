@@ -22,6 +22,8 @@ export enum TokenType {
   EACH_START,
   EACH_END,
   VARIABLE_REFERENCE,
+  BOLD,
+  ITALIC,
   EOF
 }
 
@@ -522,6 +524,47 @@ export function tokenize(content: string): Token[] {
       }
     }
     
+    // Handle bold syntax (**text**)
+    if (char === '*' && content[pos + 1] === '*' && 
+        pos + 2 < content.length && content[pos + 2] !== '*') {
+      pos += 2; // Skip '**'
+      
+      let boldText = '';
+      while (pos < content.length - 1) {
+        if (content[pos] === '*' && content[pos + 1] === '*') {
+          pos += 2; // Skip closing '**'
+          tokens.push({
+            type: TokenType.BOLD,
+            value: boldText
+          });
+          break;
+        }
+        boldText += content[pos];
+        pos++;
+      }
+      continue;
+    }
+    
+    // Handle italic syntax (*text* but not **text**)
+    if (char === '*' && content[pos + 1] !== '*' && pos > 0 && content[pos - 1] !== '*') {
+      pos++; // Skip '*'
+      
+      let italicText = '';
+      while (pos < content.length) {
+        if (content[pos] === '*' && (pos + 1 >= content.length || content[pos + 1] !== '*')) {
+          pos++; // Skip closing '*'
+          tokens.push({
+            type: TokenType.ITALIC,
+            value: italicText
+          });
+          break;
+        }
+        italicText += content[pos];
+        pos++;
+      }
+      continue;
+    }
+    
     // Handle plain text
     let text = '';
     while (pos < content.length && 
@@ -529,6 +572,7 @@ export function tokenize(content: string): Token[] {
            content[pos] !== '#' && 
            content[pos] !== '[' && 
            content[pos] !== '{' &&
+           content[pos] !== '*' &&
            !(content[pos] === '!' && content[pos + 1] === '[')) {
       text += content[pos];
       pos++;
@@ -609,6 +653,9 @@ export function parseTokens(tokens: Token[]): any[] {
       }
     }
 
+    // Track pending style for next element in container
+    let containerStyle: string | null = null;
+    
     // Parse until we find the matching closing tag
     while (currentIndex < tokens.length && tokens[currentIndex].type !== TokenType.EOF) {
       const t = tokens[currentIndex];
@@ -620,10 +667,24 @@ export function parseTokens(tokens: Token[]): any[] {
         break;
       }
       
+      // Handle style marker - applies to the next element
+      if (t.type === TokenType.STYLE_MARKER) {
+        flushContainerParagraph();
+        containerStyle = t.value;
+        currentIndex++;
+        continue;
+      }
+      
       // Handle nested containers
       if (t.type === TokenType.FORM_START) {
         flushContainerParagraph();
         const nestedForm = parseContainer(TokenType.FORM_START, TokenType.FORM_END, 'form', t);
+        // Apply pending style if present
+        if (containerStyle) {
+          if (!nestedForm.attributes) nestedForm.attributes = {};
+          nestedForm.attributes.class = containerStyle;
+          containerStyle = null;
+        }
         containerElements.push(nestedForm);
         continue;
       }
@@ -631,6 +692,12 @@ export function parseTokens(tokens: Token[]): any[] {
       if (t.type === TokenType.DIV_START) {
         flushContainerParagraph();
         const nestedDiv = parseContainer(TokenType.DIV_START, TokenType.DIV_END, 'div', t);
+        // Apply pending style if present
+        if (containerStyle) {
+          if (!nestedDiv.attributes) nestedDiv.attributes = {};
+          nestedDiv.attributes.class = containerStyle;
+          containerStyle = null;
+        }
         containerElements.push(nestedDiv);
         continue;
       }
@@ -638,6 +705,12 @@ export function parseTokens(tokens: Token[]): any[] {
       if (t.type === TokenType.BUTTON_START) {
         flushContainerParagraph();
         const nestedButton = parseContainer(TokenType.BUTTON_START, TokenType.BUTTON_END, 'button', t);
+        // Apply pending style if present
+        if (containerStyle) {
+          if (!nestedButton.attributes) nestedButton.attributes = {};
+          nestedButton.attributes.class = containerStyle;
+          containerStyle = null;
+        }
         containerElements.push(nestedButton);
         continue;
       }
@@ -645,6 +718,12 @@ export function parseTokens(tokens: Token[]): any[] {
       if (t.type === TokenType.SPAN_START) {
         flushContainerParagraph();
         const nestedSpan = parseContainer(TokenType.SPAN_START, TokenType.SPAN_END, 'span', t);
+        // Apply pending style if present
+        if (containerStyle) {
+          if (!nestedSpan.attributes) nestedSpan.attributes = {};
+          nestedSpan.attributes.class = containerStyle;
+          containerStyle = null;
+        }
         containerElements.push(nestedSpan);
         continue;
       }
@@ -656,6 +735,11 @@ export function parseTokens(tokens: Token[]): any[] {
           type: `h${t.level}`,
           content: [t.value]
         };
+        // Apply pending style if present
+        if (containerStyle) {
+          heading['attributes'] = { class: containerStyle };
+          containerStyle = null;
+        }
         containerElements.push(heading);
         currentIndex++;
         continue;
@@ -687,6 +771,11 @@ export function parseTokens(tokens: Token[]): any[] {
           type: 'img',
           attributes: { ...t.attributes }
         };
+        // Apply pending style if present
+        if (containerStyle) {
+          imageElement.attributes.class = containerStyle;
+          containerStyle = null;
+        }
         containerElements.push(imageElement);
         currentIndex++;
         continue;
@@ -696,6 +785,12 @@ export function parseTokens(tokens: Token[]): any[] {
       if (t.type === TokenType.EACH_START) {
         flushContainerParagraph();
         const loopElement = parseContainer(TokenType.EACH_START, TokenType.EACH_END, 'loop', t);
+        // Apply pending style if present
+        if (containerStyle) {
+          if (!loopElement.attributes) loopElement.attributes = {};
+          loopElement.attributes.class = containerStyle;
+          containerStyle = null;
+        }
         containerElements.push(loopElement);
         continue;
       }
@@ -714,7 +809,50 @@ export function parseTokens(tokens: Token[]): any[] {
         continue;
       }
       
-      // Skip newlines and other tokens
+      // Handle bold text
+      if (t.type === TokenType.BOLD) {
+        containerInlineBuffer.push({
+          type: 'strong',
+          content: [t.value]
+        });
+        currentIndex++;
+        continue;
+      }
+      
+      // Handle italic text
+      if (t.type === TokenType.ITALIC) {
+        containerInlineBuffer.push({
+          type: 'em',
+          content: [t.value]
+        });
+        currentIndex++;
+        continue;
+      }
+      
+      // Handle newlines - check for double newline (paragraph break)
+      if (t.type === TokenType.NEWLINE) {
+        currentIndex++;
+        // Check if the next token is also a newline (blank line = new paragraph)
+        if (currentIndex < tokens.length && tokens[currentIndex].type === TokenType.NEWLINE) {
+          flushContainerParagraph();
+          currentIndex++; // Skip the second newline
+        } else {
+          // Single newline - treat as a space (markdown convention)
+          // Only add space if buffer has content and doesn't end with space
+          if (containerInlineBuffer.length > 0) {
+            const lastItem = containerInlineBuffer[containerInlineBuffer.length - 1];
+            if (typeof lastItem === 'string' && !lastItem.endsWith(' ')) {
+              containerInlineBuffer.push(' ');
+            } else if (typeof lastItem !== 'string') {
+              // Last item was a bold/italic element, add space
+              containerInlineBuffer.push(' ');
+            }
+          }
+        }
+        continue;
+      }
+      
+      // Skip other tokens
       currentIndex++;
     }
     
@@ -951,8 +1089,51 @@ export function parseTokens(tokens: Token[]): any[] {
       currentIndex++;
       continue;
     }
+    
+    // Handle bold text
+    if (token.type === TokenType.BOLD) {
+      inlineBuffer.push({
+        type: 'strong',
+        content: [token.value]
+      });
+      currentIndex++;
+      continue;
+    }
+    
+    // Handle italic text
+    if (token.type === TokenType.ITALIC) {
+      inlineBuffer.push({
+        type: 'em',
+        content: [token.value]
+      });
+      currentIndex++;
+      continue;
+    }
+    
+    // Handle newlines
+    if (token.type === TokenType.NEWLINE) {
+      currentIndex++;
+      // Check if the next token is also a newline (blank line = new paragraph)
+      if (currentIndex < tokens.length && tokens[currentIndex].type === TokenType.NEWLINE) {
+        flushParagraph();
+        currentIndex++; // Skip the second newline
+      } else {
+        // Single newline - treat as a space (markdown convention)
+        // Only add space if buffer has content and doesn't end with space
+        if (inlineBuffer.length > 0) {
+          const lastItem = inlineBuffer[inlineBuffer.length - 1];
+          if (typeof lastItem === 'string' && !lastItem.endsWith(' ')) {
+            inlineBuffer.push(' ');
+          } else if (typeof lastItem !== 'string') {
+            // Last item was a bold/italic element, add space
+            inlineBuffer.push(' ');
+          }
+        }
+      }
+      continue;
+    }
 
-    // Skip newlines and other tokens
+    // Skip other tokens
     currentIndex++;
   }
 

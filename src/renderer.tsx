@@ -223,15 +223,42 @@ function ElementRenderer({
     
     if (variableName.startsWith('$') && variableName.includes('.')) {
       const [varName, ...path] = variableName.split('.');
-      const variable = loopVariables[varName];
+      
+      // First check loop variables
+      let variable = loopVariables[varName];
+      
+      // If not in loop variables, check query results
+      if (!variable && queryResults[varName]) {
+        const queryData = queryResults[varName];
+        // If it's an array, automatically take the first item
+        variable = Array.isArray(queryData) && queryData.length > 0 ? queryData[0] : queryData;
+      }
       
       if (variable) {
         // Access nested properties
-        const result = path.reduce((obj, prop) => obj?.[prop], variable) || '';
-        // console.log(`Resolved ${variableName} to:`, result);
-        return String(result);
+        const result = path.reduce((obj, prop) => obj?.[prop], variable);
+        console.log(`Resolved ${variableName} to:`, result);
+        // Return empty string if undefined/null, otherwise convert to string
+        return result !== undefined && result !== null ? String(result) : '';
       } else {
-        console.log(`Variable ${varName} not found in loop variables`);
+        console.log(`Variable ${varName} not found in loop variables or query results. Available queries:`, Object.keys(queryResults));
+      }
+    }
+    
+    // Handle simple $variable without property access
+    if (variableName.startsWith('$')) {
+      const varName = variableName;
+      
+      // Check loop variables first
+      if (loopVariables[varName]) {
+        return String(loopVariables[varName]);
+      }
+      
+      // Check query results
+      if (queryResults[varName]) {
+        const queryData = queryResults[varName];
+        // If it's an array, return JSON stringified
+        return Array.isArray(queryData) ? JSON.stringify(queryData) : String(queryData);
       }
     }
     
@@ -271,7 +298,7 @@ function ElementRenderer({
         const value = extractedVariables[variableName];
         return Array.isArray(value) ? value.join(', ') : String(value);
       }
-      // Handle loop variables (like $note.content)
+      // Handle query variables and loop variables (like $note.content or $profile.pubkey)
       if (variableName.startsWith('$')) {
         return resolveVariable(variableName);
       }
@@ -292,28 +319,13 @@ function ElementRenderer({
     case 'h2':
     case 'h3':
     case 'p':
-      // Handle content arrays by joining with newlines for proper display
-      const textContent = element.content?.map((item) => 
-        typeof item === 'string' 
-          ? processContent(item)
-          : null // We'll handle nested elements separately
-      ).filter(Boolean).join('\n');
-      
-      // Handle nested elements
-      const nestedElements = element.content?.filter(item => typeof item !== 'string');
-      
-      return React.createElement(
-        element.type,
-        { 
-          id: element.elementId, 
-          style: { 
-            whiteSpace: 'pre-line', // Preserve line breaks
-            ...elementStyles 
-          } 
-        },
-        [
-          textContent,
-          ...(nestedElements?.map((item, idx) => (
+      // Process all content items in order, preserving inline elements
+      const processedContent = element.content?.map((item, idx) => {
+        if (typeof item === 'string') {
+          return processContent(item);
+        } else {
+          // Render nested elements inline
+          return (
             <ElementRenderer 
               key={`nested-${idx}`}
               element={item as HypernoteElement}
@@ -327,8 +339,17 @@ function ElementRenderer({
               userContext={userContext}
               loopVariables={loopVariables}
             />
-          )) || [])
-        ].filter(Boolean)
+          );
+        }
+      });
+      
+      return React.createElement(
+        element.type,
+        { 
+          id: element.elementId, 
+          style: elementStyles 
+        },
+        processedContent
       );
       
     case 'form':
@@ -405,6 +426,52 @@ function ElementRenderer({
         </span>
       );
       
+    case 'strong':
+      return (
+        <strong id={element.elementId} style={elementStyles}>
+          {element.content?.map((item, idx) => 
+            typeof item === 'string' 
+              ? processContent(item)
+              : <ElementRenderer 
+                  key={idx}
+                  element={item as HypernoteElement}
+                  relayHandler={relayHandler}
+                  formData={formData}
+                  setFormData={setFormData}
+                  events={events}
+                  queries={queries}
+                  queryResults={queryResults}
+                  extractedVariables={extractedVariables}
+                  userContext={userContext}
+                  loopVariables={loopVariables}
+                />
+          )}
+        </strong>
+      );
+      
+    case 'em':
+      return (
+        <em id={element.elementId} style={elementStyles}>
+          {element.content?.map((item, idx) => 
+            typeof item === 'string' 
+              ? processContent(item)
+              : <ElementRenderer 
+                  key={idx}
+                  element={item as HypernoteElement}
+                  relayHandler={relayHandler}
+                  formData={formData}
+                  setFormData={setFormData}
+                  events={events}
+                  queries={queries}
+                  queryResults={queryResults}
+                  extractedVariables={extractedVariables}
+                  userContext={userContext}
+                  loopVariables={loopVariables}
+                />
+          )}
+        </em>
+      );
+      
     case 'div':
       return (
         <div 
@@ -443,17 +510,53 @@ function ElementRenderer({
       );
       
     case 'img':
+      // Process src attribute for variable references
+      let imgSrc = element.attributes?.src || '';
+      
+      // Only process if it contains variables
+      if (imgSrc.includes('{')) {
+        const processed = processContent(imgSrc);
+        // If variable resolution failed (returned original with braces), don't render broken src
+        imgSrc = processed.includes('{') ? '' : processed;
+      }
+      
+      // Process alt attribute for variable references too
+      let imgAlt = element.attributes?.alt || '';
+      if (imgAlt.includes('{')) {
+        imgAlt = processContent(imgAlt);
+      }
+      
+      // Don't render img with empty src (causes browser to re-download page)
+      if (!imgSrc) {
+        return (
+          <div 
+            id={element.elementId}
+            style={{ 
+              ...elementStyles, 
+              display: 'inline-block',
+              padding: '1rem',
+              backgroundColor: '#f3f4f6',
+              borderRadius: '0.25rem',
+              color: '#6b7280',
+              fontSize: '0.875rem'
+            }}
+          >
+            [Image: {element.attributes?.alt || 'No image available'}]
+          </div>
+        );
+      }
+      
       return (
         <img
           id={element.elementId}
-          src={element.attributes?.src || ''}
-          alt={element.attributes?.alt || ''}
+          src={imgSrc}
+          alt={imgAlt}
           style={elementStyles}
         />
       );
       
     case 'json':
-      // Get the variable path from attributes (e.g., "$note" or "$note.content")
+      // Get the variable path from attributes (e.g., "$note" or "$note.content" or "$profile")
       const variablePath = element.attributes?.variable || '$data';
       
       // Parse the variable path to handle dot notation
@@ -461,17 +564,30 @@ function ElementRenderer({
       let displayVariableName = variablePath;
       
       if (variablePath.includes('.')) {
-        // Handle dot notation like "$note.content"
+        // Handle dot notation like "$note.content" or "$profile.pubkey"
         const [varName, ...propertyPath] = variablePath.split('.');
-        const baseData = loopVariables[varName];
+        
+        // First check loop variables
+        let baseData = loopVariables[varName];
+        
+        // If not in loop variables, check query results
+        if (baseData === undefined && queryResults[varName]) {
+          baseData = queryResults[varName];
+        }
         
         if (baseData !== undefined) {
           // Navigate the property path
           actualData = propertyPath.reduce((obj, prop) => obj?.[prop], baseData);
         }
       } else {
-        // Simple variable reference like "$note"
+        // Simple variable reference like "$note" or "$profile"
+        // Check loop variables first
         actualData = loopVariables[variablePath];
+        
+        // If not in loop variables, check query results
+        if (actualData === undefined && queryResults[variablePath]) {
+          actualData = queryResults[variablePath];
+        }
       }
       
       // Pretty-print the JSON
@@ -615,18 +731,11 @@ function ElementRenderer({
 // Main renderer function that takes markdown and returns React node
 export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string, relayHandler: RelayHandler }) {
   // Debounce the markdown input to prevent re-rendering on every keystroke
-  const [debouncedMarkdown] = useDebounce(markdown, 300);
-  
-  // Guard against undefined or null markdown
-  if (!debouncedMarkdown || typeof debouncedMarkdown !== 'string') {
-    return (
-      <div>No content to display. Please select an example or enter markdown content.</div>
-    );
-  }
+  const [debouncedMarkdown] = useDebounce(markdown || '', 300);
 
   // Compile markdown to content object - memoize to prevent unnecessary recompilation
   const content: Hypernote = useMemo(
-    () => compileHypernoteToContent(debouncedMarkdown),
+    () => compileHypernoteToContent(debouncedMarkdown || ''),
     [debouncedMarkdown]
   );
   
@@ -687,10 +796,12 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
     );
   }
   
-  // If there are no elements, show a placeholder
+  // If there are no elements, show an empty container (allow editing)
   if (!content.elements || content.elements.length === 0) {
     return (
-      <div>No content to display. Try adding some markdown!</div>
+      <div className="hypernote-content" style={content.style || {}}>
+        {/* Empty but editable */}
+      </div>
     );
   }
 
@@ -732,18 +843,15 @@ export function HypernoteJsonOutput({ markdown }: { markdown: string }) {
   // Debounce the markdown input to match the renderer
   const [debouncedMarkdown] = useDebounce(markdown, 300);
   
-  // Guard against undefined or null markdown
-  if (!debouncedMarkdown || typeof debouncedMarkdown !== 'string') {
-    return (
-      <pre className="bg-slate-100 text-red-900 text-xs p-4 rounded overflow-auto">
-        No markdown content provided
-      </pre>
-    );
-  }
-
   // Memoize the compilation to prevent unnecessary recompilation
+  // Use empty string fallback to ensure hooks are always called
   const content: Hypernote = useMemo(
-    () => compileHypernoteToContent(debouncedMarkdown),
+    () => {
+      if (!debouncedMarkdown || typeof debouncedMarkdown !== 'string') {
+        return { elements: [], style: {} } as Hypernote;
+      }
+      return compileHypernoteToContent(debouncedMarkdown);
+    },
     [debouncedMarkdown]
   );
   

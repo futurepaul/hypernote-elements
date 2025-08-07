@@ -251,6 +251,10 @@ const QueryPipeStepSchema = z.union([
     operation: z.literal("filter"),
     expression: z.string().min(1), // jq expression that returns boolean
   }),
+  z.object({
+    operation: z.literal("parse_json"),
+    field: z.string().min(1).optional(), // Field containing JSON to parse (default: 'content')
+  }),
 ]);
 
 // Query schema - combines base Nostr filter with optional pipe transformations
@@ -300,7 +304,7 @@ export const hypernoteSchema = z.object({
   events: z.record(z.string().min(1), EventTemplateSchema).optional(),
   
   // Main content structure as a flat array of element objects
-  elements: z.array(AnyElementSchema).min(1),
+  elements: z.array(AnyElementSchema).min(0),
 });
 
 // Export the inferred type

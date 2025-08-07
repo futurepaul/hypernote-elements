@@ -253,6 +253,36 @@ export function applyPipeOperation(operation: any, data: any, context?: any): an
       if (!Array.isArray(data)) return data;
       return data.filter(item => evaluateCondition(operation.expression, item));
       
+    case 'parse_json':
+      // Parse JSON from a specific field (usually 'content' for kind 0 events)
+      const field = operation.field || 'content';
+      
+      if (Array.isArray(data)) {
+        return data.map(item => {
+          if (item && typeof item === 'object' && field in item) {
+            try {
+              const parsed = JSON.parse(item[field]);
+              // Merge parsed data with original event, preserving event metadata
+              return { ...item, ...parsed };
+            } catch (e) {
+              console.warn(`Failed to parse JSON from field ${field}:`, e);
+              return item;
+            }
+          }
+          return item;
+        });
+      } else if (data && typeof data === 'object' && field in data) {
+        try {
+          const parsed = JSON.parse(data[field]);
+          // Merge parsed data with original event
+          return { ...data, ...parsed };
+        } catch (e) {
+          console.warn(`Failed to parse JSON from field ${field}:`, e);
+          return data;
+        }
+      }
+      return data;
+      
     default:
       console.warn(`Unknown pipe operation: ${operation.operation}`);
       return data;
