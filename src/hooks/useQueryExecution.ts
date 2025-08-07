@@ -143,7 +143,7 @@ export function useQueryExecution(
               console.log(`[LIVE] Starting live subscription for ${queryName}`);
               
               // Create live subscription
-              const cleanup = snstrClient.relayHandler.subscribeLive(
+              const cleanup = snstrClient.subscribeLive(
                 [processedFilters],
                 (event: NostrEvent) => {
                   console.log(`[LIVE] New event for ${queryName}:`, event.id);

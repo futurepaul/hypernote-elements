@@ -322,6 +322,64 @@ export class SNSTRClient {
     });
   }
 
+  // Subscribe with live updates - keeps connection open after EOSE
+  subscribeLive(
+    filters: Filter[],
+    onEvent: (event: NostrEvent) => void,
+    onEose?: () => void
+  ): () => void {
+    const connectedRelays = this.getConnectedRelays();
+    
+    if (connectedRelays.length === 0) {
+      throw new Error("No relays connected for live subscription");
+    }
+    
+    this.logger(`[LIVE] Starting live subscription with ${connectedRelays.length} relays`);
+    
+    const subIds: string[] = [];
+    const seenIds = new Set<string>();
+    let eoseCount = 0;
+    let hasCalledEose = false;
+    
+    // Subscribe to each relay
+    connectedRelays.forEach((relayUrl) => {
+      const relay = this.relays.get(relayUrl);
+      if (!relay) return;
+      
+      const subId = relay.subscribe(filters, {
+        onEvent: (event) => {
+          // Deduplicate events across relays
+          if (!seenIds.has(event.id)) {
+            seenIds.add(event.id);
+            this.logger(`[LIVE] New event: ${event.id}`);
+            onEvent(event);
+          }
+        },
+        onEose: () => {
+          eoseCount++;
+          this.logger(`[LIVE] EOSE from ${relayUrl} (${eoseCount}/${connectedRelays.length})`);
+          
+          // Call onEose once when all relays have sent EOSE
+          if (eoseCount >= connectedRelays.length && !hasCalledEose && onEose) {
+            hasCalledEose = true;
+            onEose();
+          }
+        }
+      });
+      
+      subIds.push(subId);
+    });
+    
+    // Return cleanup function
+    return () => {
+      this.logger(`[LIVE] Closing live subscription`);
+      subIds.forEach((subId, index) => {
+        const relay = this.relays.get(connectedRelays[index]);
+        relay?.unsubscribe(subId);
+      });
+    };
+  }
+  
   // Fetch events with EOSE (End of Stored Events) handling
   async fetchEvents(filters: Filter[], timeout: number = 5000): Promise<NostrEvent[]> {
     const events: NostrEvent[] = [];
