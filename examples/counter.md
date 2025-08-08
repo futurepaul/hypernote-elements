@@ -9,12 +9,6 @@ name: "contextvm-counter"  # Optional: custom slug for 'd' tag (auto-generated f
   authors: [user.pubkey]
   limit: 1
   live: true
-  pipe:
-    - operation: first
-    - operation: field
-      name: content
-    - operation: default
-      value: "0"
 
 "@increment":
   kind: 25910
@@ -22,7 +16,7 @@ name: "contextvm-counter"  # Optional: custom slug for 'd' tag (auto-generated f
   provider: "npub1r86mtnf0eenr5w6fz66zcduvq2qvec4ll5908ppcp6gn2m7078tq82cuah"
   tool_name: "addone"
   arguments:
-    a: "{$count}"
+    a: "{$count.content}"
   target: "@update_count"
 
 "@decrement":
@@ -31,7 +25,7 @@ name: "contextvm-counter"  # Optional: custom slug for 'd' tag (auto-generated f
   provider: "npub1r86mtnf0eenr5w6fz66zcduvq2qvec4ll5908ppcp6gn2m7078tq82cuah"
   tool_name: "minusone"
   arguments:
-    a: "{$count}"
+    a: "{$count.content}"
   target: "@update_count"
 
 "@update_count":
@@ -50,7 +44,7 @@ name: "contextvm-counter"  # Optional: custom slug for 'd' tag (auto-generated f
 # Counter Example
 
 [div class="text-center"]
-## {$count}
+## {$count.content | first}
 [/div]
 
 [form @increment]

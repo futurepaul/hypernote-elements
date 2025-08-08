@@ -211,6 +211,11 @@ export function useQueryExecution(
                   // But check for duplicates first
                   setQueryResults(prev => {
                     const existing = prev[queryName] || [];
+                    // Only process if existing is an array (not transformed by pipes)
+                    if (!Array.isArray(existing)) {
+                      console.log(`[LIVE] Query ${queryName} has been transformed by pipes, skipping live update`);
+                      return prev;
+                    }
                     // Check if this event already exists
                     if (existing.some(e => e.id === event.id)) {
                       console.log(`[LIVE] Skipping duplicate event ${event.id}`);
