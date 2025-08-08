@@ -1,0 +1,207 @@
+{
+  "version": "1.1.0",
+  "type": "hypernote",
+  "title": "Nostr Client",
+  "description": "A simple Twitter-style Nostr client showing your following feed",
+  "name": "nostr-client",
+  "imports": {
+    "#profile": "naddr1qvzqqqrldqpzqrtvswydevzfhrw5ljxnmrpmhy778k5sh2pguncfezks7dry3z3nqy88wumn8ghj7mn0wvhxcmmv9uq32amnwvaz7tmjv4kxz7fwv3sk6atn9e5k7tcpzamhxue69uhhyetvv9ujuurjd9kkzmpwdejhgtcqp4c8ymmxd9kx2ttzv9jxwegsqyvt2"
+  },
+  "queries": {
+    "$contact_list": {
+      "kinds": [
+        3
+      ],
+      "authors": [
+        "user.pubkey"
+      ],
+      "limit": 1,
+      "pipe": [
+        {
+          "operation": "extract",
+          "expression": ".tags[] | select(.[0] == \"p\") | .[1]",
+          "as": "followed_pubkeys"
+        }
+      ]
+    },
+    "$following_feed": {
+      "kinds": [
+        1
+      ],
+      "authors": "$followed_pubkeys",
+      "limit": 20,
+      "since": 0,
+      "live": true
+    }
+  },
+  "events": {
+    "@post_note": {
+      "kind": 1,
+      "content": "{form.message}",
+      "tags": [
+        [
+          "client",
+          "hypernote-client"
+        ]
+      ]
+    }
+  },
+  "elements": [
+    {
+      "type": "h1",
+      "content": [
+        "Nostr Client"
+      ]
+    },
+    {
+      "type": "div",
+      "style": {
+        "marginBottom": "1rem",
+        "padding": "1rem",
+        "backgroundColor": "rgb(255,255,255)",
+        "borderRadius": "0.5rem",
+        "boxShadow": "0 0 #0000, 0 0 #0000, 0 1px 3px 0 rgb(0,0,0,0.1), 0 1px 2px -1px rgb(0,0,0,0.1)"
+      },
+      "elements": [
+        {
+          "type": "h2",
+          "content": [
+            "Your Following Feed"
+          ]
+        },
+        {
+          "type": "component",
+          "alias": "profile",
+          "argument": "user.pubkey"
+        },
+        {
+          "type": "json",
+          "content": [],
+          "attributes": {
+            "variable": "user.pubkey"
+          }
+        }
+      ]
+    },
+    {
+      "type": "div",
+      "style": {
+        "marginBottom": "1rem",
+        "padding": "1rem",
+        "backgroundColor": "rgb(255,255,255)",
+        "borderRadius": "0.5rem",
+        "boxShadow": "0 0 #0000, 0 0 #0000, 0 1px 3px 0 rgb(0,0,0,0.1), 0 1px 2px -1px rgb(0,0,0,0.1)"
+      },
+      "elements": [
+        {
+          "type": "form",
+          "event": "@post_note",
+          "elements": [
+            {
+              "type": "input",
+              "style": {
+                "width": "100%",
+                "padding": "0.5rem",
+                "borderWidth": "1px",
+                "borderRadius": "0.25rem"
+              },
+              "content": [],
+              "attributes": {
+                "name": "message",
+                "placeholder": "What's happening?"
+              }
+            },
+            {
+              "type": "button",
+              "style": {
+                "marginTop": "0.5rem",
+                "paddingTop": "0.5rem",
+                "paddingRight": "1rem",
+                "paddingBottom": "0.5rem",
+                "paddingLeft": "1rem",
+                "color": "rgb(255,255,255)",
+                "backgroundColor": "rgb(59,130,246)",
+                "borderRadius": "0.25rem"
+              },
+              "elements": [
+                {
+                  "type": "p",
+                  "content": [
+                    "Post"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "div",
+      "elements": [
+        {
+          "type": "loop",
+          "source": "$following_feed",
+          "variable": "$note",
+          "elements": [
+            {
+              "type": "div",
+              "style": {
+                "marginBottom": "1rem",
+                "padding": "1rem",
+                "backgroundColor": "rgb(255,255,255)",
+                "borderRadius": "0.5rem",
+                "boxShadow": "0 0 #0000, 0 0 #0000, 0 1px 3px 0 rgb(0,0,0,0.1), 0 1px 2px -1px rgb(0,0,0,0.1)"
+              },
+              "elements": [
+                {
+                  "type": "component",
+                  "alias": "profile",
+                  "argument": "$note.pubkey"
+                },
+                {
+                  "type": "div",
+                  "style": {
+                    "marginTop": "0.5rem",
+                    "color": "rgb(55,65,81)"
+                  },
+                  "elements": [
+                    {
+                      "type": "p",
+                      "content": [
+                        "      ",
+                        "{$note.content}",
+                        " ",
+                        "    "
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "div",
+                  "style": {
+                    "marginTop": "0.5rem",
+                    "color": "rgb(107,114,128)",
+                    "fontSize": "0.875rem",
+                    "lineHeight": "1.25rem"
+                  },
+                  "elements": [
+                    {
+                      "type": "p",
+                      "content": [
+                        "      Posted at: ",
+                        "{$note.created_at}",
+                        " ",
+                        "    "
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

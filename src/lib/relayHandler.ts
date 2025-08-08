@@ -214,6 +214,71 @@ export class RelayHandler {
   }
 
   /**
+   * Subscribe with live updates - keeps subscription open after EOSE
+   * Returns a cleanup function to unsubscribe
+   */
+  public subscribeLive(
+    filters: Filter[],
+    onEvent: (event: Event) => void,
+    onEose?: () => void,
+    options: {
+      requireMinRelays?: number;
+    } = {}
+  ): () => void {
+    const subscriptionId = Math.random().toString(36).substring(2, 15);
+    const minRelays = options.requireMinRelays || 1;
+    
+    const connectedRelays = this.getConnectedRelays();
+    
+    if (connectedRelays.length < minRelays) {
+      throw new Error(`Need at least ${minRelays} connected relays, have ${connectedRelays.length}`);
+    }
+    
+    this.logger(`Starting LIVE subscription on ${connectedRelays.length} relays with filters: ${JSON.stringify(filters)}`);
+    
+    let eoseCount = 0;
+    const targetEoseCount = connectedRelays.length;
+    let hasCalledEose = false;
+    
+    const sub = this.pool.subscribeMany(
+      connectedRelays,
+      filters,
+      {
+        onevent: (event) => {
+          if (this.validateEvent(event)) {
+            this.logger(`[LIVE] Received event: ${event.id}`);
+            onEvent(event);
+          } else {
+            this.logger(`[LIVE] Received invalid event: ${event.id}`);
+          }
+        },
+        oneose: () => {
+          eoseCount++;
+          this.logger(`[LIVE] EOSE from relay (${eoseCount}/${targetEoseCount})`);
+          
+          // Call onEose only once when all relays have sent EOSE
+          if (eoseCount >= targetEoseCount && !hasCalledEose && onEose) {
+            hasCalledEose = true;
+            onEose();
+          }
+        }
+      }
+    );
+    
+    this.subscriptions.set(subscriptionId, sub);
+    
+    // Return cleanup function
+    return () => {
+      this.logger(`Closing LIVE subscription ${subscriptionId}`);
+      const subscription = this.subscriptions.get(subscriptionId);
+      if (subscription) {
+        subscription.close();
+        this.subscriptions.delete(subscriptionId);
+      }
+    };
+  }
+
+  /**
    * Subscribe with better error handling and timeout management
    */
   public async subscribe(

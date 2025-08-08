@@ -1,0 +1,336 @@
+{
+  "version": "1.1.0",
+  "type": "hypernote",
+  "title": "My Hypernotes Browser",
+  "description": "Browse all your published Hypernotes and Elements",
+  "name": "hypernotes-browser",
+  "queries": {
+    "$my_applications": {
+      "kinds": [
+        32616
+      ],
+      "authors": [
+        "user.pubkey"
+      ],
+      "limit": 10
+    },
+    "$my_elements": {
+      "kinds": [
+        32616
+      ],
+      "authors": [
+        "user.pubkey"
+      ],
+      "limit": 10
+    },
+    "$my_state": {
+      "kinds": [
+        30078
+      ],
+      "authors": [
+        "user.pubkey"
+      ],
+      "limit": 10
+    }
+  },
+  "elements": [
+    {
+      "type": "h1",
+      "content": [
+        "My Published Hypernotes"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "Connected as: ",
+        "{user.pubkey}"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "This page shows all your published Hypernotes (applications and reusable elements)."
+      ]
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Hypernote Applications (Kind 32616 with \"application\" type)"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "These are full applications like clients, counters, and games."
+      ]
+    },
+    {
+      "type": "loop",
+      "source": "$my_applications",
+      "variable": "$doc",
+      "elements": [
+        {
+          "type": "div",
+          "style": {
+            "marginBottom": "1rem",
+            "padding": "1rem",
+            "backgroundColor": "rgb(255,255,255)",
+            "borderColor": "rgb(59,130,246)",
+            "borderRadius": "0.5rem",
+            "borderLeftWidth": "4px",
+            "boxShadow": "0 0 #0000, 0 0 #0000, 0 1px 3px 0 rgb(0,0,0,0.1), 0 1px 2px -1px rgb(0,0,0,0.1)"
+          },
+          "elements": [
+            {
+              "type": "p",
+              "content": [
+                {
+                  "type": "strong",
+                  "content": [
+                    "Event ID:"
+                  ]
+                },
+                " ",
+                "{$doc.id}"
+              ]
+            },
+            {
+              "type": "p",
+              "content": [
+                {
+                  "type": "strong",
+                  "content": [
+                    "Created:"
+                  ]
+                },
+                " ",
+                "{$doc.created_at}"
+              ]
+            },
+            {
+              "type": "p",
+              "content": [
+                {
+                  "type": "strong",
+                  "content": [
+                    "Content Preview:"
+                  ]
+                },
+                " "
+              ]
+            },
+            {
+              "type": "div",
+              "style": {
+                "overflow": "auto",
+                "maxHeight": "8rem",
+                "padding": "0.5rem",
+                "backgroundColor": "rgb(249,250,251)",
+                "fontFamily": "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace",
+                "fontSize": "0.75rem",
+                "lineHeight": "1rem",
+                "borderRadius": "0.25rem"
+              },
+              "elements": [
+                {
+                  "type": "p",
+                  "content": [
+                    "{$doc.content}",
+                    " "
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "p",
+              "content": [
+                {
+                  "type": "strong",
+                  "content": [
+                    "Tags:"
+                  ]
+                },
+                " "
+              ]
+            },
+            {
+              "type": "json",
+              "content": [],
+              "attributes": {
+                "variable": "$doc.tags"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Hypernote Elements (Kind 32616 with \"element\" type)"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "These are reusable components that can be imported by other Hypernotes."
+      ]
+    },
+    {
+      "type": "loop",
+      "source": "$my_elements",
+      "variable": "$elem",
+      "elements": [
+        {
+          "type": "div",
+          "style": {
+            "marginBottom": "1rem",
+            "padding": "1rem",
+            "backgroundColor": "rgb(255,255,255)",
+            "borderColor": "rgb(34,197,94)",
+            "borderRadius": "0.5rem",
+            "borderLeftWidth": "4px",
+            "boxShadow": "0 0 #0000, 0 0 #0000, 0 1px 3px 0 rgb(0,0,0,0.1), 0 1px 2px -1px rgb(0,0,0,0.1)"
+          },
+          "elements": [
+            {
+              "type": "p",
+              "content": [
+                {
+                  "type": "strong",
+                  "content": [
+                    "Event ID:"
+                  ]
+                },
+                " ",
+                "{$elem.id}"
+              ]
+            },
+            {
+              "type": "p",
+              "content": [
+                {
+                  "type": "strong",
+                  "content": [
+                    "Created:"
+                  ]
+                },
+                " ",
+                "{$elem.created_at}"
+              ]
+            },
+            {
+              "type": "p",
+              "content": [
+                {
+                  "type": "strong",
+                  "content": [
+                    "Content Preview:"
+                  ]
+                },
+                " "
+              ]
+            },
+            {
+              "type": "div",
+              "style": {
+                "overflow": "auto",
+                "maxHeight": "8rem",
+                "padding": "0.5rem",
+                "backgroundColor": "rgb(249,250,251)",
+                "fontFamily": "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace",
+                "fontSize": "0.75rem",
+                "lineHeight": "1rem",
+                "borderRadius": "0.25rem"
+              },
+              "elements": [
+                {
+                  "type": "p",
+                  "content": [
+                    "{$elem.content}",
+                    " "
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "p",
+              "content": [
+                {
+                  "type": "strong",
+                  "content": [
+                    "Tags:"
+                  ]
+                },
+                " "
+              ]
+            },
+            {
+              "type": "json",
+              "content": [],
+              "attributes": {
+                "variable": "$elem.tags"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Application State (Kind 30078)"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "These are state events used by your applications (not Hypernotes themselves)."
+      ]
+    },
+    {
+      "type": "loop",
+      "source": "$my_state",
+      "variable": "$state",
+      "elements": [
+        {
+          "type": "div",
+          "style": {
+            "marginBottom": "0.5rem",
+            "padding": "0.5rem",
+            "backgroundColor": "rgb(243,244,246)",
+            "fontSize": "0.875rem",
+            "lineHeight": "1.25rem",
+            "borderRadius": "0.25rem"
+          },
+          "elements": [
+            {
+              "type": "p",
+              "content": [
+                {
+                  "type": "strong",
+                  "content": [
+                    "Content:"
+                  ]
+                },
+                " ",
+                "{$state.content}",
+                " ",
+                {
+                  "type": "strong",
+                  "content": [
+                    "Created:"
+                  ]
+                },
+                " ",
+                "{$state.created_at}",
+                " "
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

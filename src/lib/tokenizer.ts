@@ -21,7 +21,13 @@ export enum TokenType {
   NEWLINE,
   EACH_START,
   EACH_END,
+  IF_START,
+  IF_END,
   VARIABLE_REFERENCE,
+  BOLD,
+  ITALIC,
+  INLINE_CODE,
+  COMPONENT,
   EOF
 }
 
@@ -122,22 +128,34 @@ export function tokenize(content: string): Token[] {
       continue;
     }
     
-    // Handle variable reference (e.g., {$variable})
-    if (char === '{' && content[pos + 1] === '$') {
-      let variableName = '{';
-      pos++; // Skip '{'
-      while (pos < content.length && content[pos] !== '}') {
-        variableName += content[pos];
-        pos++;
-      }
-      variableName += '}'; // Include closing brace
-      pos++; // Skip '}'
+    // Handle variable reference (e.g., {$variable}, {user.pubkey}, {time.now}, {target.id}, {form.message})
+    if (char === '{' && pos + 1 < content.length) {
+      const nextChar = content[pos + 1];
+      // Check if this looks like a variable reference
+      // Variables can start with $, or be one of our special contexts (user, time, target, form)
+      const restOfContent = content.slice(pos + 1);
+      const isVariable = nextChar === '$' || 
+                        restOfContent.startsWith('user.') ||
+                        restOfContent.startsWith('time.') ||
+                        restOfContent.startsWith('target.') ||
+                        restOfContent.startsWith('form.');
       
-      tokens.push({ 
-        type: TokenType.VARIABLE_REFERENCE, 
-        value: variableName
-      });
-      continue;
+      if (isVariable) {
+        let variableName = '{';
+        pos++; // Skip '{'
+        while (pos < content.length && content[pos] !== '}') {
+          variableName += content[pos];
+          pos++;
+        }
+        variableName += '}'; // Include closing brace
+        pos++; // Skip '}'
+        
+        tokens.push({ 
+          type: TokenType.VARIABLE_REFERENCE, 
+          value: variableName
+        });
+        continue;
+      }
     }
     
     // Handle image syntax (e.g., ![alt text](src))
@@ -215,7 +233,41 @@ export function tokenize(content: string): Token[] {
           case 'each':
             tokens.push({ type: TokenType.EACH_END, value: elementType });
             break;
+          case 'if':
+            tokens.push({ type: TokenType.IF_END, value: elementType });
+            break;
         }
+        continue;
+      }
+      
+      // Check if this is a component reference [#alias argument]
+      if (content[pos] === '#') {
+        pos++; // Skip '#'
+        
+        // Get the alias name
+        let alias = '';
+        while (pos < content.length && content[pos] !== ' ' && content[pos] !== ']') {
+          alias += content[pos];
+          pos++;
+        }
+        
+        // Skip whitespace
+        if (content[pos] === ' ') pos++;
+        
+        // Get the argument (e.g., user.pubkey, $note.pubkey, or a literal npub/nevent)
+        let argument = '';
+        while (pos < content.length && content[pos] !== ']') {
+          argument += content[pos];
+          pos++;
+        }
+        
+        if (content[pos] === ']') pos++; // Skip ']'
+        
+        tokens.push({
+          type: TokenType.COMPONENT,
+          value: alias,
+          attributes: { argument: argument.trim() }
+        });
         continue;
       }
       
@@ -419,6 +471,25 @@ export function tokenize(content: string): Token[] {
           attributes: { source, variable }
         });
         continue;
+      } else if (elementType === 'if') {
+        // Handle [if condition]
+        if (content[pos] === ' ') pos++; // Skip space
+        
+        // Get the condition expression
+        let condition = '';
+        while (pos < content.length && content[pos] !== ']') {
+          condition += content[pos];
+          pos++;
+        }
+        
+        if (content[pos] === ']') pos++; // Skip ']'
+        
+        tokens.push({ 
+          type: TokenType.IF_START, 
+          value: elementType,
+          attributes: { condition: condition.trim() }
+        });
+        continue;
       } else if (elementType === 'json') {
         // Handle [json $variable] or [json $variable.property] syntax
         let attributes: Record<string, string> = {};
@@ -510,6 +581,67 @@ export function tokenize(content: string): Token[] {
       }
     }
     
+    // Handle inline code syntax (`code`)
+    if (char === '`') {
+      pos++; // Skip opening '`'
+      
+      let codeText = '';
+      while (pos < content.length) {
+        if (content[pos] === '`') {
+          pos++; // Skip closing '`'
+          tokens.push({
+            type: TokenType.INLINE_CODE,
+            value: codeText
+          });
+          break;
+        }
+        codeText += content[pos];
+        pos++;
+      }
+      continue;
+    }
+    
+    // Handle bold syntax (**text**)
+    if (char === '*' && content[pos + 1] === '*' && 
+        pos + 2 < content.length && content[pos + 2] !== '*') {
+      pos += 2; // Skip '**'
+      
+      let boldText = '';
+      while (pos < content.length - 1) {
+        if (content[pos] === '*' && content[pos + 1] === '*') {
+          pos += 2; // Skip closing '**'
+          tokens.push({
+            type: TokenType.BOLD,
+            value: boldText
+          });
+          break;
+        }
+        boldText += content[pos];
+        pos++;
+      }
+      continue;
+    }
+    
+    // Handle italic syntax (*text* but not **text**)
+    if (char === '*' && content[pos + 1] !== '*' && pos > 0 && content[pos - 1] !== '*') {
+      pos++; // Skip '*'
+      
+      let italicText = '';
+      while (pos < content.length) {
+        if (content[pos] === '*' && (pos + 1 >= content.length || content[pos + 1] !== '*')) {
+          pos++; // Skip closing '*'
+          tokens.push({
+            type: TokenType.ITALIC,
+            value: italicText
+          });
+          break;
+        }
+        italicText += content[pos];
+        pos++;
+      }
+      continue;
+    }
+    
     // Handle plain text
     let text = '';
     while (pos < content.length && 
@@ -517,6 +649,8 @@ export function tokenize(content: string): Token[] {
            content[pos] !== '#' && 
            content[pos] !== '[' && 
            content[pos] !== '{' &&
+           content[pos] !== '*' &&
+           content[pos] !== '`' &&
            !(content[pos] === '!' && content[pos + 1] === '[')) {
       text += content[pos];
       pos++;
@@ -597,6 +731,9 @@ export function parseTokens(tokens: Token[]): any[] {
       }
     }
 
+    // Track pending style for next element in container
+    let containerStyle: string | null = null;
+    
     // Parse until we find the matching closing tag
     while (currentIndex < tokens.length && tokens[currentIndex].type !== TokenType.EOF) {
       const t = tokens[currentIndex];
@@ -608,10 +745,24 @@ export function parseTokens(tokens: Token[]): any[] {
         break;
       }
       
+      // Handle style marker - applies to the next element
+      if (t.type === TokenType.STYLE_MARKER) {
+        flushContainerParagraph();
+        containerStyle = t.value;
+        currentIndex++;
+        continue;
+      }
+      
       // Handle nested containers
       if (t.type === TokenType.FORM_START) {
         flushContainerParagraph();
         const nestedForm = parseContainer(TokenType.FORM_START, TokenType.FORM_END, 'form', t);
+        // Apply pending style if present
+        if (containerStyle) {
+          if (!nestedForm.attributes) nestedForm.attributes = {};
+          nestedForm.attributes.class = containerStyle;
+          containerStyle = null;
+        }
         containerElements.push(nestedForm);
         continue;
       }
@@ -619,6 +770,12 @@ export function parseTokens(tokens: Token[]): any[] {
       if (t.type === TokenType.DIV_START) {
         flushContainerParagraph();
         const nestedDiv = parseContainer(TokenType.DIV_START, TokenType.DIV_END, 'div', t);
+        // Apply pending style if present
+        if (containerStyle) {
+          if (!nestedDiv.attributes) nestedDiv.attributes = {};
+          nestedDiv.attributes.class = containerStyle;
+          containerStyle = null;
+        }
         containerElements.push(nestedDiv);
         continue;
       }
@@ -626,6 +783,12 @@ export function parseTokens(tokens: Token[]): any[] {
       if (t.type === TokenType.BUTTON_START) {
         flushContainerParagraph();
         const nestedButton = parseContainer(TokenType.BUTTON_START, TokenType.BUTTON_END, 'button', t);
+        // Apply pending style if present
+        if (containerStyle) {
+          if (!nestedButton.attributes) nestedButton.attributes = {};
+          nestedButton.attributes.class = containerStyle;
+          containerStyle = null;
+        }
         containerElements.push(nestedButton);
         continue;
       }
@@ -633,6 +796,12 @@ export function parseTokens(tokens: Token[]): any[] {
       if (t.type === TokenType.SPAN_START) {
         flushContainerParagraph();
         const nestedSpan = parseContainer(TokenType.SPAN_START, TokenType.SPAN_END, 'span', t);
+        // Apply pending style if present
+        if (containerStyle) {
+          if (!nestedSpan.attributes) nestedSpan.attributes = {};
+          nestedSpan.attributes.class = containerStyle;
+          containerStyle = null;
+        }
         containerElements.push(nestedSpan);
         continue;
       }
@@ -644,7 +813,25 @@ export function parseTokens(tokens: Token[]): any[] {
           type: `h${t.level}`,
           content: [t.value]
         };
+        // Apply pending style if present
+        if (containerStyle) {
+          heading['attributes'] = { class: containerStyle };
+          containerStyle = null;
+        }
         containerElements.push(heading);
+        currentIndex++;
+        continue;
+      }
+      
+      // Handle component references
+      if (t.type === TokenType.COMPONENT) {
+        flushContainerParagraph();
+        const componentElement = {
+          type: 'component',
+          alias: t.value,
+          argument: t.attributes?.argument || ''
+        };
+        containerElements.push(componentElement);
         currentIndex++;
         continue;
       }
@@ -675,6 +862,11 @@ export function parseTokens(tokens: Token[]): any[] {
           type: 'img',
           attributes: { ...t.attributes }
         };
+        // Apply pending style if present
+        if (containerStyle) {
+          imageElement.attributes.class = containerStyle;
+          containerStyle = null;
+        }
         containerElements.push(imageElement);
         currentIndex++;
         continue;
@@ -684,7 +876,27 @@ export function parseTokens(tokens: Token[]): any[] {
       if (t.type === TokenType.EACH_START) {
         flushContainerParagraph();
         const loopElement = parseContainer(TokenType.EACH_START, TokenType.EACH_END, 'loop', t);
+        // Apply pending style if present
+        if (containerStyle) {
+          if (!loopElement.attributes) loopElement.attributes = {};
+          loopElement.attributes.class = containerStyle;
+          containerStyle = null;
+        }
         containerElements.push(loopElement);
+        continue;
+      }
+      
+      // Handle conditionals
+      if (t.type === TokenType.IF_START) {
+        flushContainerParagraph();
+        const ifElement = parseContainer(TokenType.IF_START, TokenType.IF_END, 'if', t);
+        // Apply pending style if present
+        if (containerStyle) {
+          if (!ifElement.attributes) ifElement.attributes = {};
+          ifElement.attributes.class = containerStyle;
+          containerStyle = null;
+        }
+        containerElements.push(ifElement);
         continue;
       }
       
@@ -702,7 +914,60 @@ export function parseTokens(tokens: Token[]): any[] {
         continue;
       }
       
-      // Skip newlines and other tokens
+      // Handle inline code
+      if (t.type === TokenType.INLINE_CODE) {
+        containerInlineBuffer.push({
+          type: 'code',
+          content: [t.value]
+        });
+        currentIndex++;
+        continue;
+      }
+      
+      // Handle bold text
+      if (t.type === TokenType.BOLD) {
+        containerInlineBuffer.push({
+          type: 'strong',
+          content: [t.value]
+        });
+        currentIndex++;
+        continue;
+      }
+      
+      // Handle italic text
+      if (t.type === TokenType.ITALIC) {
+        containerInlineBuffer.push({
+          type: 'em',
+          content: [t.value]
+        });
+        currentIndex++;
+        continue;
+      }
+      
+      // Handle newlines - check for double newline (paragraph break)
+      if (t.type === TokenType.NEWLINE) {
+        currentIndex++;
+        // Check if the next token is also a newline (blank line = new paragraph)
+        if (currentIndex < tokens.length && tokens[currentIndex].type === TokenType.NEWLINE) {
+          flushContainerParagraph();
+          currentIndex++; // Skip the second newline
+        } else {
+          // Single newline - treat as a space (markdown convention)
+          // Only add space if buffer has content and doesn't end with space
+          if (containerInlineBuffer.length > 0) {
+            const lastItem = containerInlineBuffer[containerInlineBuffer.length - 1];
+            if (typeof lastItem === 'string' && !lastItem.endsWith(' ')) {
+              containerInlineBuffer.push(' ');
+            } else if (typeof lastItem !== 'string') {
+              // Last item was a bold/italic element, add space
+              containerInlineBuffer.push(' ');
+            }
+          }
+        }
+        continue;
+      }
+      
+      // Skip other tokens
       currentIndex++;
     }
     
@@ -737,6 +1002,11 @@ export function parseTokens(tokens: Token[]): any[] {
       delete container.attributes; // Loop doesn't use regular attributes
     }
     
+    if (containerType === 'if') {
+      container.condition = token.attributes?.condition;
+      delete container.attributes; // If doesn't use regular attributes
+    }
+    
     return container;
   }
 
@@ -767,7 +1037,9 @@ export function parseTokens(tokens: Token[]): any[] {
       token.type === TokenType.BUTTON_START ||
       token.type === TokenType.SPAN_START ||
       token.type === TokenType.EACH_START ||
-      token.type === TokenType.IMAGE
+      token.type === TokenType.IF_START ||
+      token.type === TokenType.IMAGE ||
+      token.type === TokenType.COMPONENT
     ) {
       flushParagraph();
     }
@@ -876,6 +1148,39 @@ export function parseTokens(tokens: Token[]): any[] {
       elements.push(loopElement);
       continue;
     }
+    
+    if (token.type === TokenType.IF_START) {
+      const ifElement = parseContainer(TokenType.IF_START, TokenType.IF_END, 'if', token);
+      if (currentId) {
+        ifElement.elementId = currentId;
+        currentId = null;
+      }
+      if (currentStyle) {
+        if (!ifElement.attributes) {
+          ifElement.attributes = {};
+        }
+        ifElement.attributes.class = currentStyle;
+        currentStyle = null;
+      }
+      elements.push(ifElement);
+      continue;
+    }
+
+    // Handle component references
+    if (token.type === TokenType.COMPONENT) {
+      const componentElement = {
+        type: 'component',
+        alias: token.value,
+        argument: token.attributes?.argument || ''
+      };
+      if (currentId) {
+        componentElement['elementId'] = currentId;
+        currentId = null;
+      }
+      elements.push(componentElement);
+      currentIndex++;
+      continue;
+    }
 
     // Handle regular elements
     if (token.type === TokenType.ELEMENT_START) {
@@ -939,8 +1244,61 @@ export function parseTokens(tokens: Token[]): any[] {
       currentIndex++;
       continue;
     }
+    
+    // Handle inline code
+    if (token.type === TokenType.INLINE_CODE) {
+      inlineBuffer.push({
+        type: 'code',
+        content: [token.value]
+      });
+      currentIndex++;
+      continue;
+    }
+    
+    // Handle bold text
+    if (token.type === TokenType.BOLD) {
+      inlineBuffer.push({
+        type: 'strong',
+        content: [token.value]
+      });
+      currentIndex++;
+      continue;
+    }
+    
+    // Handle italic text
+    if (token.type === TokenType.ITALIC) {
+      inlineBuffer.push({
+        type: 'em',
+        content: [token.value]
+      });
+      currentIndex++;
+      continue;
+    }
+    
+    // Handle newlines
+    if (token.type === TokenType.NEWLINE) {
+      currentIndex++;
+      // Check if the next token is also a newline (blank line = new paragraph)
+      if (currentIndex < tokens.length && tokens[currentIndex].type === TokenType.NEWLINE) {
+        flushParagraph();
+        currentIndex++; // Skip the second newline
+      } else {
+        // Single newline - treat as a space (markdown convention)
+        // Only add space if buffer has content and doesn't end with space
+        if (inlineBuffer.length > 0) {
+          const lastItem = inlineBuffer[inlineBuffer.length - 1];
+          if (typeof lastItem === 'string' && !lastItem.endsWith(' ')) {
+            inlineBuffer.push(' ');
+          } else if (typeof lastItem !== 'string') {
+            // Last item was a bold/italic element, add space
+            inlineBuffer.push(' ');
+          }
+        }
+      }
+      continue;
+    }
 
-    // Skip newlines and other tokens
+    // Skip other tokens
     currentIndex++;
   }
 

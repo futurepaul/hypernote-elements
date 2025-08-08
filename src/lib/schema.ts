@@ -1,6 +1,12 @@
 import { z } from "zod/v4";
 import { StyleSheetSchema, StylePropertiesSchema } from "./style-schema";
 
+// Nostr event kind constants
+export const HYPERNOTE_KIND = 32616;          // All Hypernote documents and components
+export const HYPERNOTE_ELEMENT_KIND = 32616;  // Hypernote components (same as HYPERNOTE_KIND)
+export const APP_STATE_KIND = 30078;          // Application state (counters, preferences, etc.)
+export const CONTEXTVM_KIND = 25910;          // ContextVM tool call events
+
 /**
  * IMPORTANT: TypeScript Circular Reference Warnings
  * 
@@ -215,14 +221,67 @@ const AnyElementSchema = z.union([
 
 // Query pipe step schema - now only for transformations, no Nostr filters
 const QueryPipeStepSchema = z.union([
-  // Extract operation (existing)
+  // Extract operation - jq-style data extraction with variable assignment
   z.object({
-    extract: z.string().min(1),
-    as: z.string().min(1),
+    operation: z.literal("extract"),
+    expression: z.string().min(1), // jq expression like ".tags[] | select(.[0] == \"p\") | .[1]"
+    as: z.string().min(1), // variable name to store result
   }),
-  // Reverse operation (new)
+  // Reverse operation - reverses array order
   z.object({
     operation: z.literal("reverse"),
+  }),
+  // Flatten operation - flattens nested arrays
+  z.object({
+    operation: z.literal("flatten"),
+    depth: z.number().positive().optional(), // optional depth limit
+  }),
+  // Unique operation - removes duplicate values
+  z.object({
+    operation: z.literal("unique"),
+    by: z.string().optional(), // optional property to determine uniqueness
+  }),
+  // Sort operation - sorts array by property
+  z.object({
+    operation: z.literal("sort"),
+    by: z.string().optional(), // property to sort by (e.g., "created_at")
+    order: z.enum(["asc", "desc"]).optional().default("asc"),
+  }),
+  // Map operation - transforms each item
+  z.object({
+    operation: z.literal("map"),
+    expression: z.string().min(1), // jq expression to apply to each item
+  }),
+  // Filter operation - filters items based on condition
+  z.object({
+    operation: z.literal("filter"),
+    expression: z.string().min(1), // jq expression that returns boolean
+  }),
+  z.object({
+    operation: z.literal("parse_json"),
+    field: z.string().min(1).optional(), // Field containing JSON to parse (default: 'content')
+  }),
+  // First operation - takes first element of array
+  z.object({
+    operation: z.literal("first"),
+  }),
+  // Last operation - takes last element of array
+  z.object({
+    operation: z.literal("last"),
+  }),
+  // Field operation - extracts a specific field
+  z.object({
+    operation: z.literal("field"),
+    name: z.string().min(1), // field name to extract
+  }),
+  // Default operation - provides a default value
+  z.object({
+    operation: z.literal("default"),
+    value: z.any(), // default value if data is null/undefined/empty
+  }),
+  // JSON operation - parses a JSON string
+  z.object({
+    operation: z.literal("json"),
   }),
 ]);
 
@@ -235,17 +294,37 @@ const QuerySchema = z.object({
   since: z.union([z.int().nonnegative(), z.string()]).optional(),
   until: z.union([z.int().nonnegative(), z.string()]).optional(),
   ids: z.array(z.string().min(1)).optional(),
-  tags: z.record(z.string().min(1), z.array(z.string())).optional(),
+  
+  // Tag filters (NIP-01 standard)
+  "#e": z.array(z.string().min(1)).optional(),
+  "#p": z.array(z.string().min(1)).optional(),
+  "#d": z.array(z.string().min(1)).optional(),
+  "#t": z.array(z.string().min(1)).optional(),
+  "#a": z.array(z.string().min(1)).optional(),
+  "#r": z.array(z.string().min(1)).optional(),
+  
+  // Live subscription flag - keeps WebSocket connection open for real-time updates
+  live: z.boolean().optional(),
   
   // Optional transformation pipeline
   pipe: z.array(QueryPipeStepSchema).optional(),
 });
 
-// Event template schema
+// Event template schema - supports both regular events and tool calls
 const EventTemplateSchema = z.object({
   kind: z.int().nonnegative(),
-  content: z.string(),
+  content: z.string().optional(), // Optional for tool calls
   tags: z.array(z.array(z.string())).optional(),
+  
+  // Tool call specific fields
+  tool_call: z.boolean().optional(),
+  provider: z.string().optional(), // Provider npub for tool calls
+  tool_name: z.string().optional(), // Name of the tool to execute
+  arguments: z.record(z.string(), z.any()).optional(), // Tool arguments
+  target: z.string().optional(), // Event template to trigger with response
+  
+  // Regular replaceable event fields
+  d: z.string().optional(), // d tag for replaceable events
 });
 
 /**
@@ -256,8 +335,14 @@ export const hypernoteSchema = z.object({
   // Schema version (should match the ["hypernote", "..."] tag)
   version: z.string().min(1),
   
-  // For component definitions: 0 (npub input), 1 (nevent input), or null (not a component)
-  component_kind: z.union([z.literal(0), z.literal(1), z.null()]).optional(),
+  // Metadata from frontmatter
+  type: z.enum(["hypernote", "element"]).optional(), // Document type
+  title: z.string().optional(), // Document title
+  description: z.string().optional(), // Document description
+  name: z.string().optional(), // Optional slug for 'd' tag (auto-generated from title if not provided)
+  
+  // For component definitions: 0 (npub input), 1 (nevent input), undefined (not a component)
+  kind: z.union([z.literal(0), z.literal(1)]).optional(),
   
   // Maps aliases used in HNMD to their Nostr identifiers (naddr, nevent, etc.)
   imports: z.record(z.string().min(1), z.string().min(1)).optional(),
@@ -273,7 +358,7 @@ export const hypernoteSchema = z.object({
   events: z.record(z.string().min(1), EventTemplateSchema).optional(),
   
   // Main content structure as a flat array of element objects
-  elements: z.array(AnyElementSchema).min(1),
+  elements: z.array(AnyElementSchema).min(0),
 });
 
 // Export the inferred type

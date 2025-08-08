@@ -8,7 +8,7 @@ test("should parse basic H1 and a form triggering a hardcoded event", () => {
   const result = compileHypernoteToContent(example.markdown);
   
   expect(result.version).toBe("1.1.0");
-  expect(result.component_kind).toBe(null);
+  expect(result.kind).toBeUndefined();
   expect(result.events?.["@post_hello"]).toBeDefined();
   expect(result.events?.["@post_hello"].kind).toBe(1);
   expect(result.events?.["@post_hello"].content).toBe("hello world");
@@ -43,13 +43,14 @@ test("should parse H1 with ID and apply a simple style rule", () => {
   expect(h1.type).toBe("h1");
   expect(h1.content).toEqual(["Div Container Example"]);
   
-  // Check element with ID (the paragraph after the ID marker)
-  const elementWithId = result.elements[1] as any;
-  expect(elementWithId.elementId).toBe("card-container");
+  // Check paragraph element
+  const paragraph = result.elements[1] as any;
+  expect(paragraph.type).toBe("p");
   
-  // Check styled div element
+  // Check styled div element with ID
   const divElement = result.elements[2] as any;
   expect(divElement.type).toBe("div");
+  expect(divElement.elementId).toBe("card-container");
   expect(divElement.style).toBeDefined();
   expect(divElement.style?.backgroundColor).toBe("rgb(255,255,255)");
   expect(divElement.style?.padding).toBe("1.5rem");
@@ -157,7 +158,7 @@ Some content here.`;
     
     // Should return fallback structure instead of throwing
     expect(result.version).toBe("1.1.0");
-    expect(result.component_kind).toBe(null);
+    expect(result.kind).toBeUndefined();
     expect(result.elements).toBeArray();
     expect(result.elements.length).toBe(1);
     expect(result.elements[0].type).toBe("div");

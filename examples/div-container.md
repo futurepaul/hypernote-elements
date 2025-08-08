@@ -1,5 +1,11 @@
 ---
+type: "hypernote"
+title: "Div Container Demo"
+description: "Demonstrates nested div containers with styling"
+name: "div-container"
+
 style: "p-4 bg-gray-100"
+
 "@submit_feedback":
   kind: 1
   content: "Thanks for your feedback: {form.message}"

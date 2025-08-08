@@ -6,18 +6,46 @@ This document defines the JSON structure used within the `content` field of a No
 
 ## Nostr Event Fields
 
-A Hypernote is published as a standard Nostr event with the following characteristics:
+Hypernote uses different event kinds for different purposes:
 
-* **`kind`**: `30078` (Proposed; or another dedicated kind TBD).
-    * *Component Definitions* might use a separate kind like `31990` (Proposed; TBD) to clearly distinguish them.
+### Event Kind Assignments
+
+* **`kind: 32616`**: All Hypernote documents and components (replaceable, parameterized)
+    * Both applications and reusable components use this kind
+    * Differentiated by `hypernote-type` tag: "application" or "element"
+    * Uses `d` tag for unique identification
+* **`kind: 30078`**: Application state events (replaceable, parameterized)
+    * Used by Hypernote applications for storing user state (e.g., counter values, preferences)
+    * Not a Hypernote document itself, but data used by Hypernotes
+
+### Hypernote Event Structure (kind: 32616)
+
 * **`tags`**:
-    * `["d", "<hypernote-identifier>"]` (Required): A unique identifier for the Hypernote instance or definition (e.g., slug, UUID). Allows replacement via NIP-23.
+    * `["d", "<hypernote-identifier>"]` (Required): A unique identifier for the Hypernote instance or definition (e.g., slug, UUID). Allows replacement via NIP-33.
     * `["t", "hypernote"]` (Recommended): General tag for discoverability.
     * `["hypernote", "<spec_version>"]` (Required): Indicates the version of the *JSON structure specification* this event conforms to (e.g., `"1.1.0"`). Clients should check this.
-    * *For Component Definitions*: `["hypernote-component-kind", "<kind_0_or_1>"]` (Required): Specifies if the component expects an `npub` (`0`) or `nevent` (`1`) as input.
+    * `["hypernote-type", "application"]` or `["hypernote-type", "element"]` (Required): Differentiates between applications and reusable components.
+    * For applications: `["t", "hypernote-app"]` (Recommended)
+    * For components: `["t", "hypernote-element"]` (Recommended)
     * Other relevant tags (e.g., `["title", "My Hypernote Title"]`, language tags `["L", "en"]`, etc.) can be included as needed.
 * **`content`**: A JSON string conforming to the specification detailed below. This contains the structured Hypernote document.
-* `created_at`, `pubkey`, `id`, `sig`: Standard Nostr fields.
+
+### Component-Specific Tags (when hypernote-type is "element")
+
+When the `hypernote-type` is "element", additional tags are included:
+
+* **Additional tags**:
+    * `["hypernote-component-kind", "<kind_0_or_1>"]` (Required for components): Specifies if the component expects an `npub` (`0`) or `nevent` (`1`) as input.
+
+Standard Nostr fields (`created_at`, `pubkey`, `id`, `sig`) apply to all event types.
+
+### Querying Hypernotes
+
+To query for specific types of hypernotes:
+
+* **Applications only**: Filter for `kinds: [32616]` with `"#hypernote-type": ["application"]`
+* **Components only**: Filter for `kinds: [32616]` with `"#hypernote-type": ["element"]`
+* **All hypernotes**: Filter for `kinds: [32616]` without type filtering
 
 ## JSON Content Payload (`content` field)
 
@@ -80,6 +108,18 @@ The `content` field contains a JSON string which, when parsed, results in the fo
         ["p", "{target.pubkey}"]  // Client substitutes target component's pubkey
         // ... other tags
       ]
+    },
+    
+    // ContextVM Tool Call Event Template
+    "@increment": {
+      "kind": 25910,           // ContextVM event kind
+      "tool_call": true,       // Flag indicating this is a tool call (requires special handling)
+      "provider": "npub1...",  // ContextVM provider pubkey
+      "tool_name": "addone",   // Name of the tool to execute
+      "arguments": {           // Tool-specific arguments
+        "a": "{$count.content || '0'}"
+      },
+      "target": "$count"       // Query to update with tool response (creates replaceable event)
     }
     // ... other named event templates
   },
@@ -339,6 +379,12 @@ The styling system supports a validated subset of CSS-in-JS properties designed 
     2.  Substitute variables (`form.*`, `target.*`, `user.*`, etc.) into the referenced event template from the `events` map.
     3.  Construct the final Nostr event.
     4.  **Crucially:** Prompt the user to review, sign, and publish the generated event.
+* **ContextVM Tool Calls:** When an event template includes `tool_call: true`, the client must:
+    1.  Construct a JSON-RPC request with the specified `tool_name` and `arguments`.
+    2.  Wrap the request in a kind 25910 event with a `p` tag for the provider.
+    3.  Subscribe to responses from the provider (kind 25910 with `e` tag matching request).
+    4.  Extract the response content and use it to create/update a replaceable event.
+    5.  If a `target` query is specified, invalidate that query to trigger UI updates.
 * **Styling:** Clients need to parse the `style` object and apply the specified styles to elements based on their type, ID, or class. The styling system uses a minimal subset of CSS designed for cross-platform compatibility. See the "Cross-Platform Styling System" section above for detailed property mappings and platform-specific implementation guidance.
 * **Component Loading:** When encountering a `component` element, the client needs to:
     1.  Resolve the `alias` using the `imports` map to get the Nostr identifier (`reference`).

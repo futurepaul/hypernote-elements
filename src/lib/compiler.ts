@@ -152,10 +152,26 @@ export function compileHypernoteToContent(hnmd: string): Hypernote {
           }
           result.queries[key] = frontmatter[key];
           debugLog(`Added query: ${key}`, frontmatter[key]);
-        } else if (key === 'component_kind') {
-          // Handle component kind
-          result.component_kind = frontmatter[key];
-          debugLog(`Set component_kind: ${frontmatter[key]}`);
+        } else if (key === 'kind') {
+          // Handle component kind (0 for npub input, 1 for nevent input)
+          result.kind = frontmatter[key];
+          debugLog(`Set kind: ${frontmatter[key]}`);
+        } else if (key === 'type') {
+          // Handle document type (hypernote or element)
+          result.type = frontmatter[key];
+          debugLog(`Set type: ${frontmatter[key]}`);
+        } else if (key === 'title') {
+          // Handle document title
+          result.title = frontmatter[key];
+          debugLog(`Set title: ${frontmatter[key]}`);
+        } else if (key === 'description') {
+          // Handle document description
+          result.description = frontmatter[key];
+          debugLog(`Set description: ${frontmatter[key]}`);
+        } else if (key === 'name') {
+          // Handle document name (slug for 'd' tag)
+          result.name = frontmatter[key];
+          debugLog(`Set name: ${frontmatter[key]}`);
         } else if (key.startsWith('#')) {
           // Handle imports - create imports object if it doesn't exist
           if (!result.imports) {
@@ -192,7 +208,7 @@ export function compileHypernoteToContent(hnmd: string): Hypernote {
   result.elements = elements;
   debugLog('Final result before validation:', {
     version: result.version,
-    component_kind: result.component_kind,
+    kind: result.kind,
     hasEvents: !!result.events,
     hasQueries: !!result.queries,
     hasImports: !!result.imports,
@@ -242,7 +258,6 @@ export function compileHypernoteToContent(hnmd: string): Hypernote {
     // Return a fallback structure that's guaranteed to be valid
     return {
       version: "1.1.0",
-      component_kind: null,
       elements: [
         {
           type: "div" as const,

@@ -1,8 +1,6 @@
 import { create } from "zustand";
-import { getPublicKey } from "nostr-tools/pure";
-import { RelayHandler } from "../lib/relayHandler";
+import { SNSTRClient } from "../lib/snstr/client";
 import { QueryClient } from "@tanstack/react-query";
-import { convertKey, getKeyType } from "../utils/nostr-keys";
 
 // Create a QueryClient instance to be used throughout the app
 export const queryClient = new QueryClient({
@@ -15,9 +13,8 @@ export const queryClient = new QueryClient({
 });
 
 interface NostrStore {
-  relayHandler: RelayHandler | null;
-  privateKey: string | null;
-  publicKey: string | null;
+  relayHandler: any | null; // Temporarily keeping for compatibility
+  snstrClient: SNSTRClient | null;
   currentRelaySet: RelaySet;
   logs: string[];
   addLog: (message: string) => void;
@@ -34,16 +31,13 @@ export const RELAY_SETS = {
   real: [
     'wss://nos.lol/',
     'wss://relay.damus.io/',
-    'wss://nostr.wine/',
-    'wss://relay.primal.net/',
-    'wss://nostr.land/'
+    'wss://relay.primal.net/'
   ]
 } as const;
 
 export const useNostrStore = create<NostrStore>((set, get) => ({
   relayHandler: null,
-  privateKey: null,
-  publicKey: null,
+  snstrClient: null,
   currentRelaySet: (localStorage.getItem('currentRelaySet') as RelaySet) || 'local',
   logs: [],
   addLog: (message: string) => {
@@ -55,69 +49,48 @@ export const useNostrStore = create<NostrStore>((set, get) => ({
   },
   initialize: async () => {
     const store = useNostrStore.getState();
-    store.addLog("Initializing Nostr store...");
+    store.addLog("Initializing Nostr store with SNSTR client...");
     
-    let privkey = localStorage.getItem("privkey");
-
-    if (!privkey) {
-      const userInput = prompt("Please enter your Nostr key (npub, nsec, or hex)");
-      if (userInput) {
-        const keyType = getKeyType(userInput);
-        store.addLog(`Detected key type: ${keyType}`);
-        
-        const conversion = convertKey(userInput);
-        if (!conversion.success) {
-          store.addLog(`❌ ${conversion.error}`);
-          return;
+    const currentRelayUrls = [...RELAY_SETS[get().currentRelaySet]];
+    
+    // Create SNSTR client
+    const client = new SNSTRClient(currentRelayUrls, store.addLog);
+    
+    try {
+      await client.connect();
+      
+      // Create a compatibility wrapper for existing code
+      const compatibilityHandler = {
+        relayUrls: currentRelayUrls,
+        cleanup: () => client.disconnect(),
+        getRelayStatuses: () => client.getRelayStatuses(),
+        getConnectedRelays: () => client.getConnectedRelays(),
+        // For compatibility with existing nostrFetch code
+        subscribe: async (filters: any) => {
+          // Use fetchEvents which returns a Promise<NostrEvent[]>
+          return await client.fetchEvents(filters);
+        },
+        publishEvent: async (kind: number, content: string) => {
+          // This will be updated to use NIP-07 signing
+          throw new Error("Publishing requires NIP-07 authentication");
         }
-        
-        if (!conversion.privateKeyHex) {
-          store.addLog("❌ Cannot use public key only. Please provide private key (nsec or private hex).");
-          store.addLog("💡 Your public key info:");
-          store.addLog(`   npub: ${conversion.npub}`);
-          store.addLog(`   hex: ${conversion.publicKeyHex}`);
-          return;
-        }
-        
-        // Success - we have a private key
-        store.addLog(`✅ Key converted successfully!`);
-        store.addLog(`   Your npub: ${conversion.npub}`);
-        localStorage.setItem("privkey", conversion.privateKeyHex);
-        localStorage.setItem("pubkey", conversion.publicKeyHex!);
-        privkey = conversion.privateKeyHex;
-      }
-    }
-
-    if (privkey) {
-      const privkeyBytes = new Uint8Array(
-        privkey.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16))
-      );
-      const pubkey = getPublicKey(privkeyBytes);
+      };
       
-      // Log the generated pubkey for debugging
-      store.addLog(`Generated pubkey: ${pubkey}`);
+      set({ 
+        snstrClient: client,
+        relayHandler: compatibilityHandler 
+      });
       
-      // Store the public key in localStorage so it can be accessed by components
-      localStorage.setItem("pubkey", pubkey);
+      store.addLog("SNSTR client initialized successfully");
+      store.addLog("Using NIP-07 for authentication - no private keys stored!");
       
-      const currentRelayUrls = [...RELAY_SETS[get().currentRelaySet]];
-      const handler = new RelayHandler(currentRelayUrls, privkeyBytes, store.addLog);
-      
-      set({ relayHandler: handler, privateKey: privkey, publicKey: pubkey });
-      
-      // Explicitly connect to relays
-      try {
-        await handler.connect();
-        store.addLog("Successfully connected to relays");
-        
-        // Log final connection status
-        const statuses = handler.getRelayStatuses();
-        statuses.forEach(status => {
-          store.addLog(`Relay ${status.url}: ${status.connected ? '✅ connected' : '❌ failed'}`);
-        });
-      } catch (error) {
-        store.addLog(`Failed to connect to relays: ${error}`);
-      }
+      // Log connection status
+      const statuses = client.getRelayStatuses();
+      statuses.forEach(status => {
+        store.addLog(`Relay ${status.url}: ${status.connected ? '✅ connected' : '❌ failed'}`);
+      });
+    } catch (error) {
+      store.addLog(`Failed to initialize SNSTR client: ${error}`);
     }
   },
   switchRelaySet: async (relaySet: RelaySet) => {
@@ -129,51 +102,61 @@ export const useNostrStore = create<NostrStore>((set, get) => ({
     set({ currentRelaySet: relaySet });
     
     // Cleanup existing connection
-    if (store.relayHandler) {
+    if (store.snstrClient) {
       store.addLog("Cleaning up existing relay connections...");
-      store.relayHandler.cleanup();
+      store.snstrClient.disconnect();
     }
     
-    // Reinitialize with new relay set
-    const privkey = store.privateKey;
-    if (privkey) {
-      const privkeyBytes = new Uint8Array(
-        privkey.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16))
-      );
+    // Create new SNSTR client with new relay set
+    const newRelayUrls = [...RELAY_SETS[relaySet]];
+    const client = new SNSTRClient(newRelayUrls, store.addLog);
+    
+    try {
+      await client.connect();
       
-      const newRelayUrls = [...RELAY_SETS[relaySet]];
-      const handler = new RelayHandler(newRelayUrls, privkeyBytes, store.addLog);
+      // Create compatibility wrapper
+      const compatibilityHandler = {
+        relayUrls: newRelayUrls,
+        cleanup: () => client.disconnect(),
+        getRelayStatuses: () => client.getRelayStatuses(),
+        getConnectedRelays: () => client.getConnectedRelays(),
+        // For compatibility with existing nostrFetch code
+        subscribe: async (filters: any) => {
+          // Use fetchEvents which returns a Promise<NostrEvent[]>
+          return await client.fetchEvents(filters);
+        },
+        publishEvent: async (kind: number, content: string) => {
+          throw new Error("Publishing requires NIP-07 authentication");
+        }
+      };
       
-      // Set the new handler before connecting
-      set({ relayHandler: handler });
+      set({ 
+        snstrClient: client,
+        relayHandler: compatibilityHandler 
+      });
       
-      // Connect to new relays
-      try {
-        await handler.connect();
-        store.addLog(`Successfully connected to ${relaySet} relays`);
-        
-        // Log connection status
-        const statuses = handler.getRelayStatuses();
-        statuses.forEach(status => {
-          store.addLog(`Relay ${status.url}: ${status.connected ? '✅ connected' : '❌ failed'}`);
-        });
-        
-        // Clear query cache AFTER successful connection to force refetch with new relays
-        queryClient.clear();
-        store.addLog("Query cache cleared - data will refetch with new relays");
-        
-      } catch (error) {
-        store.addLog(`Failed to connect to ${relaySet} relays: ${error}`);
-        // Don't clear cache if connection failed
-      }
+      store.addLog(`Successfully connected to ${relaySet} relays`);
+      
+      // Log connection status
+      const statuses = client.getRelayStatuses();
+      statuses.forEach(status => {
+        store.addLog(`Relay ${status.url}: ${status.connected ? '✅ connected' : '❌ failed'}`);
+      });
+      
+      // Clear query cache to force refetch with new relays
+      queryClient.clear();
+      store.addLog("Query cache cleared - data will refetch with new relays");
+    } catch (error) {
+      store.addLog(`Failed to connect to ${relaySet} relays: ${error}`);
     }
   },
   cleanup: () => {
     set((state) => {
       state.addLog("Cleaning up Nostr store...");
+      state.snstrClient?.disconnect();
       state.relayHandler?.cleanup();
       queryClient.clear(); // Clear the query cache when cleaning up
-      return { relayHandler: null };
+      return { relayHandler: null, snstrClient: null };
     });
   },
 })); 

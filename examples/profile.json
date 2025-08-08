@@ -1,0 +1,70 @@
+{
+  "version": "1.1.0",
+  "type": "element",
+  "title": "Profile Badge",
+  "description": "A compact profile badge component",
+  "name": "profile-badge",
+  "kind": 0,
+  "queries": {
+    "$profile": {
+      "kinds": [
+        0
+      ],
+      "authors": [
+        "target.pubkey"
+      ],
+      "limit": 1,
+      "pipe": [
+        {
+          "operation": "first"
+        },
+        {
+          "operation": "parse_json",
+          "field": "content"
+        }
+      ]
+    }
+  },
+  "elements": [
+    {
+      "type": "div",
+      "style": {
+        "padding": "1rem",
+        "flexDirection": "row",
+        "alignItems": "center",
+        "gap": "0.5rem",
+        "backgroundColor": "rgb(243,244,246)",
+        "borderRadius": "0.5rem"
+      },
+      "elements": [
+        {
+          "type": "img",
+          "style": {
+            "width": "2.5rem",
+            "height": "2.5rem",
+            "borderRadius": "9999px"
+          },
+          "attributes": {
+            "alt": "{$profile.name}",
+            "src": "{$profile.picture}"
+          }
+        },
+        {
+          "type": "p",
+          "content": [
+            {
+              "type": "strong",
+              "content": [
+                "{$profile.name | default:Anonymous}"
+              ]
+            },
+            " ",
+            "- ",
+            "{$profile.nip05 | default:}",
+            " "
+          ]
+        }
+      ]
+    }
+  ]
+}

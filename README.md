@@ -547,6 +547,63 @@ Hypernote implementations should prioritize clear and precise error reporting. W
 
 This approach aids developers in debugging Hypernotes effectively.
 
+## ContextVM Tool Calls
+
+Hypernote supports integration with ContextVM for executing tool calls and updating state based on responses. This enables interactive applications with server-side logic while maintaining the declarative nature of Hypernote.
+
+### Tool Call Syntax
+
+Define tool calls in the frontmatter using the `tool_call` flag:
+
+```yaml
+"@increment":
+  kind: 25910              # ContextVM event kind
+  tool_call: true          # Signals special handling
+  provider: "npub1..."     # ContextVM provider pubkey
+  tool_name: "addone"      # Tool to execute
+  arguments:               # Tool-specific arguments
+    current: "{$state.content}"
+  target: "$state"         # Query to update with response
+```
+
+### How It Works
+
+1. **Tool Call Request**: When a form with a tool call event is submitted, Hypernote creates a JSON-RPC request wrapped in a kind 25910 event
+2. **Provider Processing**: The ContextVM provider executes the tool and returns a response
+3. **State Update**: The response is used to create/update a replaceable event (typically kind 30078)
+4. **UI Refresh**: The targeted query is invalidated, causing the UI to reflect the new state
+
+### Example: Counter Application
+
+See [`examples/counter.md`](examples/counter.md) for a complete implementation of a counter using ContextVM tool calls:
+
+```markdown
+---
+"$count":
+  kinds: [30078]
+  d: "counter"
+  authors: [user.pubkey]
+  limit: 1
+
+"@increment":
+  kind: 25910
+  tool_call: true
+  provider: "npub1..."
+  tool_name: "addone"
+  arguments:
+    a: "{$count.content || '0'}"
+  target: "$count"
+---
+
+## Current Count: {$count.content || 0}
+
+[form @increment]
+  [button]+1[/button]
+[/form]
+```
+
+This creates a stateful counter where clicking +1 triggers a tool call that updates the count stored in a replaceable Nostr event.
+
 ## Upcoming Features
 
 The Hypernote specification and reference implementation continue to evolve. Major features in development include:

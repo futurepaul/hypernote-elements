@@ -1,0 +1,29 @@
+{
+  "version": "1.1.0",
+  "type": "hypernote",
+  "title": "Image Variable Test",
+  "description": "Testing variable resolution in image URLs",
+  "name": "image-variables",
+  "style": {
+    "backgroundColor": "rgb(243,244,246)"
+  },
+  "elements": [
+    {
+      "type": "h1",
+      "content": [
+        "Image Variable Resolution Test"
+      ]
+    },
+    {
+      "type": "img",
+      "style": {
+        "width": "8rem",
+        "height": "8rem"
+      },
+      "attributes": {
+        "alt": "User avatar",
+        "src": "https://robohash.org/{user.pubkey}?size=150x150"
+      }
+    }
+  ]
+}
