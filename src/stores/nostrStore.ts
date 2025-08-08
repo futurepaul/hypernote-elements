@@ -38,7 +38,14 @@ export const RELAY_SETS = {
 export const useNostrStore = create<NostrStore>((set, get) => ({
   relayHandler: null,
   snstrClient: null,
-  currentRelaySet: (localStorage.getItem('currentRelaySet') as RelaySet) || 'local',
+  currentRelaySet: (() => {
+    const isProduction = typeof process !== 'undefined' && process.env.NODE_ENV === 'production';
+    if (isProduction) return 'real';
+    const saved = typeof localStorage !== 'undefined' ? (localStorage.getItem('currentRelaySet') as RelaySet | null) : null;
+    // Never use 'real' by default outside production
+    if (saved === 'real') return 'local';
+    return (saved as RelaySet) || 'local';
+  })(),
   logs: [],
   addLog: (message: string) => {
     const timestamp = new Date().toISOString();
@@ -95,11 +102,20 @@ export const useNostrStore = create<NostrStore>((set, get) => ({
   },
   switchRelaySet: async (relaySet: RelaySet) => {
     const store = get();
-    store.addLog(`Switching to ${relaySet} relay set...`);
+    const isProduction = typeof process !== 'undefined' && process.env.NODE_ENV === 'production';
+    let targetRelaySet: RelaySet = relaySet;
+    // Protect tests/dev from accidentally switching to 'real'
+    if (!isProduction && relaySet === 'real') {
+      store.addLog("'real' relay set is disabled in dev/test; switching to 'local' instead.");
+      targetRelaySet = 'local';
+    }
+    store.addLog(`Switching to ${targetRelaySet} relay set...`);
     
     // Update current relay set and save to localStorage first
-    localStorage.setItem('currentRelaySet', relaySet);
-    set({ currentRelaySet: relaySet });
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('currentRelaySet', targetRelaySet);
+    }
+    set({ currentRelaySet: targetRelaySet });
     
     // Cleanup existing connection
     if (store.snstrClient) {
@@ -108,7 +124,7 @@ export const useNostrStore = create<NostrStore>((set, get) => ({
     }
     
     // Create new SNSTR client with new relay set
-    const newRelayUrls = [...RELAY_SETS[relaySet]];
+    const newRelayUrls = [...RELAY_SETS[targetRelaySet]];
     const client = new SNSTRClient(newRelayUrls, store.addLog);
     
     try {
@@ -135,7 +151,7 @@ export const useNostrStore = create<NostrStore>((set, get) => ({
         relayHandler: compatibilityHandler 
       });
       
-      store.addLog(`Successfully connected to ${relaySet} relays`);
+      store.addLog(`Successfully connected to ${targetRelaySet} relays`);
       
       // Log connection status
       const statuses = client.getRelayStatuses();

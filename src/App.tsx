@@ -102,21 +102,23 @@ export function App() {
             </SelectContent>
           </Select>
           
-          <Select
-            value={currentRelaySet}
-            onValueChange={(value: RelaySet) => {
-              switchRelaySet(value);
-            }}
-          >
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Select relays" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="local">Local</SelectItem>
-              <SelectItem value="test">Test</SelectItem>
-              <SelectItem value="real">Real</SelectItem>
-            </SelectContent>
-          </Select>
+          {import.meta.hot && (
+            <Select
+              value={currentRelaySet}
+              onValueChange={(value: RelaySet) => {
+                switchRelaySet(value);
+              }}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Select relays" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="local">Local</SelectItem>
+                <SelectItem value="test">Test</SelectItem>
+                <SelectItem value="real">Real</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
           
           <PublishButton markdown={markdownStates[template]} />
 
