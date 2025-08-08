@@ -1,4 +1,8 @@
 ---
+type: "hypernote"
+title: "My Feed"
+description: "A simple feed viewer with posting capability"
+
 "$my_feed":
   authors: [user.pubkey]
   kinds: [1]

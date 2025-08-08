@@ -1,4 +1,8 @@
 ---
+type: "hypernote"
+title: "Nostr Client"
+description: "A simple Twitter-style Nostr client showing your following feed"
+
 "$contact_list":
   kinds: [3]
   authors: [user.pubkey]

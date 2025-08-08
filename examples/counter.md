@@ -1,6 +1,10 @@
 ---
+type: "hypernote"
+title: "ContextVM Counter"
+description: "Interactive counter demonstrating tool calls and state management"
+
 "$count":
-  kinds: [30078]
+  kinds: [30078]  # Application state, not a hypernote
   authors: [user.pubkey]
   limit: 1
   live: true
