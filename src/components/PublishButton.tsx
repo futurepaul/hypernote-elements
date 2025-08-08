@@ -20,23 +20,34 @@ export function PublishButton({ markdown }: PublishButtonProps) {
       return;
     }
 
-    // Simple prompt for name
-    const name = prompt('Enter a unique name for this hypernote (e.g., "my-profile"):');
-    if (!name || !name.trim()) {
-      return;
-    }
-
-    const title = prompt('Enter a title (optional):') || undefined;
-    const description = prompt('Enter a description (optional):') || undefined;
-
     setIsPublishing(true);
     
     try {
       // Compile the markdown to JSON
       const hypernote = compileHypernoteToContent(markdown);
       
-      // Determine type based on presence of 'kind' field
-      const isComponent = hypernote.kind !== undefined;
+      // Extract metadata from the compiled hypernote
+      const documentType = hypernote.type || (hypernote.kind !== undefined ? 'element' : 'hypernote');
+      const isComponent = documentType === 'element' || hypernote.kind !== undefined;
+      
+      // Use title from frontmatter or prompt for it
+      let title = hypernote.title;
+      if (!title) {
+        title = prompt('Enter a title for this ' + documentType + ':');
+        if (!title || !title.trim()) {
+          setIsPublishing(false);
+          return;
+        }
+      }
+      
+      // Generate a slug from the title for the 'd' tag
+      const name = title.toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .substring(0, 50); // Limit length
+      
+      // Use description from frontmatter
+      const description = hypernote.description;
       
       // Publish using the new function
       const result = await publishHypernote(

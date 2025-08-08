@@ -156,6 +156,18 @@ export function compileHypernoteToContent(hnmd: string): Hypernote {
           // Handle component kind (0 for npub input, 1 for nevent input)
           result.kind = frontmatter[key];
           debugLog(`Set kind: ${frontmatter[key]}`);
+        } else if (key === 'type') {
+          // Handle document type (hypernote or element)
+          result.type = frontmatter[key];
+          debugLog(`Set type: ${frontmatter[key]}`);
+        } else if (key === 'title') {
+          // Handle document title
+          result.title = frontmatter[key];
+          debugLog(`Set title: ${frontmatter[key]}`);
+        } else if (key === 'description') {
+          // Handle document description
+          result.description = frontmatter[key];
+          debugLog(`Set description: ${frontmatter[key]}`);
         } else if (key.startsWith('#')) {
           // Handle imports - create imports object if it doesn't exist
           if (!result.imports) {

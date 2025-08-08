@@ -313,6 +313,11 @@ export const hypernoteSchema = z.object({
   // Schema version (should match the ["hypernote", "..."] tag)
   version: z.string().min(1),
   
+  // Metadata from frontmatter
+  type: z.enum(["hypernote", "element"]).optional(), // Document type
+  title: z.string().optional(), // Document title
+  description: z.string().optional(), // Document description
+  
   // For component definitions: 0 (npub input), 1 (nevent input), undefined (not a component)
   kind: z.union([z.literal(0), z.literal(1)]).optional(),
   

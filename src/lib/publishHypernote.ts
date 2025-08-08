@@ -1,4 +1,5 @@
 import type { Hypernote } from './schema';
+import { HYPERNOTE_KIND, HYPERNOTE_ELEMENT_KIND } from './schema';
 import { nip19 } from 'nostr-tools';
 import type { SNSTRClient } from './snstr/client';
 
@@ -26,18 +27,21 @@ export async function publishHypernote(
       throw new Error("NIP-07 extension not found. Please install a Nostr signer extension.");
     }
 
-    const isComponent = hypernote.kind !== undefined;
+    // Determine document type and event kind
+    const documentType = hypernote.type || (hypernote.kind !== undefined ? 'element' : 'hypernote');
+    const isComponent = documentType === 'element' || hypernote.kind !== undefined;
+    const eventKind = isComponent ? HYPERNOTE_ELEMENT_KIND : HYPERNOTE_KIND;
     
     // Build tags
     const tags: string[][] = [
       ["d", name], // Replaceable identifier
-      ["t", "hypernote"],
-      ["hypernote", "0.2-alpha"],
-      ["hypernote-type", isComponent ? "component" : "hypernote"]
+      ["hypernote", "1.1.0"],
+      ["t", "hypernote"]
     ];
     
     if (isComponent) {
-      tags.push(["component-kind", String(hypernote.kind)]);
+      tags.push(["hypernote-component-kind", String(hypernote.kind)]);
+      tags.push(["t", "hypernote-element"]);
     }
     
     if (metadata?.title) {
@@ -50,7 +54,7 @@ export async function publishHypernote(
     
     // Create the unsigned event
     const unsignedEvent = {
-      kind: 30078,
+      kind: eventKind,
       created_at: Math.floor(Date.now() / 1000),
       tags,
       content: JSON.stringify(hypernote),
@@ -71,7 +75,7 @@ export async function publishHypernote(
     const naddrData = {
       identifier: name,
       pubkey: signedEvent.pubkey,
-      kind: 30078,
+      kind: eventKind,
       relays: client.getConnectedRelays()
     };
     
