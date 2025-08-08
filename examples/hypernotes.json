@@ -1,0 +1,139 @@
+{
+  "version": "1.1.0",
+  "queries": {
+    "$my_hypernotes": {
+      "kinds": [
+        30078
+      ],
+      "authors": [
+        "user.pubkey"
+      ],
+      "limit": 10
+    }
+  },
+  "elements": [
+    {
+      "type": "h1",
+      "content": [
+        "My Published Hypernotes"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "Connected as: ",
+        "{user.pubkey}"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "This page shows all hypernotes (kind 30078) published by your account."
+      ]
+    },
+    {
+      "type": "h2",
+      "content": [
+        "All Published Hypernotes"
+      ]
+    },
+    {
+      "type": "loop",
+      "source": "$my_hypernotes",
+      "variable": "$note",
+      "elements": [
+        {
+          "type": "div",
+          "style": {
+            "marginBottom": "1rem",
+            "padding": "1rem",
+            "backgroundColor": "rgb(255,255,255)",
+            "borderRadius": "0.5rem",
+            "boxShadow": "0 0 #0000, 0 0 #0000, 0 1px 3px 0 rgb(0,0,0,0.1), 0 1px 2px -1px rgb(0,0,0,0.1)"
+          },
+          "elements": [
+            {
+              "type": "p",
+              "content": [
+                {
+                  "type": "strong",
+                  "content": [
+                    "Event ID:"
+                  ]
+                },
+                " ",
+                "{$note.id}"
+              ]
+            },
+            {
+              "type": "p",
+              "content": [
+                {
+                  "type": "strong",
+                  "content": [
+                    "Created:"
+                  ]
+                },
+                " ",
+                "{$note.created_at}"
+              ]
+            },
+            {
+              "type": "p",
+              "content": [
+                {
+                  "type": "strong",
+                  "content": [
+                    "Content Preview:"
+                  ]
+                },
+                " "
+              ]
+            },
+            {
+              "type": "div",
+              "style": {
+                "overflow": "auto",
+                "maxHeight": "8rem",
+                "padding": "0.5rem",
+                "backgroundColor": "rgb(249,250,251)",
+                "fontFamily": "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace",
+                "fontSize": "0.75rem",
+                "lineHeight": "1rem",
+                "borderRadius": "0.25rem"
+              },
+              "elements": [
+                {
+                  "type": "p",
+                  "content": [
+                    "{$note.content}",
+                    " "
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "p",
+              "content": [
+                {
+                  "type": "strong",
+                  "content": [
+                    "Tags:"
+                  ]
+                },
+                " "
+              ]
+            },
+            {
+              "type": "json",
+              "content": [],
+              "attributes": {
+                "variable": "$note.tags"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

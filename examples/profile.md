@@ -1,7 +1,8 @@
 ---
+kind: 0
 "$profile":
   kinds: [0]
-  authors: [user.pubkey]
+  authors: [target.pubkey]
   limit: 1
   pipe:
     - operation: parse_json

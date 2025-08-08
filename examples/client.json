@@ -1,6 +1,8 @@
 {
   "version": "1.1.0",
-  "component_kind": null,
+  "imports": {
+    "#profile": "naddr1qvzqqqr40cpzqrtvswydevzfhrw5ljxnmrpmhy778k5sh2pguncfezks7dry3z3nqy88wumn8ghj7mn0wvhxcmmv9uq32amnwvaz7tmjv4kxz7fwv3sk6atn9e5k7tcpzamhxue69uhhyetvv9ujuurjd9kkzmpwdejhgtcqpfkhjttswfhkv6tvv55gkpyc"
+  },
   "queries": {
     "$contact_list": {
       "kinds": [
@@ -49,7 +51,6 @@
     },
     {
       "type": "div",
-      "elementId": "user-info",
       "style": {
         "marginBottom": "1rem",
         "padding": "1rem",
@@ -65,24 +66,21 @@
           ]
         },
         {
-          "type": "p",
-          "content": [
-            "Connected as: ",
-            "{user.pubkey}"
-          ]
+          "type": "component",
+          "alias": "profile",
+          "argument": "user.pubkey"
         },
         {
-          "type": "p",
-          "content": [
-            "This shows posts from people you follow, extracted from your contact list.",
-            " "
-          ]
+          "type": "json",
+          "content": [],
+          "attributes": {
+            "variable": "user.pubkey"
+          }
         }
       ]
     },
     {
       "type": "div",
-      "elementId": "post-form",
       "style": {
         "marginBottom": "1rem",
         "padding": "1rem",
@@ -136,7 +134,6 @@
     },
     {
       "type": "div",
-      "elementId": "feed",
       "elements": [
         {
           "type": "loop",
@@ -154,22 +151,9 @@
               },
               "elements": [
                 {
-                  "type": "div",
-                  "style": {
-                    "color": "rgb(31,41,55)",
-                    "fontWeight": 700
-                  },
-                  "elements": [
-                    {
-                      "type": "p",
-                      "content": [
-                        "      ",
-                        "{$note.pubkey}",
-                        " ",
-                        "    "
-                      ]
-                    }
-                  ]
+                  "type": "component",
+                  "alias": "profile",
+                  "argument": "$note.pubkey"
                 },
                 {
                   "type": "div",

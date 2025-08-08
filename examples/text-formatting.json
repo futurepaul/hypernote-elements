@@ -1,6 +1,5 @@
 {
   "version": "1.1.0",
-  "component_kind": null,
   "style": {
     "padding": "2rem",
     "backgroundColor": "rgb(255,255,255)"

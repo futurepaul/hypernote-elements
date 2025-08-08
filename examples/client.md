@@ -19,20 +19,20 @@
   kind: 1
   content: "{form.message}"
   tags: [["client", "hypernote-client"]]
+
+"#profile": naddr1qvzqqqr40cpzqrtvswydevzfhrw5ljxnmrpmhy778k5sh2pguncfezks7dry3z3nqy88wumn8ghj7mn0wvhxcmmv9uq32amnwvaz7tmjv4kxz7fwv3sk6atn9e5k7tcpzamhxue69uhhyetvv9ujuurjd9kkzmpwdejhgtcqpfkhjttswfhkv6tvv55gkpyc
 ---
 
 # Nostr Client
 
-{#user-info}
 [div class="bg-white p-4 rounded-lg shadow mb-4"]
 ## Your Following Feed
 
-Connected as: {user.pubkey}
+[#profile user.pubkey]
 
-This shows posts from people you follow, extracted from your contact list.
+[json user.pubkey]
 [/div]
 
-{#post-form}
 [div class="bg-white p-4 rounded-lg shadow mb-4"]
 [form @post_note]
   [input name="message" placeholder="What's happening?" class="w-full p-2 border rounded"]
@@ -40,21 +40,15 @@ This shows posts from people you follow, extracted from your contact list.
 [/form]
 [/div]
 
-{#feed}
 [div]
 [each $following_feed as $note]
   [div class="bg-white p-4 rounded-lg shadow mb-4"]
-    {#author}
-    [div class="font-bold text-gray-800"]
-      {$note.pubkey}
-    [/div]
+    [#profile $note.pubkey]
     
-    {#content}
     [div class="mt-2 text-gray-700"]
       {$note.content}
     [/div]
     
-    {#timestamp}
     [div class="mt-2 text-sm text-gray-500"]
       Posted at: {$note.created_at}
     [/div]

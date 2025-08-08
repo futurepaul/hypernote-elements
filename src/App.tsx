@@ -21,6 +21,7 @@ import {
 import { Toaster } from "sonner";
 import { AVAILABLE_EXAMPLES, loadExample, type ExampleName } from "../tests/example-loader";
 import { UserProfile } from "./components/UserProfile";
+import { PublishButton } from "./components/PublishButton";
 
 // Load all examples at build time
 const EXAMPLES = Object.fromEntries(
@@ -55,9 +56,9 @@ export function App() {
   const { relayHandler, initialize, cleanup, logs, currentRelaySet, switchRelaySet } = useNostrStore();
 
   // Debug logging
-  console.log("App: Current template:", template);
-  console.log("App: Current markdown value:", markdownStates[template]);
-  console.log("App: Type of markdown value:", typeof markdownStates[template]);
+  // console.log("App: Current template:", template);
+  // console.log("App: Current markdown value:", markdownStates[template]);
+  // console.log("App: Type of markdown value:", typeof markdownStates[template]);
 
   useEffect(() => {
     initialize().catch(error => {
@@ -113,6 +114,8 @@ export function App() {
               <SelectItem value="real">Real</SelectItem>
             </SelectContent>
           </Select>
+          
+          <PublishButton markdown={markdownStates[template]} />
         </div>
         
         <UserProfile />

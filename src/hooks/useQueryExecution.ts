@@ -7,19 +7,27 @@ import { QueryExecutor, QueryContext } from '../lib/query-executor';
 import { useAuthStore } from '../stores/authStore';
 import { useNostrStore } from '../stores/nostrStore';
 import type { NostrEvent } from '../lib/snstr/nip07';
+import { queryCache } from '../lib/queryCache';
 
 interface UseQueryExecutionResult {
   queryResults: Record<string, NostrEvent[]>;
   extractedVariables: Record<string, any>;
   loading: boolean;
   error: Error | null;
+  allLoading?: boolean;
+}
+
+interface UseQueryExecutionOptions {
+  target?: any; // Target context for components
+  parentExtracted?: Record<string, any>; // Parent's extracted variables
 }
 
 /**
  * Hook that executes all queries in dependency order
  */
 export function useQueryExecution(
-  queries: Record<string, any>
+  queries: Record<string, any>,
+  options?: UseQueryExecutionOptions
 ): UseQueryExecutionResult {
   const [queryResults, setQueryResults] = useState<Record<string, NostrEvent[]>>({});
   const [extractedVariables, setExtractedVariables] = useState<Record<string, any>>({});
@@ -53,10 +61,11 @@ export function useQueryExecution(
   // Memoize context but include queriesHash in dependencies so it updates when queries change
   const context = useMemo<QueryContext>(() => ({
     user: { pubkey },
+    target: options?.target || {},
     time: { now: 0 }, // Will be set during query execution
-    extracted: {},
+    extracted: options?.parentExtracted || {},
     results: new Map()
-  }), [pubkey, queriesHash]); // Re-create context when queries actually change
+  }), [pubkey, options?.target, options?.parentExtracted, queriesHash]); // Re-create context when queries actually change
   
   useEffect(() => {
     if (!snstrClient) {
@@ -72,7 +81,7 @@ export function useQueryExecution(
         setLoading(true);
         setError(null);
         
-        // Create fetch function that uses snstrClient
+        // Create fetch function that uses snstrClient with caching
         const fetchEvents = async (filters: any): Promise<NostrEvent[]> => {
           // Handle arrays in filters (e.g., authors could be an array from extraction)
           const processedFilters = { ...filters };
@@ -85,9 +94,11 @@ export function useQueryExecution(
             processedFilters.authors = processedFilters.authors[0];
           }
           
-          console.log('Fetching events with filters:', processedFilters);
-          // SNSTRClient.fetchEvents expects an array of filters, so wrap in array
-          return await snstrClient.fetchEvents([processedFilters]);
+          // Use cache to deduplicate requests
+          return await queryCache.getOrFetch(processedFilters, async (filter) => {
+            console.log('Cache miss, fetching events with filter:', filter);
+            return await snstrClient.fetchEvents([filter]);
+          });
         };
         
         // Update context with current time
@@ -106,7 +117,6 @@ export function useQueryExecution(
           results.forEach((value, key) => {
             resultsObject[key] = value;
           });
-          console.log('[useQueryExecution] Setting results:', Object.keys(resultsObject).map(k => `${k}: ${resultsObject[k].length} items`));
           setQueryResults(resultsObject);
           setExtractedVariables({ ...executor.getExtractedVariables() });
           
@@ -236,6 +246,7 @@ export function useQueryExecution(
     queryResults,
     extractedVariables,
     loading,
-    error
+    error,
+    allLoading: loading
   };
 }

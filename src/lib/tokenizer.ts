@@ -24,6 +24,7 @@ export enum TokenType {
   VARIABLE_REFERENCE,
   BOLD,
   ITALIC,
+  COMPONENT,
   EOF
 }
 
@@ -230,6 +231,37 @@ export function tokenize(content: string): Token[] {
             tokens.push({ type: TokenType.EACH_END, value: elementType });
             break;
         }
+        continue;
+      }
+      
+      // Check if this is a component reference [#alias argument]
+      if (content[pos] === '#') {
+        pos++; // Skip '#'
+        
+        // Get the alias name
+        let alias = '';
+        while (pos < content.length && content[pos] !== ' ' && content[pos] !== ']') {
+          alias += content[pos];
+          pos++;
+        }
+        
+        // Skip whitespace
+        if (content[pos] === ' ') pos++;
+        
+        // Get the argument (e.g., user.pubkey, $note.pubkey, or a literal npub/nevent)
+        let argument = '';
+        while (pos < content.length && content[pos] !== ']') {
+          argument += content[pos];
+          pos++;
+        }
+        
+        if (content[pos] === ']') pos++; // Skip ']'
+        
+        tokens.push({
+          type: TokenType.COMPONENT,
+          value: alias,
+          attributes: { argument: argument.trim() }
+        });
         continue;
       }
       
@@ -745,6 +777,19 @@ export function parseTokens(tokens: Token[]): any[] {
         continue;
       }
       
+      // Handle component references
+      if (t.type === TokenType.COMPONENT) {
+        flushContainerParagraph();
+        const componentElement = {
+          type: 'component',
+          alias: t.value,
+          argument: t.attributes?.argument || ''
+        };
+        containerElements.push(componentElement);
+        currentIndex++;
+        continue;
+      }
+      
       // Handle regular elements (input, etc.)
       if (t.type === TokenType.ELEMENT_START) {
         flushContainerParagraph();
@@ -917,7 +962,8 @@ export function parseTokens(tokens: Token[]): any[] {
       token.type === TokenType.BUTTON_START ||
       token.type === TokenType.SPAN_START ||
       token.type === TokenType.EACH_START ||
-      token.type === TokenType.IMAGE
+      token.type === TokenType.IMAGE ||
+      token.type === TokenType.COMPONENT
     ) {
       flushParagraph();
     }
@@ -1024,6 +1070,22 @@ export function parseTokens(tokens: Token[]): any[] {
         currentStyle = null;
       }
       elements.push(loopElement);
+      continue;
+    }
+
+    // Handle component references
+    if (token.type === TokenType.COMPONENT) {
+      const componentElement = {
+        type: 'component',
+        alias: token.value,
+        argument: token.attributes?.argument || ''
+      };
+      if (currentId) {
+        componentElement['elementId'] = currentId;
+        currentId = null;
+      }
+      elements.push(componentElement);
+      currentIndex++;
       continue;
     }
 

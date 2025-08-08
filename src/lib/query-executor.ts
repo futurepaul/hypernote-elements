@@ -28,6 +28,7 @@ interface QueryNode {
 export interface QueryContext {
   // Built-in variables
   user: { pubkey: string | null };
+  target?: any; // Target context for components
   time: { now: number };
   
   // Extracted variables from queries (without $ prefix in storage)
@@ -313,6 +314,17 @@ export class QueryExecutor {
       // Handle user.pubkey
       if (value === 'user.pubkey') {
         return this.context.user.pubkey;
+      }
+      
+      // Handle target variables (e.g., target.pubkey, target.name)
+      if (value.startsWith('target.') && this.context.target) {
+        const targetField = value.substring(7); // Remove 'target.' prefix
+        const targetValue = this.context.target[targetField];
+        if (targetValue !== undefined) {
+          return targetValue;
+        }
+        console.warn(`Target field ${targetField} not found`);
+        return value;
       }
       
       // Handle time.now

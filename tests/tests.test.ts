@@ -12,7 +12,7 @@ test("should parse basic event from frontmatter", () => {
   const result = compileHypernoteToContent(example.markdown);
   
   expect(result.version).toBe("1.1.0");
-  expect(result.component_kind).toBe(null);
+  expect(result.kind).toBeUndefined();
   expect(result.events).toEqual({
     "@post_hello": {
       kind: 1,
@@ -27,7 +27,7 @@ test("should parse frontmatter with styles", () => {
   const result = compileHypernoteToContent(example.markdown);
   
   expect(result.version).toBe("1.1.0");
-  expect(result.component_kind).toBe(null);
+  expect(result.kind).toBeUndefined();
   expect(result.events).toEqual({
     "@submit_feedback": {
       kind: 1,
@@ -45,7 +45,7 @@ test("should parse frontmatter with event using variable", () => {
   const result = compileHypernoteToContent(example.markdown);
   
   expect(result.version).toBe("1.1.0");
-  expect(result.component_kind).toBe(null);
+  expect(result.kind).toBeUndefined();
   expect(result.events).toEqual({
     "@post_message": {
       kind: 1,
@@ -60,7 +60,7 @@ test("should parse client example with pipe operations and query dependencies", 
   const result = compileHypernoteToContent(example.markdown);
   
   expect(result.version).toBe("1.1.0");
-  expect(result.component_kind).toBe(null);
+  expect(result.kind).toBeUndefined();
   
   // Check that queries are parsed correctly
   expect(result.queries).toBeDefined();

@@ -290,8 +290,8 @@ export const hypernoteSchema = z.object({
   // Schema version (should match the ["hypernote", "..."] tag)
   version: z.string().min(1),
   
-  // For component definitions: 0 (npub input), 1 (nevent input), or null (not a component)
-  component_kind: z.union([z.literal(0), z.literal(1), z.null()]).optional(),
+  // For component definitions: 0 (npub input), 1 (nevent input), undefined (not a component)
+  kind: z.union([z.literal(0), z.literal(1)]).optional(),
   
   // Maps aliases used in HNMD to their Nostr identifiers (naddr, nevent, etc.)
   imports: z.record(z.string().min(1), z.string().min(1)).optional(),

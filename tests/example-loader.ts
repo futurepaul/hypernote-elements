@@ -5,22 +5,22 @@ import basicHelloMd from "../examples/basic-hello.md";
 import feedMd from "../examples/feed.md";
 import divContainerMd from "../examples/div-container.md";
 import zapCloudMd from "../examples/zap-cloud.md";
-import imageTestMd from "../examples/image-test.md";
 import clientMd from "../examples/client.md";
 import profileMd from "../examples/profile.md";
 import textFormattingMd from "../examples/text-formatting.md";
 import imageVariablesMd from "../examples/image-variables.md";
+import hypernotesMd from "../examples/hypernotes.md";
 
 // Import all JSON examples directly using Bun's built-in JSON loader
 import basicHelloJson from "../examples/basic-hello.json";
 import feedJson from "../examples/feed.json";
 import divContainerJson from "../examples/div-container.json";
 import zapCloudJson from "../examples/zap-cloud.json";
-import imageTestJson from "../examples/image-test.json";
 import clientJson from "../examples/client.json";
 import profileJson from "../examples/profile.json";
 import textFormattingJson from "../examples/text-formatting.json";
 import imageVariablesJson from "../examples/image-variables.json";
+import hypernotesJson from "../examples/hypernotes.json";
 
 // Map of example names to their imported content
 const EXAMPLE_MAP = {
@@ -28,11 +28,11 @@ const EXAMPLE_MAP = {
   "feed": { markdown: feedMd, json: feedJson },
   "div-container": { markdown: divContainerMd, json: divContainerJson },
   "zap-cloud": { markdown: zapCloudMd, json: zapCloudJson },
-  "image-test": { markdown: imageTestMd, json: imageTestJson },
   "client": { markdown: clientMd, json: clientJson },
   "profile": { markdown: profileMd, json: profileJson },
   "image-variables": { markdown: imageVariablesMd, json: imageVariablesJson },
   "text-formatting": { markdown: textFormattingMd, json: textFormattingJson },
+  "hypernotes": { markdown: hypernotesMd, json: hypernotesJson },
 } as const;
 
 export interface ExampleData {
@@ -75,9 +75,9 @@ export const AVAILABLE_EXAMPLES = [
   "feed",
   "div-container",
   "zap-cloud",
-  "image-test",
   "image-variables",
   "text-formatting",
+  "hypernotes",
 ] as const;
 
 export type ExampleName = typeof AVAILABLE_EXAMPLES[number]; 
