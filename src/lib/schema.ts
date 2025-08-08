@@ -317,6 +317,7 @@ export const hypernoteSchema = z.object({
   type: z.enum(["hypernote", "element"]).optional(), // Document type
   title: z.string().optional(), // Document title
   description: z.string().optional(), // Document description
+  name: z.string().optional(), // Optional slug for 'd' tag (auto-generated from title if not provided)
   
   // For component definitions: 0 (npub input), 1 (nevent input), undefined (not a component)
   kind: z.union([z.literal(0), z.literal(1)]).optional(),

@@ -30,18 +30,18 @@ export function PublishButton({ markdown }: PublishButtonProps) {
       const documentType = hypernote.type || (hypernote.kind !== undefined ? 'element' : 'hypernote');
       const isComponent = documentType === 'element' || hypernote.kind !== undefined;
       
-      // Use title from frontmatter or prompt for it
-      let title = hypernote.title;
+      // Title is required from frontmatter
+      const title = hypernote.title;
       if (!title) {
-        title = prompt('Enter a title for this ' + documentType + ':');
-        if (!title || !title.trim()) {
-          setIsPublishing(false);
-          return;
-        }
+        toast.error('Missing required metadata', {
+          description: 'Please add a "title" field to your frontmatter'
+        });
+        setIsPublishing(false);
+        return;
       }
       
-      // Generate a slug from the title for the 'd' tag
-      const name = title.toLowerCase()
+      // Use name from frontmatter or generate a slug from the title for the 'd' tag
+      const name = hypernote.name || title.toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '')
         .substring(0, 50); // Limit length

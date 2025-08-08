@@ -168,6 +168,10 @@ export function compileHypernoteToContent(hnmd: string): Hypernote {
           // Handle document description
           result.description = frontmatter[key];
           debugLog(`Set description: ${frontmatter[key]}`);
+        } else if (key === 'name') {
+          // Handle document name (slug for 'd' tag)
+          result.name = frontmatter[key];
+          debugLog(`Set name: ${frontmatter[key]}`);
         } else if (key.startsWith('#')) {
           // Handle imports - create imports object if it doesn't exist
           if (!result.imports) {

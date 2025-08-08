@@ -2,6 +2,7 @@
 type: "hypernote"
 title: "ContextVM Counter"
 description: "Interactive counter demonstrating tool calls and state management"
+name: "contextvm-counter"  # Optional: custom slug for 'd' tag (auto-generated from title if omitted)
 
 "$count":
   kinds: [30078]  # Application state, not a hypernote
