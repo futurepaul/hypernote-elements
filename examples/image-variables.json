@@ -1,5 +1,9 @@
 {
   "version": "1.1.0",
+  "type": "hypernote",
+  "title": "Image Variable Test",
+  "description": "Testing variable resolution in image URLs",
+  "name": "image-variables",
   "style": {
     "backgroundColor": "rgb(243,244,246)"
   },

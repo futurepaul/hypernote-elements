@@ -2,6 +2,7 @@
 type: "hypernote"
 title: "My Hypernotes Browser"
 description: "Browse all your published Hypernotes and Elements"
+name: "hypernotes-browser"
 
 "$my_documents":
   kinds: [30023]  # Hypernote applications

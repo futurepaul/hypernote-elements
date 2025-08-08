@@ -1,4 +1,9 @@
 ---
+type: "hypernote"
+title: "Inline Code Examples"
+description: "Demonstrating backtick syntax for inline code formatting"
+name: "inline-code"
+
 style: bg-gray-100 p-4
 ---
 

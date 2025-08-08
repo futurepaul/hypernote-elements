@@ -1,5 +1,9 @@
 {
   "version": "1.1.0",
+  "type": "hypernote",
+  "title": "Hello World",
+  "description": "A simple hello world example",
+  "name": "hello-world",
   "events": {
     "@post_hello": {
       "kind": 1,

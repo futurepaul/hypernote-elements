@@ -1,4 +1,9 @@
 ---
+type: "hypernote"
+title: "Text Formatting Demo"
+description: "Examples of bold, italic, and inline code formatting"
+name: "text-formatting"
+
 style: bg-white p-8
 ---
 

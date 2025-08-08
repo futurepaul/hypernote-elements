@@ -2,43 +2,37 @@ import type { Hypernote } from "../src/lib/schema";
 
 // Import all markdown examples directly using our custom loader
 import basicHelloMd from "../examples/basic-hello.md";
-import feedMd from "../examples/feed.md";
 import divContainerMd from "../examples/div-container.md";
-import zapCloudMd from "../examples/zap-cloud.md";
 import clientMd from "../examples/client.md";
 import profileMd from "../examples/profile.md";
 import textFormattingMd from "../examples/text-formatting.md";
 import imageVariablesMd from "../examples/image-variables.md";
 import hypernotesMd from "../examples/hypernotes.md";
-import ifExampleMd from "../examples/if-example.md";
 import counterMd from "../examples/counter.md";
+import inlineCodeMd from "../examples/inline-code.md";
 
 // Import all JSON examples directly using Bun's built-in JSON loader
 import basicHelloJson from "../examples/basic-hello.json";
-import feedJson from "../examples/feed.json";
 import divContainerJson from "../examples/div-container.json";
-import zapCloudJson from "../examples/zap-cloud.json";
 import clientJson from "../examples/client.json";
 import profileJson from "../examples/profile.json";
 import textFormattingJson from "../examples/text-formatting.json";
 import imageVariablesJson from "../examples/image-variables.json";
 import hypernotesJson from "../examples/hypernotes.json";
-import ifExampleJson from "../examples/if-example.json";
 import counterJson from "../examples/counter.json";
+import inlineCodeJson from "../examples/inline-code.json";
 
 // Map of example names to their imported content
 const EXAMPLE_MAP = {
   "basic-hello": { markdown: basicHelloMd, json: basicHelloJson },
-  "feed": { markdown: feedMd, json: feedJson },
   "div-container": { markdown: divContainerMd, json: divContainerJson },
-  "zap-cloud": { markdown: zapCloudMd, json: zapCloudJson },
   "client": { markdown: clientMd, json: clientJson },
   "profile": { markdown: profileMd, json: profileJson },
   "image-variables": { markdown: imageVariablesMd, json: imageVariablesJson },
   "text-formatting": { markdown: textFormattingMd, json: textFormattingJson },
   "hypernotes": { markdown: hypernotesMd, json: hypernotesJson },
-  "if-example": { markdown: ifExampleMd, json: ifExampleJson },
   "counter": { markdown: counterMd, json: counterJson },
+  "inline-code": { markdown: inlineCodeMd, json: inlineCodeJson },
 } as const;
 
 export interface ExampleData {
@@ -78,14 +72,12 @@ export const AVAILABLE_EXAMPLES = [
   "basic-hello",
   "profile",
   "client",
-  "feed",
   "div-container",
-  "zap-cloud",
   "image-variables",
   "text-formatting",
   "hypernotes",
-  "if-example",
   "counter",
+  "inline-code",
 ] as const;
 
 export type ExampleName = typeof AVAILABLE_EXAMPLES[number]; 

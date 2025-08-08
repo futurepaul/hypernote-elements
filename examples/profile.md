@@ -2,6 +2,7 @@
 type: "element"
 title: "Profile Badge"
 description: "A compact profile badge component"
+name: "profile-badge"
 kind: 0  # Expects npub as input
 
 "$profile":

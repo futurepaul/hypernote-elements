@@ -2,6 +2,7 @@
 type: "hypernote"
 title: "Nostr Client"
 description: "A simple Twitter-style Nostr client showing your following feed"
+name: "nostr-client"
 
 "$contact_list":
   kinds: [3]
@@ -24,7 +25,7 @@ description: "A simple Twitter-style Nostr client showing your following feed"
   content: "{form.message}"
   tags: [["client", "hypernote-client"]]
 
-"#profile": naddr1qvzqqqr40cpzqrtvswydevzfhrw5ljxnmrpmhy778k5sh2pguncfezks7dry3z3nqy88wumn8ghj7mn0wvhxcmmv9uq32amnwvaz7tmjv4kxz7fwv3sk6atn9e5k7tcpzamhxue69uhhyetvv9ujuurjd9kkzmpwdejhgtcqpfkhjttswfhkv6tvv55gkpyc
+"#profile": naddr1qvzqqqrldqpzqrtvswydevzfhrw5ljxnmrpmhy778k5sh2pguncfezks7dry3z3nqy88wumn8ghj7mn0wvhxcmmv9uq32amnwvaz7tmjv4kxz7fwv3sk6atn9e5k7tcpzamhxue69uhhyetvv9ujuurjd9kkzmpwdejhgtcqp4c8ymmxd9kx2ttzv9jxwegsqyvt2
 ---
 
 # Nostr Client

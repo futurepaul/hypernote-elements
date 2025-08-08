@@ -1,4 +1,9 @@
 ---
+type: "hypernote"
+title: "Image Variable Test"
+description: "Testing variable resolution in image URLs"
+name: "image-variables"
+
 style: bg-gray-100
 ---
 

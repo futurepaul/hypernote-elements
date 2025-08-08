@@ -1,5 +1,9 @@
 {
   "version": "1.1.0",
+  "type": "hypernote",
+  "title": "Inline Code Examples",
+  "description": "Demonstrating backtick syntax for inline code formatting",
+  "name": "inline-code",
   "style": {
     "padding": "1rem",
     "backgroundColor": "rgb(243,244,246)"

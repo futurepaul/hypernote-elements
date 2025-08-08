@@ -1,5 +1,9 @@
 {
   "version": "1.1.0",
+  "type": "hypernote",
+  "title": "Div Container Demo",
+  "description": "Demonstrates nested div containers with styling",
+  "name": "div-container",
   "style": {
     "padding": "1rem",
     "backgroundColor": "rgb(243,244,246)"
