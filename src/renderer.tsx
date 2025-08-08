@@ -65,14 +65,19 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
     () => compileHypernoteToContent(debouncedMarkdown || ''),
     [debouncedMarkdown]
   );
-  
+
+  return <RenderHypernoteContent content={content} />;
+}
+
+// New: Render from compiled Hypernote JSON directly
+export function RenderHypernoteContent({ content }: { content: Hypernote }) {
   // Get SNSTR client from store
   const { snstrClient } = useNostrStore();
-  
+
   // Set up component resolver
-  const resolverRef = useRef<ComponentResolver>();
+  const resolverRef = useRef<ComponentResolver | undefined>(undefined);
   const [componentsLoaded, setComponentsLoaded] = useState(false);
-  
+
   // Prefetch all imported components
   useEffect(() => {
     const loadComponents = async () => {
@@ -82,10 +87,10 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
           console.log('[Renderer] Waiting for SNSTRClient to initialize...');
           return;
         }
-        
+
         console.log('[Renderer] Loading imported components:', content.imports);
         const resolver = new ComponentResolver(snstrClient);
-        
+
         try {
           await resolver.prefetchComponents(content.imports);
           resolverRef.current = resolver;
@@ -100,18 +105,18 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
     };
     loadComponents();
   }, [content.imports, snstrClient]);
-  
+
   // Set up form data state
   const [formData, setFormData] = useState<Record<string, string>>({});
-  
+
   // Get user pubkey from auth store (NIP-07)
   const { pubkey } = useAuthStore();
-  
+
   const userContext = { pubkey };
-  
+
   // Create a hash of the queries to detect actual changes
   const [queriesHash, setQueriesHash] = useState<string>('');
-  
+
   useEffect(() => {
     const hashQueries = async () => {
       const queriesJson = JSON.stringify(content.queries || {});
@@ -125,38 +130,38 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
     };
     hashQueries();
   }, [content.queries]);
-  
+
   // Memoize queries based on their hash to prevent unnecessary re-fetches
   const memoizedQueries = useMemo(() => {
     console.log('[Renderer] Using memoized queries with hash:', queriesHash.substring(0, 16) + '...');
     return content.queries || {};
   }, [queriesHash]);
-  
+
   // Execute all queries with dependency resolution
   const { queryResults, extractedVariables, loading: queriesLoading, error: queryError } = useQueryExecution(
     memoizedQueries
   );
-  
+
   // Debug: Log when queryResults changes
   useEffect(() => {
     console.log('[Renderer] queryResults changed:', Object.keys(queryResults).map(k => `${k}: ${queryResults[k]?.length} items`));
   }, [queryResults]);
-  
+
   // Get auth store for NIP-07 signing
   const { isAuthenticated, signEvent, login } = useAuthStore();
-  
+
   // Process form submission with NIP-07 signing
   const handleFormSubmit = async (eventName: string) => {
     if (!eventName) {
       console.log('Form submitted but no event is specified');
       return;
     }
-    
+
     if (!content.events || !content.events[eventName]) {
       console.error(`Event ${eventName} not found`);
       return;
     }
-    
+
     // Check if user is authenticated
     if (!isAuthenticated) {
       toast.error('Please connect NIP-07 to publish events');
@@ -164,14 +169,14 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
       login();
       return;
     }
-    
+
     if (!snstrClient) {
       toast.error('Relay client not initialized');
       return;
     }
-    
+
     const eventTemplate = content.events[eventName];
-    
+
     // Process template variables
     let eventContent = eventTemplate.content;
     if (typeof eventContent === 'string' && eventContent.includes('{form.')) {
@@ -180,7 +185,7 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
         eventContent = eventContent.replace(`{form.${key}}`, formData[key] || '');
       });
     }
-    
+
     // Create event template for signing
     const unsignedEvent = {
       kind: eventTemplate.kind,
@@ -188,21 +193,21 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
       tags: eventTemplate.tags || [],
       created_at: Math.floor(Date.now() / 1000)
     };
-    
+
     // Sign and publish the event
     try {
       // Sign with NIP-07
       const signedEvent = await signEvent(unsignedEvent);
-      
+
       // Publish to relays
       const result = await snstrClient.publishEvent(signedEvent);
-      
+
       console.log(`Published event: ${result.eventId} to ${result.successCount} relays`);
       toast.success(`Event published to ${result.successCount} relays!`);
-      
+
       // Reset form if successful
       setFormData({});
-      
+
       // No need to invalidate - subscriptions are reactive and will auto-update!
     } catch (error) {
       console.error(`Failed to publish event: ${error}`);
@@ -217,10 +222,10 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
       [name]: value
     }));
   };
-  
+
   // Don't block on loading - render progressively!
   // Queries will populate as they resolve
-  
+
   // If there are no elements, show an empty container (allow editing)
   if (!content.elements || content.elements.length === 0) {
     return (
@@ -232,13 +237,13 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
 
   // Get the root-level styles from the hypernote
   const rootStyles = content.style || {};
-  
+
   // Determine theme class based on background color or explicit class
   let themeClass = '';
   if (rootStyles.backgroundColor === 'rgb(0,0,0)' || rootStyles.backgroundColor === '#000000' || rootStyles.backgroundColor === 'black') {
     themeClass = 'hypernote-dark';
   }
-  
+
   // Build context for pure renderer
   // Track which queries are still loading
   const loadingQueries = new Set<string>();
@@ -250,7 +255,7 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
       }
     });
   }
-  
+
   const context: RenderContext = {
     queryResults: queryResults || {},  // Empty initially, populates progressively
     extractedVariables: extractedVariables || {},
@@ -265,14 +270,14 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
     onFormSubmit: handleFormSubmit,
     onInputChange: handleInputChange
   };
-  
+
   // Show error banner if there was a query error, but still render the page
   const errorBanner = queryError ? (
     <div style={{ backgroundColor: '#fee', color: '#c00', padding: '10px', marginBottom: '10px', borderRadius: '4px' }}>
       ⚠️ Some data failed to load: {queryError.message}
     </div>
   ) : null;
-  
+
   return (
     <>
       <style>{`

@@ -9,5 +9,23 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // SPA navigation support for static hosting
+      (function() {
+        document.addEventListener('click', function(e) {
+          const a = e.target.closest('a');
+          if (!a) return;
+          const url = new URL(a.href);
+          const sameOrigin = url.origin === location.origin;
+          const isModified = e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0;
+          const isExternal = a.target && a.target !== '_self';
+          if (sameOrigin && !isModified && !isExternal) {
+            e.preventDefault();
+            history.pushState({}, '', a.getAttribute('href'));
+            window.dispatchEvent(new Event('popstate'));
+          }
+        }, true);
+      })();
+    </script>
   </body>
 </html>
