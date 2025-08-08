@@ -263,7 +263,10 @@ export class QueryExecutor {
     }
     
     // Substitute variables in query config
+    console.log(`[QueryExecutor] ${name} - Before substitution:`, JSON.stringify(node.config, null, 2));
+    console.log(`[QueryExecutor] ${name} - Context user:`, this.context.user);
     const substituted = this.substituteVariables(node.config);
+    console.log(`[QueryExecutor] ${name} - After substitution:`, JSON.stringify(substituted, null, 2));
     
     // Extract filters and pipe from config (exclude 'live' as it's not a Nostr filter)
     const { pipe, live, ...filters } = substituted;

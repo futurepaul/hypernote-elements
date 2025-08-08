@@ -1,0 +1,134 @@
+{
+  "version": "1.1.0",
+  "style": {
+    "padding": "1rem",
+    "backgroundColor": "rgb(243,244,246)"
+  },
+  "queries": {
+    "$profile": {
+      "kinds": [
+        0
+      ],
+      "authors": [
+        "user.pubkey"
+      ],
+      "limit": 1
+    }
+  },
+  "elements": [
+    {
+      "type": "h1",
+      "content": [
+        "Conditional Rendering Example"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "This example demonstrates the ",
+        {
+          "type": "code",
+          "content": [
+            "[if]"
+          ]
+        },
+        " statement for conditional rendering."
+      ]
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Profile Display"
+      ]
+    },
+    {
+      "type": "loop",
+      "source": "$profile",
+      "variable": "$p",
+      "elements": [
+        {
+          "type": "if",
+          "condition": "$p.picture",
+          "elements": [
+            {
+              "type": "div",
+              "style": {
+                "marginBottom": "1rem"
+              },
+              "elements": [
+                {
+                  "type": "img",
+                  "style": {
+                    "width": "8rem",
+                    "height": "8rem",
+                    "borderRadius": "9999px"
+                  },
+                  "attributes": {
+                    "alt": "Profile Picture",
+                    "src": "{$p.picture}"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "if",
+          "condition": "$p.name",
+          "elements": [
+            {
+              "type": "h2",
+              "content": [
+                "Hello, {$p.name}!"
+              ]
+            }
+          ]
+        },
+        {
+          "type": "if",
+          "condition": "!$p.name",
+          "elements": [
+            {
+              "type": "h2",
+              "content": [
+                "Hello, Anonymous!"
+              ]
+            }
+          ]
+        },
+        {
+          "type": "if",
+          "condition": "$p.about",
+          "elements": [
+            {
+              "type": "div",
+              "style": {
+                "padding": "1rem",
+                "backgroundColor": "rgb(255,255,255)",
+                "borderRadius": "0.25rem",
+                "boxShadow": "0 0 #0000, 0 0 #0000, 0 1px 3px 0 rgb(0,0,0,0.1), 0 1px 2px -1px rgb(0,0,0,0.1)"
+              },
+              "elements": [
+                {
+                  "type": "h3",
+                  "content": [
+                    "About"
+                  ]
+                },
+                {
+                  "type": "p",
+                  "content": [
+                    "      ",
+                    "{$p.about}",
+                    " ",
+                    "    "
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

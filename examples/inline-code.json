@@ -1,0 +1,246 @@
+{
+  "version": "1.1.0",
+  "style": {
+    "padding": "1rem",
+    "backgroundColor": "rgb(243,244,246)"
+  },
+  "elements": [
+    {
+      "type": "h1",
+      "content": [
+        "Inline Code Example"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "This example demonstrates inline code formatting with backticks."
+      ]
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Markdown Syntax"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "You can use ",
+        {
+          "type": "code",
+          "content": [
+            "backticks"
+          ]
+        },
+        " to create inline code. This is useful for:"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "- Referencing code elements like ",
+        {
+          "type": "code",
+          "content": [
+            "[if]"
+          ]
+        },
+        " statements",
+        " ",
+        "- Showing variable names like ",
+        {
+          "type": "code",
+          "content": [
+            "$count"
+          ]
+        },
+        " or ",
+        {
+          "type": "code",
+          "content": [
+            "user.pubkey"
+          ]
+        },
+        " ",
+        "- Displaying function names like ",
+        {
+          "type": "code",
+          "content": [
+            "addone()"
+          ]
+        },
+        " and ",
+        {
+          "type": "code",
+          "content": [
+            "minusone()"
+          ]
+        },
+        " ",
+        "- Mentioning file paths like ",
+        {
+          "type": "code",
+          "content": [
+            "/usr/local/bin"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Hypernote Elements"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "The following Hypernote elements are available:"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "- ",
+        {
+          "type": "code",
+          "content": [
+            "[if condition]"
+          ]
+        },
+        " - Conditional rendering",
+        " ",
+        "- ",
+        {
+          "type": "code",
+          "content": [
+            "[each $source as $item]"
+          ]
+        },
+        " - Loop through arrays",
+        " ",
+        "- ",
+        {
+          "type": "code",
+          "content": [
+            "[form @event]"
+          ]
+        },
+        " - Create interactive forms",
+        " ",
+        "- ",
+        {
+          "type": "code",
+          "content": [
+            "[div]"
+          ]
+        },
+        " and ",
+        {
+          "type": "code",
+          "content": [
+            "[span]"
+          ]
+        },
+        " - Container elements",
+        " ",
+        "- ",
+        {
+          "type": "code",
+          "content": [
+            "{$variable}"
+          ]
+        },
+        " - Variable interpolation"
+      ]
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Code in Context"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "When discussing the counter example, you might say: \"The ",
+        {
+          "type": "code",
+          "content": [
+            "addone"
+          ]
+        },
+        " tool increments the value stored in ",
+        {
+          "type": "code",
+          "content": [
+            "$count.content"
+          ]
+        },
+        " and publishes a replaceable event with kind ",
+        {
+          "type": "code",
+          "content": [
+            "30078"
+          ]
+        },
+        ".\""
+      ]
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Mixed Formatting"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "You can combine ",
+        {
+          "type": "strong",
+          "content": [
+            "bold"
+          ]
+        },
+        ", ",
+        {
+          "type": "em",
+          "content": [
+            "italic"
+          ]
+        },
+        ", and ",
+        {
+          "type": "code",
+          "content": [
+            "code"
+          ]
+        },
+        " formatting in the same sentence. For example: The ",
+        {
+          "type": "strong",
+          "content": [
+            "`[if]`"
+          ]
+        },
+        " statement supports ",
+        {
+          "type": "em",
+          "content": [
+            "negation"
+          ]
+        },
+        " with the ",
+        {
+          "type": "code",
+          "content": [
+            "!"
+          ]
+        },
+        " operator."
+      ]
+    }
+  ]
+}

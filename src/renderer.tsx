@@ -177,20 +177,250 @@ export function RenderHypernoteContent({ content }: { content: Hypernote }) {
 
     const eventTemplate = content.events[eventName];
 
+    // Check if this is a tool call
+    if (eventTemplate.tool_call) {
+      // Handle ContextVM tool call
+      console.log('[ContextVM] Processing tool call:', eventTemplate.tool_name);
+      
+      // Process arguments with context substitution
+      const processedArgs: Record<string, any> = {};
+      if (eventTemplate.arguments) {
+        for (const [key, value] of Object.entries(eventTemplate.arguments)) {
+          if (typeof value === 'string' && value.includes('{')) {
+            // Process template variables in arguments
+            let processedValue = value;
+            
+            // Replace query results
+            Object.keys(queryResults).forEach(queryName => {
+              const data = queryResults[queryName];
+              if (data && data.length > 0) {
+                // Handle properties like $count.content
+                const content = data[0].content || '0'; // Default to '0' if no content
+                processedValue = processedValue.replace(`{${queryName}.content}`, content);
+                processedValue = processedValue.replace(`{${queryName}}`, JSON.stringify(data[0]));
+              } else {
+                // No data found, use default value
+                processedValue = processedValue.replace(`{${queryName}.content}`, '0');
+                processedValue = processedValue.replace(`{${queryName}}`, '{}');
+              }
+            });
+            
+            processedArgs[key] = processedValue;
+          } else {
+            processedArgs[key] = value;
+          }
+        }
+      }
+      
+      // Create JSON-RPC request
+      const jsonRpcRequest = {
+        jsonrpc: "2.0",
+        id: Math.random().toString(36).substring(7),
+        method: "tools/call",
+        params: {
+          name: eventTemplate.tool_name,
+          arguments: processedArgs
+        }
+      };
+      
+      // Convert provider npub to hex if needed
+      let providerHex = eventTemplate.provider || "";
+      if (providerHex.startsWith('npub')) {
+        try {
+          const decoded = nip19.decode(providerHex);
+          if (decoded.type === 'npub') {
+            providerHex = decoded.data as string;
+          }
+        } catch (e) {
+          console.error('[ContextVM] Failed to decode provider npub:', e);
+        }
+      }
+      
+      // Create tool call event
+      const toolCallEvent = {
+        kind: 25910,
+        content: JSON.stringify(jsonRpcRequest),
+        tags: [["p", providerHex]],
+        created_at: Math.floor(Date.now() / 1000)
+      };
+      
+      try {
+        // Sign and publish tool call
+        const signedEvent = await signEvent(toolCallEvent);
+        const result = await snstrClient.publishEvent(signedEvent);
+        
+        console.log(`[ContextVM] Published tool call: ${result.eventId}`);
+        toast.info(`Tool call sent to provider...`);
+        
+        // Subscribe to response
+        const responseFilter = {
+          kinds: [25910],
+          authors: [providerHex],
+          "#e": [result.eventId],
+          limit: 1
+        };
+        
+        // Subscribe to response
+        console.log('[ContextVM] Waiting for response with filter:', responseFilter);
+        
+        // Set up response subscription with timeout
+        let responseReceived = false;
+        let responseProcessed = false; // Track if we've already processed a response
+        const timeoutId = setTimeout(() => {
+          if (!responseReceived) {
+            console.log('[ContextVM] No response received within timeout');
+            toast.error('Tool call timed out - no response from provider');
+          }
+        }, 30000); // 30 second timeout
+        
+        // Subscribe to response events
+        await snstrClient.subscribe(
+          [responseFilter],
+          async (responseEvent: NostrEvent, relay: string) => {
+            responseReceived = true;
+            
+            // Check if we've already processed a response
+            if (responseProcessed) {
+              console.log('[ContextVM] Response already processed, ignoring duplicate from', relay);
+              return;
+            }
+            responseProcessed = true;
+            clearTimeout(timeoutId);
+            
+            console.log('[ContextVM] Processing response from', relay, ':', responseEvent);
+            
+            try {
+              // Parse JSON-RPC response
+              const response = JSON.parse(responseEvent.content);
+              console.log('[ContextVM] Parsed response:', response);
+              
+              if (response.error) {
+                console.error('[ContextVM] Tool call error:', response.error);
+                toast.error(`Tool call failed: ${response.error.message || 'Unknown error'}`);
+                return;
+              }
+              
+              // Check if there's a target event template
+              if (!eventTemplate.target) {
+                console.warn('[ContextVM] No target event specified for tool call response');
+                return;
+              }
+              
+              // Get the target event template
+              const targetEventName = eventTemplate.target;
+              if (!content.events || !content.events[targetEventName]) {
+                console.error(`[ContextVM] Target event ${targetEventName} not found`);
+                return;
+              }
+              
+              const targetEvent = content.events[targetEventName];
+              
+              // Process the target event template with response data
+              let eventContent = targetEvent.content || '';
+              if (typeof eventContent === 'string') {
+                // Replace {response.result} with the actual result
+                if (eventContent.includes('{response.')) {
+                  // Extract the actual value from the result
+                  let resultValue = response.result;
+                  
+                  // Handle MCP-style response format: result.content[0].text
+                  if (typeof resultValue === 'object' && resultValue !== null) {
+                    // Check if it's MCP format with content array
+                    if ('content' in resultValue && Array.isArray(resultValue.content)) {
+                      // Find the first text content
+                      const textContent = resultValue.content.find((item: any) => item.type === 'text');
+                      if (textContent && textContent.text) {
+                        resultValue = textContent.text;
+                      } else if (resultValue.content.length > 0 && resultValue.content[0].text) {
+                        // Fallback to first item if it has text
+                        resultValue = resultValue.content[0].text;
+                      }
+                    }
+                    // Check other common patterns if not MCP format
+                    else if ('value' in resultValue) {
+                      resultValue = resultValue.value;
+                    } else if ('result' in resultValue) {
+                      resultValue = resultValue.result;
+                    } else {
+                      // If no known field, stringify the object
+                      resultValue = JSON.stringify(resultValue);
+                    }
+                  }
+                  
+                  console.log('[ContextVM] Extracted result value:', resultValue);
+                  eventContent = eventContent.replace(/\{response\.result\}/g, String(resultValue));
+                  eventContent = eventContent.replace(/\{response\}/g, JSON.stringify(response));
+                }
+                // Also handle form variables (though they would be empty in tool call context)
+                if (eventContent.includes('{form.')) {
+                  Object.keys(formData).forEach(key => {
+                    eventContent = eventContent.replace(`{form.${key}}`, formData[key] || '');
+                  });
+                }
+              }
+              
+              // Handle 'd' tag for replaceable events
+              const tags = targetEvent.tags ? [...targetEvent.tags] : [];
+              if (targetEvent.d) {
+                tags.push(['d', targetEvent.d]);
+              }
+              
+              // Create the target event
+              const unsignedEvent = {
+                kind: targetEvent.kind,
+                content: eventContent,
+                tags: tags,
+                created_at: Math.floor(Date.now() / 1000)
+              };
+              
+              // Sign and publish the target event
+              const signedEvent = await signEvent(unsignedEvent);
+              const result = await snstrClient.publishEvent(signedEvent);
+              
+              console.log(`[ContextVM] Published target event: ${result.eventId}`);
+              toast.success('State updated!');
+              
+              // The live subscription will automatically update the UI
+            } catch (error) {
+              console.error('[ContextVM] Failed to process response:', error);
+              toast.error('Failed to process tool response');
+            }
+          },
+          undefined, // onEose callback (optional)
+          30000 // timeout in ms
+        );
+        
+      } catch (error) {
+        console.error(`[ContextVM] Failed to publish tool call: ${error}`);
+        toast.error(`Failed to send tool call: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+      
+      return;
+    }
+
+    // Regular event publishing (not a tool call)
     // Process template variables
-    let eventContent = eventTemplate.content;
-    if (typeof eventContent === 'string' && eventContent.includes('{form.')) {
+    let eventContent = eventTemplate.content || '';
+    if (typeof eventContent === 'string') {
       // Replace {form.fieldName} with actual form values
-      Object.keys(formData).forEach(key => {
-        eventContent = eventContent.replace(`{form.${key}}`, formData[key] || '');
-      });
+      if (eventContent.includes('{form.')) {
+        Object.keys(formData).forEach(key => {
+          eventContent = eventContent.replace(new RegExp(`\\{form\\.${key}\\}`, 'g'), formData[key] || '');
+        });
+      }
+    }
+
+    // Handle 'd' tag for replaceable events
+    const tags = eventTemplate.tags ? [...eventTemplate.tags] : [];
+    if (eventTemplate.d) {
+      tags.push(['d', eventTemplate.d]);
     }
 
     // Create event template for signing
     const unsignedEvent = {
       kind: eventTemplate.kind,
       content: eventContent,
-      tags: eventTemplate.tags || [],
+      tags: tags,
       created_at: Math.floor(Date.now() / 1000)
     };
 
@@ -373,6 +603,22 @@ function resolveExpression(expr: string, ctx: RenderContext): any {
   if (value !== undefined && path.length > 0) {
     // If value is an array and we're accessing properties, use first item
     const baseValue = Array.isArray(value) && value.length > 0 ? value[0] : value;
+    
+    // For Kind 0 events, the profile data is in the content field as JSON
+    // We need to parse it if accessing profile properties
+    if (baseValue?.kind === 0 && baseValue?.content && path[0] !== 'content' && path[0] !== 'kind' && path[0] !== 'pubkey' && path[0] !== 'created_at' && path[0] !== 'id') {
+      try {
+        const profileData = JSON.parse(baseValue.content);
+        const result = path.reduce((obj, prop) => obj?.[prop], profileData);
+        // Only return the parsed result if we found the property
+        if (result !== undefined) {
+          return result;
+        }
+      } catch (e) {
+        // If parsing fails, try normal property access
+      }
+    }
+    
     const result = path.reduce((obj, prop) => obj?.[prop], baseValue);
     return result !== undefined ? result : '';
   }
@@ -419,7 +665,7 @@ function renderElement(element: HypernoteElement, ctx: RenderContext): React.Rea
   };
 
   // Text elements with content array
-  if (['h1', 'h2', 'h3', 'p', 'strong', 'em'].includes(element.type)) {
+  if (['h1', 'h2', 'h3', 'p', 'strong', 'em', 'code'].includes(element.type)) {
     return React.createElement(
       element.type,
       props,
@@ -468,12 +714,22 @@ function renderElement(element: HypernoteElement, ctx: RenderContext): React.Rea
 
     case 'input':
       const name = element.attributes?.name || '';
+      const inputType = element.attributes?.type || 'text';
+      const defaultValue = element.attributes?.value || '';
+      
+      // For hidden inputs, set the value immediately if not already set
+      if (inputType === 'hidden' && name && !ctx.formData[name]) {
+        // Use a setTimeout to avoid updating state during render
+        setTimeout(() => ctx.onInputChange(name, defaultValue), 0);
+      }
+      
       return (
         <input
           {...props}
+          type={inputType}
           name={name}
           placeholder={element.attributes?.placeholder || ''}
-          value={ctx.formData[name] || ''}
+          value={ctx.formData[name] || defaultValue}
           onChange={(e) => ctx.onInputChange(name, e.target.value)}
         />
       );
@@ -509,6 +765,9 @@ function renderElement(element: HypernoteElement, ctx: RenderContext): React.Rea
 
     case 'loop':
       return renderLoop(element, ctx);
+    
+    case 'if':
+      return renderIf(element, ctx);
 
     case 'json':
       return renderJson(element, ctx);
@@ -529,6 +788,53 @@ function renderElement(element: HypernoteElement, ctx: RenderContext): React.Rea
 }
 
 // Pure loop renderer
+function renderIf(element: HypernoteElement & { condition?: string }, ctx: RenderContext): React.ReactNode {
+  const condition = element.condition || '';
+  
+  // Check if condition starts with ! for negation
+  const isNegated = condition.startsWith('!');
+  const cleanCondition = isNegated ? condition.slice(1).trim() : condition;
+  
+  // Evaluate the condition
+  const value = resolveExpression(cleanCondition, ctx);
+  
+  // Determine truthiness
+  let isTruthy = false;
+  if (value === undefined || value === null) {
+    isTruthy = false;
+  } else if (typeof value === 'boolean') {
+    isTruthy = value;
+  } else if (typeof value === 'string') {
+    isTruthy = value.length > 0;
+  } else if (typeof value === 'number') {
+    isTruthy = value !== 0;
+  } else if (Array.isArray(value)) {
+    isTruthy = value.length > 0;
+  } else if (typeof value === 'object') {
+    isTruthy = Object.keys(value).length > 0;
+  } else {
+    isTruthy = !!value;
+  }
+  
+  // Apply negation if needed
+  if (isNegated) {
+    isTruthy = !isTruthy;
+  }
+  
+  // Only render children if condition is truthy
+  if (!isTruthy) {
+    return null;
+  }
+  
+  return (
+    <div id={element.elementId} style={element.style}>
+      {element.elements?.map((child, i) => 
+        <React.Fragment key={i}>{renderElement(child, ctx)}</React.Fragment>
+      )}
+    </div>
+  );
+}
+
 function renderLoop(element: HypernoteElement, ctx: RenderContext): React.ReactNode {
   const source = element.source || '';
   const data = ctx.queryResults[source];

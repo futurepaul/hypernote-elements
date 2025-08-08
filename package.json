@@ -49,6 +49,8 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@contextvm/sdk": "^0.1.14",
+    "@modelcontextprotocol/sdk": "^1.17.2",
     "@types/bun": "latest",
     "@types/js-yaml": "^4.0.9",
     "@types/react": "^19",

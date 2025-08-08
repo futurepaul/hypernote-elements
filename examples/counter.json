@@ -1,0 +1,170 @@
+{
+  "version": "1.1.0",
+  "queries": {
+    "$count": {
+      "kinds": [
+        30078
+      ],
+      "authors": [
+        "user.pubkey"
+      ],
+      "limit": 1,
+      "live": true
+    }
+  },
+  "events": {
+    "@increment": {
+      "kind": 25910,
+      "tool_call": true,
+      "provider": "npub1r86mtnf0eenr5w6fz66zcduvq2qvec4ll5908ppcp6gn2m7078tq82cuah",
+      "tool_name": "addone",
+      "arguments": {
+        "a": "{$count.content}"
+      },
+      "target": "@update_count"
+    },
+    "@decrement": {
+      "kind": 25910,
+      "tool_call": true,
+      "provider": "npub1r86mtnf0eenr5w6fz66zcduvq2qvec4ll5908ppcp6gn2m7078tq82cuah",
+      "tool_name": "minusone",
+      "arguments": {
+        "a": "{$count.content}"
+      },
+      "target": "@update_count"
+    },
+    "@update_count": {
+      "kind": 30078,
+      "content": "{response.result}",
+      "tags": [
+        [
+          "d",
+          "counter"
+        ]
+      ]
+    },
+    "@initialize": {
+      "kind": 30078,
+      "content": "0",
+      "tags": [
+        [
+          "d",
+          "counter"
+        ]
+      ]
+    }
+  },
+  "elements": [
+    {
+      "type": "h1",
+      "content": [
+        "Counter Example"
+      ]
+    },
+    {
+      "type": "div",
+      "style": {
+        "textAlign": "center"
+      },
+      "elements": [
+        {
+          "type": "h2",
+          "content": [
+            "{count.content}"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "form",
+      "event": "@increment",
+      "elements": [
+        {
+          "type": "button",
+          "style": {
+            "paddingTop": "0.75rem",
+            "paddingRight": "1.5rem",
+            "paddingBottom": "0.75rem",
+            "paddingLeft": "1.5rem",
+            "color": "rgb(255,255,255)",
+            "backgroundColor": "rgb(22,163,74)",
+            "fontSize": "1.25rem",
+            "fontWeight": 700,
+            "lineHeight": "1.75rem",
+            "borderRadius": "0.5rem"
+          },
+          "elements": [
+            {
+              "type": "p",
+              "content": [
+                "+1"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "form",
+      "event": "@decrement",
+      "elements": [
+        {
+          "type": "button",
+          "style": {
+            "paddingTop": "0.75rem",
+            "paddingRight": "1.5rem",
+            "paddingBottom": "0.75rem",
+            "paddingLeft": "1.5rem",
+            "color": "rgb(255,255,255)",
+            "backgroundColor": "rgb(220,38,38)",
+            "fontSize": "1.25rem",
+            "fontWeight": 700,
+            "lineHeight": "1.75rem",
+            "borderRadius": "0.5rem"
+          },
+          "elements": [
+            {
+              "type": "p",
+              "content": [
+                "-1"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "form",
+      "event": "@initialize",
+      "elements": [
+        {
+          "type": "button",
+          "style": {
+            "paddingTop": "0.5rem",
+            "paddingRight": "1rem",
+            "paddingBottom": "0.5rem",
+            "paddingLeft": "1rem",
+            "color": "rgb(255,255,255)",
+            "backgroundColor": "rgb(37,99,235)",
+            "borderRadius": "0.25rem"
+          },
+          "elements": [
+            {
+              "type": "p",
+              "content": [
+                "Initialize Counter"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "json",
+      "content": [],
+      "attributes": {
+        "variable": "$count"
+      }
+    }
+  ]
+}

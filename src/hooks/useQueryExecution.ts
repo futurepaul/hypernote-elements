@@ -175,6 +175,20 @@ export function useQueryExecution(
                       console.warn(`Failed to evaluate time expression: ${value}`);
                     }
                   }
+                } else if (Array.isArray(value)) {
+                  // Handle arrays (like authors: ["user.pubkey"])
+                  processedFilters[key] = value.map(item => {
+                    if (typeof item === 'string') {
+                      if (item === 'user.pubkey') {
+                        return currentContext.user.pubkey;
+                      } else if (currentContext.extracted[item]) {
+                        return currentContext.extracted[item];
+                      } else if (item.startsWith('$') && currentContext.extracted[item.substring(1)]) {
+                        return currentContext.extracted[item.substring(1)];
+                      }
+                    }
+                    return item;
+                  });
                 }
               });
               

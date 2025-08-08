@@ -10,6 +10,8 @@ import profileMd from "../examples/profile.md";
 import textFormattingMd from "../examples/text-formatting.md";
 import imageVariablesMd from "../examples/image-variables.md";
 import hypernotesMd from "../examples/hypernotes.md";
+import ifExampleMd from "../examples/if-example.md";
+import counterMd from "../examples/counter.md";
 
 // Import all JSON examples directly using Bun's built-in JSON loader
 import basicHelloJson from "../examples/basic-hello.json";
@@ -21,6 +23,8 @@ import profileJson from "../examples/profile.json";
 import textFormattingJson from "../examples/text-formatting.json";
 import imageVariablesJson from "../examples/image-variables.json";
 import hypernotesJson from "../examples/hypernotes.json";
+import ifExampleJson from "../examples/if-example.json";
+import counterJson from "../examples/counter.json";
 
 // Map of example names to their imported content
 const EXAMPLE_MAP = {
@@ -33,6 +37,8 @@ const EXAMPLE_MAP = {
   "image-variables": { markdown: imageVariablesMd, json: imageVariablesJson },
   "text-formatting": { markdown: textFormattingMd, json: textFormattingJson },
   "hypernotes": { markdown: hypernotesMd, json: hypernotesJson },
+  "if-example": { markdown: ifExampleMd, json: ifExampleJson },
+  "counter": { markdown: counterMd, json: counterJson },
 } as const;
 
 export interface ExampleData {
@@ -78,6 +84,8 @@ export const AVAILABLE_EXAMPLES = [
   "image-variables",
   "text-formatting",
   "hypernotes",
+  "if-example",
+  "counter",
 ] as const;
 
 export type ExampleName = typeof AVAILABLE_EXAMPLES[number]; 

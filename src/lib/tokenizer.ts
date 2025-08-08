@@ -21,9 +21,12 @@ export enum TokenType {
   NEWLINE,
   EACH_START,
   EACH_END,
+  IF_START,
+  IF_END,
   VARIABLE_REFERENCE,
   BOLD,
   ITALIC,
+  INLINE_CODE,
   COMPONENT,
   EOF
 }
@@ -229,6 +232,9 @@ export function tokenize(content: string): Token[] {
             break;
           case 'each':
             tokens.push({ type: TokenType.EACH_END, value: elementType });
+            break;
+          case 'if':
+            tokens.push({ type: TokenType.IF_END, value: elementType });
             break;
         }
         continue;
@@ -465,6 +471,25 @@ export function tokenize(content: string): Token[] {
           attributes: { source, variable }
         });
         continue;
+      } else if (elementType === 'if') {
+        // Handle [if condition]
+        if (content[pos] === ' ') pos++; // Skip space
+        
+        // Get the condition expression
+        let condition = '';
+        while (pos < content.length && content[pos] !== ']') {
+          condition += content[pos];
+          pos++;
+        }
+        
+        if (content[pos] === ']') pos++; // Skip ']'
+        
+        tokens.push({ 
+          type: TokenType.IF_START, 
+          value: elementType,
+          attributes: { condition: condition.trim() }
+        });
+        continue;
       } else if (elementType === 'json') {
         // Handle [json $variable] or [json $variable.property] syntax
         let attributes: Record<string, string> = {};
@@ -556,6 +581,26 @@ export function tokenize(content: string): Token[] {
       }
     }
     
+    // Handle inline code syntax (`code`)
+    if (char === '`') {
+      pos++; // Skip opening '`'
+      
+      let codeText = '';
+      while (pos < content.length) {
+        if (content[pos] === '`') {
+          pos++; // Skip closing '`'
+          tokens.push({
+            type: TokenType.INLINE_CODE,
+            value: codeText
+          });
+          break;
+        }
+        codeText += content[pos];
+        pos++;
+      }
+      continue;
+    }
+    
     // Handle bold syntax (**text**)
     if (char === '*' && content[pos + 1] === '*' && 
         pos + 2 < content.length && content[pos + 2] !== '*') {
@@ -605,6 +650,7 @@ export function tokenize(content: string): Token[] {
            content[pos] !== '[' && 
            content[pos] !== '{' &&
            content[pos] !== '*' &&
+           content[pos] !== '`' &&
            !(content[pos] === '!' && content[pos + 1] === '[')) {
       text += content[pos];
       pos++;
@@ -840,6 +886,20 @@ export function parseTokens(tokens: Token[]): any[] {
         continue;
       }
       
+      // Handle conditionals
+      if (t.type === TokenType.IF_START) {
+        flushContainerParagraph();
+        const ifElement = parseContainer(TokenType.IF_START, TokenType.IF_END, 'if', t);
+        // Apply pending style if present
+        if (containerStyle) {
+          if (!ifElement.attributes) ifElement.attributes = {};
+          ifElement.attributes.class = containerStyle;
+          containerStyle = null;
+        }
+        containerElements.push(ifElement);
+        continue;
+      }
+      
       // Handle variable references
       if (t.type === TokenType.VARIABLE_REFERENCE) {
         containerInlineBuffer.push(t.value);
@@ -850,6 +910,16 @@ export function parseTokens(tokens: Token[]): any[] {
       // Handle text
       if (t.type === TokenType.TEXT) {
         containerInlineBuffer.push(t.value);
+        currentIndex++;
+        continue;
+      }
+      
+      // Handle inline code
+      if (t.type === TokenType.INLINE_CODE) {
+        containerInlineBuffer.push({
+          type: 'code',
+          content: [t.value]
+        });
         currentIndex++;
         continue;
       }
@@ -932,6 +1002,11 @@ export function parseTokens(tokens: Token[]): any[] {
       delete container.attributes; // Loop doesn't use regular attributes
     }
     
+    if (containerType === 'if') {
+      container.condition = token.attributes?.condition;
+      delete container.attributes; // If doesn't use regular attributes
+    }
+    
     return container;
   }
 
@@ -962,6 +1037,7 @@ export function parseTokens(tokens: Token[]): any[] {
       token.type === TokenType.BUTTON_START ||
       token.type === TokenType.SPAN_START ||
       token.type === TokenType.EACH_START ||
+      token.type === TokenType.IF_START ||
       token.type === TokenType.IMAGE ||
       token.type === TokenType.COMPONENT
     ) {
@@ -1072,6 +1148,23 @@ export function parseTokens(tokens: Token[]): any[] {
       elements.push(loopElement);
       continue;
     }
+    
+    if (token.type === TokenType.IF_START) {
+      const ifElement = parseContainer(TokenType.IF_START, TokenType.IF_END, 'if', token);
+      if (currentId) {
+        ifElement.elementId = currentId;
+        currentId = null;
+      }
+      if (currentStyle) {
+        if (!ifElement.attributes) {
+          ifElement.attributes = {};
+        }
+        ifElement.attributes.class = currentStyle;
+        currentStyle = null;
+      }
+      elements.push(ifElement);
+      continue;
+    }
 
     // Handle component references
     if (token.type === TokenType.COMPONENT) {
@@ -1148,6 +1241,16 @@ export function parseTokens(tokens: Token[]): any[] {
 
     if (token.type === TokenType.VARIABLE_REFERENCE) {
       inlineBuffer.push(token.value);
+      currentIndex++;
+      continue;
+    }
+    
+    // Handle inline code
+    if (token.type === TokenType.INLINE_CODE) {
+      inlineBuffer.push({
+        type: 'code',
+        content: [token.value]
+      });
       currentIndex++;
       continue;
     }

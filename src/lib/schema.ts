@@ -1,6 +1,12 @@
 import { z } from "zod/v4";
 import { StyleSheetSchema, StylePropertiesSchema } from "./style-schema";
 
+// Nostr event kind constants
+export const HYPERNOTE_KIND = 30023;          // Hypernote documents
+export const HYPERNOTE_ELEMENT_KIND = 32616;  // Hypernote components
+export const APP_STATE_KIND = 30078;          // Application state (counters, preferences, etc.)
+export const CONTEXTVM_KIND = 25910;          // ContextVM tool call events
+
 /**
  * IMPORTANT: TypeScript Circular Reference Warnings
  * 
@@ -266,7 +272,14 @@ const QuerySchema = z.object({
   since: z.union([z.int().nonnegative(), z.string()]).optional(),
   until: z.union([z.int().nonnegative(), z.string()]).optional(),
   ids: z.array(z.string().min(1)).optional(),
-  tags: z.record(z.string().min(1), z.array(z.string())).optional(),
+  
+  // Tag filters (NIP-01 standard)
+  "#e": z.array(z.string().min(1)).optional(),
+  "#p": z.array(z.string().min(1)).optional(),
+  "#d": z.array(z.string().min(1)).optional(),
+  "#t": z.array(z.string().min(1)).optional(),
+  "#a": z.array(z.string().min(1)).optional(),
+  "#r": z.array(z.string().min(1)).optional(),
   
   // Live subscription flag - keeps WebSocket connection open for real-time updates
   live: z.boolean().optional(),
@@ -275,11 +288,21 @@ const QuerySchema = z.object({
   pipe: z.array(QueryPipeStepSchema).optional(),
 });
 
-// Event template schema
+// Event template schema - supports both regular events and tool calls
 const EventTemplateSchema = z.object({
   kind: z.int().nonnegative(),
-  content: z.string(),
+  content: z.string().optional(), // Optional for tool calls
   tags: z.array(z.array(z.string())).optional(),
+  
+  // Tool call specific fields
+  tool_call: z.boolean().optional(),
+  provider: z.string().optional(), // Provider npub for tool calls
+  tool_name: z.string().optional(), // Name of the tool to execute
+  arguments: z.record(z.string(), z.any()).optional(), // Tool arguments
+  target: z.string().optional(), // Event template to trigger with response
+  
+  // Regular replaceable event fields
+  d: z.string().optional(), // d tag for replaceable events
 });
 
 /**
