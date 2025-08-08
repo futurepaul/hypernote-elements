@@ -5,9 +5,9 @@
   "description": "Browse all your published Hypernotes and Elements",
   "name": "hypernotes-browser",
   "queries": {
-    "$my_documents": {
+    "$my_applications": {
       "kinds": [
-        30023
+        32616
       ],
       "authors": [
         "user.pubkey"
@@ -56,7 +56,7 @@
     {
       "type": "h2",
       "content": [
-        "Hypernote Applications (Kind 30023)"
+        "Hypernote Applications (Kind 32616 with \"application\" type)"
       ]
     },
     {
@@ -67,7 +67,7 @@
     },
     {
       "type": "loop",
-      "source": "$my_documents",
+      "source": "$my_applications",
       "variable": "$doc",
       "elements": [
         {
@@ -168,7 +168,7 @@
     {
       "type": "h2",
       "content": [
-        "Hypernote Elements (Kind 32616)"
+        "Hypernote Elements (Kind 32616 with \"element\" type)"
       ]
     },
     {

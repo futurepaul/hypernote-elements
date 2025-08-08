@@ -4,14 +4,16 @@ title: "My Hypernotes Browser"
 description: "Browse all your published Hypernotes and Elements"
 name: "hypernotes-browser"
 
-"$my_documents":
-  kinds: [30023]  # Hypernote applications
+"$my_applications":
+  kinds: [32616]  # All hypernotes use 32616 now
   authors: [user.pubkey]
+  "#hypernote-type": ["application"]  # Filter for applications
   limit: 10
 
 "$my_elements":
-  kinds: [32616]  # Hypernote components/elements  
+  kinds: [32616]  # All hypernotes use 32616 now
   authors: [user.pubkey]
+  "#hypernote-type": ["element"]  # Filter for elements/components
   limit: 10
 
 "$my_state":
@@ -26,11 +28,11 @@ Connected as: {user.pubkey}
 
 This page shows all your published Hypernotes (applications and reusable elements).
 
-## Hypernote Applications (Kind 30023)
+## Hypernote Applications (Kind 32616 with "application" type)
 
 These are full applications like clients, counters, and games.
 
-[each $my_documents as $doc]
+[each $my_applications as $doc]
 [div class="bg-white p-4 rounded-lg shadow mb-4 border-l-4 border-blue-500"]
 
 **Event ID:** {$doc.id}
@@ -48,7 +50,7 @@ These are full applications like clients, counters, and games.
 [/div]
 [/each]
 
-## Hypernote Elements (Kind 32616)
+## Hypernote Elements (Kind 32616 with "element" type)
 
 These are reusable components that can be imported by other Hypernotes.
 

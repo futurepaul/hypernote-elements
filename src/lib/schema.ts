@@ -2,8 +2,8 @@ import { z } from "zod/v4";
 import { StyleSheetSchema, StylePropertiesSchema } from "./style-schema";
 
 // Nostr event kind constants
-export const HYPERNOTE_KIND = 30023;          // Hypernote documents
-export const HYPERNOTE_ELEMENT_KIND = 32616;  // Hypernote components
+export const HYPERNOTE_KIND = 32616;          // All Hypernote documents and components
+export const HYPERNOTE_ELEMENT_KIND = 32616;  // Hypernote components (same as HYPERNOTE_KIND)
 export const APP_STATE_KIND = 30078;          // Application state (counters, preferences, etc.)
 export const CONTEXTVM_KIND = 25910;          // ContextVM tool call events
 

@@ -121,7 +121,7 @@ export function App() {
           <PublishButton markdown={markdownStates[template]} />
 
             <Link className="underline text-blue-600" to="/">Editor</Link>
-            <Link className="underline text-blue-600" to="/hn/naddr1qvzqqqr4gupzqrtvswydevzfhrw5ljxnmrpmhy778k5sh2pguncfezks7dry3z3nqy88wumn8ghj7mn0wvhxcmmv9uq32amnwvaz7tmjv4kxz7fwv3sk6atn9e5k7tcpzamhxue69uhhyetvv9ujuurjd9kkzmpwdejhgtcqp3hx7um5wgkkxmrfv4h8gjqfed7">
+            <Link className="underline text-blue-600" to="/hn/naddr1qvzqqqrldqpzqrtvswydevzfhrw5ljxnmrpmhy778k5sh2pguncfezks7dry3z3nqy88wumn8ghj7mn0wvhxcmmv9uq32amnwvaz7tmjv4kxz7fwv3sk6atn9e5k7tcpzamhxue69uhhyetvv9ujuurjd9kkzmpwdejhgtcqp3hx7um5wgkkxmrfv4h8gavkesr">
               Sample Hypernote Route
             </Link>
           </div>

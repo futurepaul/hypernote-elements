@@ -185,7 +185,7 @@ event_handler: true  # New flag
 
 **What we accomplished:**
 1. ✅ Standardized on Nostr event kinds:
-   - **Kind 30023**: Hypernote documents (apps like client, counter)
+   - **Kind 32616**: Hypernote documents (apps like client, counter)
    - **Kind 32616**: Hypernote elements (reusable components like profile)
    - **Kind 30078**: Reserved for app state only (counter values, settings)
 
@@ -211,7 +211,7 @@ event_handler: true  # New flag
    - Zero prompts required - completely non-interactive
    - Title is required (shows error toast if missing)
    - Name/slug auto-generated from title or can be overridden
-   - Correct event kind automatically selected (30023 or 32616)
+   - Correct event kind automatically selected (32616 for both documents and elements)
    - Proper tags added based on document type
 
 **Files Changed:**
@@ -239,7 +239,7 @@ event_handler: true  # New flag
 
 5. Enhanced publishing flow:
    - Extract metadata from frontmatter (type, title, description)
-   - Automatically determine event kind (30023 or 32616)
+   - Automatically use event kind 32616 for all hypernotes
    - Add proper tags:
      ```json
      [
@@ -338,8 +338,7 @@ Current turn: {$game | field:turn}
 - Manual entry of publishing metadata
 
 ### Target State (Clear)
-- **Kind 30023**: Hypernote applications (client, counter, etc.)
-- **Kind 32616**: Hypernote elements/components (profile, note viewer, etc.)
+- **Kind 32616**: All hypernotes (both applications and components)
 - **Kind 30078**: Application state only (counter values, settings, etc.)
 - Metadata in frontmatter drives publishing
 
@@ -366,7 +365,7 @@ description: "Interactive counter with tool calls"
 ```
 
 When published:
-- Creates a Kind 30023 event (hypernote document)
+- Creates a Kind 32616 event (hypernote document)
 - With proper title and description tags
 - Content is the compiled JSON
 
@@ -393,7 +392,7 @@ When published:
 - Event type standardization fully implemented
 - All examples updated with metadata
 - Publishing flow completely automated
-- Clear separation: Apps (30023) vs Components (32616) vs State (30078)
+- Clear separation: All Hypernotes (32616) vs State (30078)
 
 ### 🚀 Ready for Phase 1: Pipe Unification
 Next steps:

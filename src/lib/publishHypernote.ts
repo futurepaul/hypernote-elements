@@ -27,10 +27,10 @@ export async function publishHypernote(
       throw new Error("NIP-07 extension not found. Please install a Nostr signer extension.");
     }
 
-    // Determine document type and event kind
+    // Determine document type (both use the same event kind now)
     const documentType = hypernote.type || (hypernote.kind !== undefined ? 'element' : 'hypernote');
     const isComponent = documentType === 'element' || hypernote.kind !== undefined;
-    const eventKind = isComponent ? HYPERNOTE_ELEMENT_KIND : HYPERNOTE_KIND;
+    const eventKind = HYPERNOTE_KIND; // Always 32616 for all hypernotes
     
     // Build tags
     const tags: string[][] = [
@@ -39,9 +39,14 @@ export async function publishHypernote(
       ["t", "hypernote"]
     ];
     
+    // Add type tag to differentiate applications from elements
     if (isComponent) {
+      tags.push(["hypernote-type", "element"]);
       tags.push(["hypernote-component-kind", String(hypernote.kind)]);
       tags.push(["t", "hypernote-element"]);
+    } else {
+      tags.push(["hypernote-type", "application"]);
+      tags.push(["t", "hypernote-app"]);
     }
     
     if (metadata?.title) {
