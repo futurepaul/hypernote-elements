@@ -640,9 +640,95 @@ function resolveExpression(expr: string, ctx: RenderContext): any {
 
 // Pure string processor - replaces {expressions} with values
 function processString(str: string, ctx: RenderContext): string {
-  return str.replace(/\{([^}]+)\}/g, (_, expr) => 
-    String(resolveExpression(expr, ctx))
-  );
+  return str.replace(/\{([^}]+)\}/g, (_, expr) => {
+    // Check if expression contains pipes
+    const pipeParts = expr.split('|').map(s => s.trim());
+    
+    if (pipeParts.length > 1) {
+      // Process with pipes
+      const baseExpr = pipeParts[0];
+      
+      // Check if baseExpr has dot notation (e.g., $profile.name)
+      // Convert it to pipes: $profile.name => $profile | field:name
+      const dotParts = baseExpr.split('.');
+      let value;
+      
+      if (dotParts.length > 1 && dotParts[0].startsWith('$')) {
+        // Has dot notation - convert to field operations
+        value = resolveExpression(dotParts[0], ctx);
+        
+        // Add field operations for each dot access
+        for (let i = 1; i < dotParts.length; i++) {
+          value = applyPipeOperation({ operation: 'field', name: dotParts[i] }, value);
+        }
+      } else {
+        value = resolveExpression(baseExpr, ctx);
+      }
+      
+      // Apply each explicit pipe operation
+      for (let i = 1; i < pipeParts.length; i++) {
+        const pipeStr = pipeParts[i];
+        
+        // Parse pipe operation (format: "operation" or "operation:param" or "operation:param:param2")
+        const [opName, ...params] = pipeStr.split(':').map(s => s.trim());
+        
+        // Create operation object
+        let operation: any = { operation: opName };
+        
+        // Handle operation-specific parameters
+        switch (opName) {
+          case 'field':
+            operation.name = params[0];
+            break;
+          case 'default':
+            operation.value = params.join(':'); // Rejoin in case value contains colons
+            break;
+          case 'parse_json':
+            operation.field = params[0] || 'content';
+            break;
+          case 'extract':
+            operation.expression = params.join(':');
+            break;
+          case 'sort':
+            operation.by = params[0];
+            operation.order = params[1];
+            break;
+          case 'unique':
+            operation.by = params[0];
+            break;
+          case 'map':
+            operation.expression = params.join(':');
+            break;
+          case 'filter':
+            operation.expression = params.join(':');
+            break;
+        }
+        
+        // Apply the pipe operation
+        value = applyPipeOperation(operation, value);
+      }
+      
+      return String(value ?? '');
+    } else {
+      // No explicit pipes, but check for dot notation
+      const dotParts = expr.split('.');
+      
+      if (dotParts.length > 1 && dotParts[0].startsWith('$')) {
+        // Has dot notation - convert to field operations
+        let value = resolveExpression(dotParts[0], ctx);
+        
+        // Apply field operations for each dot access
+        for (let i = 1; i < dotParts.length; i++) {
+          value = applyPipeOperation({ operation: 'field', name: dotParts[i] }, value);
+        }
+        
+        return String(value ?? '');
+      } else {
+        // No pipes or dots, use regular expression resolution
+        return String(resolveExpression(expr, ctx) ?? '');
+      }
+    }
+  });
 }
 
 // Pure content renderer - handles mixed string/element arrays

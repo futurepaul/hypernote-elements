@@ -13,7 +13,20 @@
         "user.pubkey"
       ],
       "limit": 1,
-      "live": true
+      "live": true,
+      "pipe": [
+        {
+          "operation": "first"
+        },
+        {
+          "operation": "field",
+          "name": "content"
+        },
+        {
+          "operation": "default",
+          "value": "0"
+        }
+      ]
     }
   },
   "events": {
@@ -23,7 +36,7 @@
       "provider": "npub1r86mtnf0eenr5w6fz66zcduvq2qvec4ll5908ppcp6gn2m7078tq82cuah",
       "tool_name": "addone",
       "arguments": {
-        "a": "{$count.content}"
+        "a": "{$count}"
       },
       "target": "@update_count"
     },
@@ -33,7 +46,7 @@
       "provider": "npub1r86mtnf0eenr5w6fz66zcduvq2qvec4ll5908ppcp6gn2m7078tq82cuah",
       "tool_name": "minusone",
       "arguments": {
-        "a": "{$count.content}"
+        "a": "{$count}"
       },
       "target": "@update_count"
     },
@@ -74,7 +87,7 @@
         {
           "type": "h2",
           "content": [
-            "{count.content}"
+            "{$count}"
           ]
         }
       ]

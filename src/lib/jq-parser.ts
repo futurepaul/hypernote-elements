@@ -283,6 +283,72 @@ export function applyPipeOperation(operation: any, data: any, context?: any): an
       }
       return data;
       
+    case 'first':
+      // Take the first element of an array
+      if (Array.isArray(data) && data.length > 0) {
+        return data[0];
+      }
+      return data;
+      
+    case 'last':
+      // Take the last element of an array
+      if (Array.isArray(data) && data.length > 0) {
+        return data[data.length - 1];
+      }
+      return data;
+      
+    case 'field':
+      // Extract a specific field from an object or array of objects
+      const fieldName = operation.name || operation.field;
+      if (!fieldName) {
+        console.warn('field operation requires a name parameter');
+        return data;
+      }
+      
+      if (Array.isArray(data)) {
+        return data.map(item => {
+          if (item && typeof item === 'object') {
+            return item[fieldName];
+          }
+          return undefined;
+        }).filter(val => val !== undefined);
+      } else if (data && typeof data === 'object') {
+        return data[fieldName];
+      }
+      return undefined;
+      
+    case 'default':
+      // Provide a default value if data is null, undefined, empty string, or empty array
+      const defaultValue = operation.value;
+      if (data === null || data === undefined || data === '' || 
+          (Array.isArray(data) && data.length === 0)) {
+        return defaultValue;
+      }
+      return data;
+      
+    case 'json':
+      // Parse a JSON string
+      if (typeof data === 'string') {
+        try {
+          return JSON.parse(data);
+        } catch (e) {
+          console.warn('Failed to parse JSON:', e);
+          return data;
+        }
+      } else if (Array.isArray(data)) {
+        return data.map(item => {
+          if (typeof item === 'string') {
+            try {
+              return JSON.parse(item);
+            } catch (e) {
+              return item;
+            }
+          }
+          return item;
+        });
+      }
+      return data;
+      
     default:
       console.warn(`Unknown pipe operation: ${operation.operation}`);
       return data;

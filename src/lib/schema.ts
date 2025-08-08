@@ -261,6 +261,28 @@ const QueryPipeStepSchema = z.union([
     operation: z.literal("parse_json"),
     field: z.string().min(1).optional(), // Field containing JSON to parse (default: 'content')
   }),
+  // First operation - takes first element of array
+  z.object({
+    operation: z.literal("first"),
+  }),
+  // Last operation - takes last element of array
+  z.object({
+    operation: z.literal("last"),
+  }),
+  // Field operation - extracts a specific field
+  z.object({
+    operation: z.literal("field"),
+    name: z.string().min(1), // field name to extract
+  }),
+  // Default operation - provides a default value
+  z.object({
+    operation: z.literal("default"),
+    value: z.any(), // default value if data is null/undefined/empty
+  }),
+  // JSON operation - parses a JSON string
+  z.object({
+    operation: z.literal("json"),
+  }),
 ]);
 
 // Query schema - combines base Nostr filter with optional pipe transformations
