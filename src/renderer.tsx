@@ -12,6 +12,7 @@ import { applyPipeOperation } from './lib/jq-parser';
 import type { NostrEvent } from './lib/snstr/nip07';
 import { ComponentResolver, parseTarget, type TargetContext } from './lib/componentResolver';
 import { nip19 } from 'nostr-tools';
+import { applyPipes, resolveVariables, resolveObjectVariables } from './lib/pipes';
 
 // Pure render context - all data needed for rendering
 interface RenderContext {
@@ -150,6 +151,85 @@ export function RenderHypernoteContent({ content }: { content: Hypernote }) {
   // Get auth store for NIP-07 signing
   const { isAuthenticated, signEvent, login } = useAuthStore();
 
+  // Set up reactive event subscriptions
+  useEffect(() => {
+    if (!content.events || !snstrClient) return;
+
+    const subscriptions: any[] = [];
+    
+    // Look for events with 'match' field (reactive events)
+    for (const [eventName, eventDef] of Object.entries(content.events)) {
+      if (!eventDef.match) continue;
+      
+      console.log(`[Reactive] Setting up subscription for event: ${eventName}`);
+      
+      // Build context for variable resolution
+      const context = {
+        ...queryResults,
+        ...extractedVariables,
+        form: formData,
+        user: userContext
+      };
+      
+      // Resolve variables in match filter
+      const resolvedFilter = resolveObjectVariables(eventDef.match, context);
+      
+      // Subscribe to matching events
+      const unsubscribe = snstrClient.subscribe(
+        [resolvedFilter],
+        async (matchedEvent: NostrEvent) => {
+          console.log(`[Reactive] Event ${eventName} matched:`, matchedEvent);
+          
+          // Apply pipes if specified
+          let processedData = matchedEvent;
+          if (eventDef.pipe) {
+            processedData = applyPipes(matchedEvent, eventDef.pipe);
+          }
+          
+          // Create context with the processed result
+          const eventContext = {
+            ...context,
+            result: processedData,
+            matched: matchedEvent
+          };
+          
+          // Process the 'then' event template
+          if (eventDef.then) {
+            const newEvent = resolveObjectVariables(eventDef.then, eventContext);
+            
+            // Sign and publish the new event
+            if (isAuthenticated) {
+              try {
+                const unsignedEvent = {
+                  ...newEvent,
+                  created_at: Math.floor(Date.now() / 1000)
+                };
+                
+                const signedEvent = await signEvent(unsignedEvent);
+                const result = await snstrClient.publishEvent(signedEvent);
+                
+                console.log(`[Reactive] Published reactive event: ${result.eventId}`);
+                toast.success('Reactive event triggered!');
+              } catch (error) {
+                console.error(`[Reactive] Failed to publish event:`, error);
+                toast.error('Failed to trigger reactive event');
+              }
+            }
+          }
+        }
+      );
+      
+      subscriptions.push(unsubscribe);
+    }
+    
+    // Cleanup subscriptions on unmount
+    return () => {
+      subscriptions.forEach(unsub => {
+        if (typeof unsub === 'function') unsub();
+      });
+    };
+  }, [content.events, snstrClient, queryResults, extractedVariables, formData, userContext, isAuthenticated]);
+
   // Process form submission with NIP-07 signing
   const handleFormSubmit = async (eventName: string) => {
     if (!eventName) {
@@ -177,224 +257,13 @@ export function RenderHypernoteContent({ content }: { content: Hypernote }) {
 
     const eventTemplate = content.events[eventName];
 
-    // Check if this is a tool call
-    if (eventTemplate.tool_call) {
-      // Handle ContextVM tool call
-      console.log('[ContextVM] Processing tool call:', eventTemplate.tool_name);
+    // Check if this is a reactive event (has 'match' field)
+    if (eventTemplate.match) {
+      // This is a reactive event - it sets up a subscription, not an immediate action
+      console.log(`[Reactive] Event ${eventName} has match field, setting up subscription`);
       
-      // Process arguments with context substitution
-      const processedArgs: Record<string, any> = {};
-      if (eventTemplate.arguments) {
-        for (const [key, value] of Object.entries(eventTemplate.arguments)) {
-          if (typeof value === 'string' && value.includes('{')) {
-            // Process template variables in arguments
-            let processedValue = value;
-            
-            // Replace query results
-            Object.keys(queryResults).forEach(queryName => {
-              const data = queryResults[queryName];
-              if (data && data.length > 0) {
-                // Handle properties like $count.content
-                const content = data[0].content || '0'; // Default to '0' if no content
-                processedValue = processedValue.replace(`{${queryName}.content}`, content);
-                processedValue = processedValue.replace(`{${queryName}}`, JSON.stringify(data[0]));
-              } else {
-                // No data found, use default value
-                processedValue = processedValue.replace(`{${queryName}.content}`, '0');
-                processedValue = processedValue.replace(`{${queryName}}`, '{}');
-              }
-            });
-            
-            processedArgs[key] = processedValue;
-          } else {
-            processedArgs[key] = value;
-          }
-        }
-      }
-      
-      // Create JSON-RPC request
-      const jsonRpcRequest = {
-        jsonrpc: "2.0",
-        id: Math.random().toString(36).substring(7),
-        method: "tools/call",
-        params: {
-          name: eventTemplate.tool_name,
-          arguments: processedArgs
-        }
-      };
-      
-      // Convert provider npub to hex if needed
-      let providerHex = eventTemplate.provider || "";
-      if (providerHex.startsWith('npub')) {
-        try {
-          const decoded = nip19.decode(providerHex);
-          if (decoded.type === 'npub') {
-            providerHex = decoded.data as string;
-          }
-        } catch (e) {
-          console.error('[ContextVM] Failed to decode provider npub:', e);
-        }
-      }
-      
-      // Create tool call event
-      const toolCallEvent = {
-        kind: 25910,
-        content: JSON.stringify(jsonRpcRequest),
-        tags: [["p", providerHex]],
-        created_at: Math.floor(Date.now() / 1000)
-      };
-      
-      try {
-        // Sign and publish tool call
-        const signedEvent = await signEvent(toolCallEvent);
-        const result = await snstrClient.publishEvent(signedEvent);
-        
-        console.log(`[ContextVM] Published tool call: ${result.eventId}`);
-        toast.info(`Tool call sent to provider...`);
-        
-        // Subscribe to response
-        const responseFilter = {
-          kinds: [25910],
-          authors: [providerHex],
-          "#e": [result.eventId],
-          limit: 1
-        };
-        
-        // Subscribe to response
-        console.log('[ContextVM] Waiting for response with filter:', responseFilter);
-        
-        // Set up response subscription with timeout
-        let responseReceived = false;
-        let responseProcessed = false; // Track if we've already processed a response
-        const timeoutId = setTimeout(() => {
-          if (!responseReceived) {
-            console.log('[ContextVM] No response received within timeout');
-            toast.error('Tool call timed out - no response from provider');
-          }
-        }, 30000); // 30 second timeout
-        
-        // Subscribe to response events
-        await snstrClient.subscribe(
-          [responseFilter],
-          async (responseEvent: NostrEvent, relay: string) => {
-            responseReceived = true;
-            
-            // Check if we've already processed a response
-            if (responseProcessed) {
-              console.log('[ContextVM] Response already processed, ignoring duplicate from', relay);
-              return;
-            }
-            responseProcessed = true;
-            clearTimeout(timeoutId);
-            
-            console.log('[ContextVM] Processing response from', relay, ':', responseEvent);
-            
-            try {
-              // Parse JSON-RPC response
-              const response = JSON.parse(responseEvent.content);
-              console.log('[ContextVM] Parsed response:', response);
-              
-              if (response.error) {
-                console.error('[ContextVM] Tool call error:', response.error);
-                toast.error(`Tool call failed: ${response.error.message || 'Unknown error'}`);
-                return;
-              }
-              
-              // Check if there's a target event template
-              if (!eventTemplate.target) {
-                console.warn('[ContextVM] No target event specified for tool call response');
-                return;
-              }
-              
-              // Get the target event template
-              const targetEventName = eventTemplate.target;
-              if (!content.events || !content.events[targetEventName]) {
-                console.error(`[ContextVM] Target event ${targetEventName} not found`);
-                return;
-              }
-              
-              const targetEvent = content.events[targetEventName];
-              
-              // Process the target event template with response data
-              let eventContent = targetEvent.content || '';
-              if (typeof eventContent === 'string') {
-                // Replace {response.result} with the actual result
-                if (eventContent.includes('{response.')) {
-                  // Extract the actual value from the result
-                  let resultValue = response.result;
-                  
-                  // Handle MCP-style response format: result.content[0].text
-                  if (typeof resultValue === 'object' && resultValue !== null) {
-                    // Check if it's MCP format with content array
-                    if ('content' in resultValue && Array.isArray(resultValue.content)) {
-                      // Find the first text content
-                      const textContent = resultValue.content.find((item: any) => item.type === 'text');
-                      if (textContent && textContent.text) {
-                        resultValue = textContent.text;
-                      } else if (resultValue.content.length > 0 && resultValue.content[0].text) {
-                        // Fallback to first item if it has text
-                        resultValue = resultValue.content[0].text;
-                      }
-                    }
-                    // Check other common patterns if not MCP format
-                    else if ('value' in resultValue) {
-                      resultValue = resultValue.value;
-                    } else if ('result' in resultValue) {
-                      resultValue = resultValue.result;
-                    } else {
-                      // If no known field, stringify the object
-                      resultValue = JSON.stringify(resultValue);
-                    }
-                  }
-                  
-                  console.log('[ContextVM] Extracted result value:', resultValue);
-                  eventContent = eventContent.replace(/\{response\.result\}/g, String(resultValue));
-                  eventContent = eventContent.replace(/\{response\}/g, JSON.stringify(response));
-                }
-                // Also handle form variables (though they would be empty in tool call context)
-                if (eventContent.includes('{form.')) {
-                  Object.keys(formData).forEach(key => {
-                    eventContent = eventContent.replace(`{form.${key}}`, formData[key] || '');
-                  });
-                }
-              }
-              
-              // Handle 'd' tag for replaceable events
-              const tags = targetEvent.tags ? [...targetEvent.tags] : [];
-              if (targetEvent.d) {
-                tags.push(['d', targetEvent.d]);
-              }
-              
-              // Create the target event
-              const unsignedEvent = {
-                kind: targetEvent.kind,
-                content: eventContent,
-                tags: tags,
-                created_at: Math.floor(Date.now() / 1000)
-              };
-              
-              // Sign and publish the target event
-              const signedEvent = await signEvent(unsignedEvent);
-              const result = await snstrClient.publishEvent(signedEvent);
-              
-              console.log(`[ContextVM] Published target event: ${result.eventId}`);
-              toast.success('State updated!');
-              
-              // The live subscription will automatically update the UI
-            } catch (error) {
-              console.error('[ContextVM] Failed to process response:', error);
-              toast.error('Failed to process tool response');
-            }
-          },
-          undefined, // onEose callback (optional)
-          30000 // timeout in ms
-        );
-        
-      } catch (error) {
-        console.error(`[ContextVM] Failed to publish tool call: ${error}`);
-        toast.error(`Failed to send tool call: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-      
+      // The subscription setup is handled in a useEffect below
+      toast.info('Reactive event subscription will be registered');
       return;
     }
 
@@ -638,96 +507,15 @@ function resolveExpression(expr: string, ctx: RenderContext): any {
   return value !== undefined ? value : expr;
 }
 
-// Pure string processor - replaces {expressions} with values
+// Pure string processor - replaces {expressions} with values  
 function processString(str: string, ctx: RenderContext): string {
-  return str.replace(/\{([^}]+)\}/g, (_, expr) => {
-    // Check if expression contains pipes
-    const pipeParts = expr.split('|').map(s => s.trim());
-    
-    if (pipeParts.length > 1) {
-      // Process with pipes
-      const baseExpr = pipeParts[0];
-      
-      // Check if baseExpr has dot notation (e.g., $profile.name)
-      // Convert it to pipes: $profile.name => $profile | field:name
-      const dotParts = baseExpr.split('.');
-      let value;
-      
-      if (dotParts.length > 1 && dotParts[0].startsWith('$')) {
-        // Has dot notation - convert to field operations
-        value = resolveExpression(dotParts[0], ctx);
-        
-        // Add field operations for each dot access
-        for (let i = 1; i < dotParts.length; i++) {
-          value = applyPipeOperation({ operation: 'field', name: dotParts[i] }, value);
-        }
-      } else {
-        value = resolveExpression(baseExpr, ctx);
-      }
-      
-      // Apply each explicit pipe operation
-      for (let i = 1; i < pipeParts.length; i++) {
-        const pipeStr = pipeParts[i];
-        
-        // Parse pipe operation (format: "operation" or "operation:param" or "operation:param:param2")
-        const [opName, ...params] = pipeStr.split(':').map(s => s.trim());
-        
-        // Create operation object
-        let operation: any = { operation: opName };
-        
-        // Handle operation-specific parameters
-        switch (opName) {
-          case 'field':
-            operation.name = params[0];
-            break;
-          case 'default':
-            operation.value = params.join(':'); // Rejoin in case value contains colons
-            break;
-          case 'parse_json':
-            operation.field = params[0] || 'content';
-            break;
-          case 'extract':
-            operation.expression = params.join(':');
-            break;
-          case 'sort':
-            operation.by = params[0];
-            operation.order = params[1];
-            break;
-          case 'unique':
-            operation.by = params[0];
-            break;
-          case 'map':
-            operation.expression = params.join(':');
-            break;
-          case 'filter':
-            operation.expression = params.join(':');
-            break;
-        }
-        
-        // Apply the pipe operation
-        value = applyPipeOperation(operation, value);
-      }
-      
-      return String(value ?? '');
-    } else {
-      // No explicit pipes, but check for dot notation
-      const dotParts = expr.split('.');
-      
-      if (dotParts.length > 1 && dotParts[0].startsWith('$')) {
-        // Has dot notation - convert to field operations
-        let value = resolveExpression(dotParts[0], ctx);
-        
-        // Apply field operations for each dot access
-        for (let i = 1; i < dotParts.length; i++) {
-          value = applyPipeOperation({ operation: 'field', name: dotParts[i] }, value);
-        }
-        
-        return String(value ?? '');
-      } else {
-        // No pipes or dots, use regular expression resolution
-        return String(resolveExpression(expr, ctx) ?? '');
-      }
-    }
+  return resolveVariables(str, {
+    ...ctx.queryResults,
+    ...ctx.extractedVariables,
+    form: ctx.formData,
+    loop: ctx.loopVariables,
+    user: { pubkey: ctx.userPubkey },
+    target: ctx.target
   });
 }
 

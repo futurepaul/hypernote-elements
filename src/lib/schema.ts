@@ -1,5 +1,6 @@
 import { z } from "zod/v4";
 import { StyleSheetSchema, StylePropertiesSchema } from "./style-schema";
+import { PipeSchema, PipeOperation } from "./pipe-schema";
 
 // Nostr event kind constants
 export const HYPERNOTE_KIND = 32616;          // All Hypernote documents and components
@@ -219,70 +220,20 @@ const AnyElementSchema = z.union([
 // Style properties schema - REMOVED as it's now in style-schema.ts
 // const StylePropertiesSchema = z.record(z.string().min(1), z.string());
 
-// Query pipe step schema - now only for transformations, no Nostr filters
-const QueryPipeStepSchema = z.union([
-  // Extract operation - jq-style data extraction with variable assignment
+// Legacy pipe operations - will be removed after migration
+// Keeping temporarily for backward compatibility during transition
+const LegacyQueryPipeStepSchema = z.union([
   z.object({
     operation: z.literal("extract"),
-    expression: z.string().min(1), // jq expression like ".tags[] | select(.[0] == \"p\") | .[1]"
-    as: z.string().min(1), // variable name to store result
+    expression: z.string().min(1),
+    as: z.string().min(1),
   }),
-  // Reverse operation - reverses array order
-  z.object({
-    operation: z.literal("reverse"),
-  }),
-  // Flatten operation - flattens nested arrays
-  z.object({
-    operation: z.literal("flatten"),
-    depth: z.number().positive().optional(), // optional depth limit
-  }),
-  // Unique operation - removes duplicate values
-  z.object({
-    operation: z.literal("unique"),
-    by: z.string().optional(), // optional property to determine uniqueness
-  }),
-  // Sort operation - sorts array by property
-  z.object({
-    operation: z.literal("sort"),
-    by: z.string().optional(), // property to sort by (e.g., "created_at")
-    order: z.enum(["asc", "desc"]).optional().default("asc"),
-  }),
-  // Map operation - transforms each item
-  z.object({
-    operation: z.literal("map"),
-    expression: z.string().min(1), // jq expression to apply to each item
-  }),
-  // Filter operation - filters items based on condition
-  z.object({
-    operation: z.literal("filter"),
-    expression: z.string().min(1), // jq expression that returns boolean
-  }),
-  z.object({
-    operation: z.literal("parse_json"),
-    field: z.string().min(1).optional(), // Field containing JSON to parse (default: 'content')
-  }),
-  // First operation - takes first element of array
-  z.object({
-    operation: z.literal("first"),
-  }),
-  // Last operation - takes last element of array
-  z.object({
-    operation: z.literal("last"),
-  }),
-  // Field operation - extracts a specific field
-  z.object({
-    operation: z.literal("field"),
-    name: z.string().min(1), // field name to extract
-  }),
-  // Default operation - provides a default value
-  z.object({
-    operation: z.literal("default"),
-    value: z.any(), // default value if data is null/undefined/empty
-  }),
-  // JSON operation - parses a JSON string
-  z.object({
-    operation: z.literal("json"),
-  }),
+  z.object({ operation: z.literal("reverse") }),
+  z.object({ operation: z.literal("first") }),
+  z.object({ operation: z.literal("last") }),
+  z.object({ operation: z.literal("json") }),
+  z.object({ operation: z.literal("field"), name: z.string() }),
+  z.object({ operation: z.literal("default"), value: z.any() }),
 ]);
 
 // Query schema - combines base Nostr filter with optional pipe transformations
@@ -303,28 +254,54 @@ const QuerySchema = z.object({
   "#a": z.array(z.string().min(1)).optional(),
   "#r": z.array(z.string().min(1)).optional(),
   
-  // Live subscription flag - keeps WebSocket connection open for real-time updates
-  live: z.boolean().optional(),
+  // NO MORE live flag - everything is live by default!
+  // live: z.boolean().optional(), // REMOVED
   
-  // Optional transformation pipeline
-  pipe: z.array(QueryPipeStepSchema).optional(),
+  // Transformation pipeline using new pipe operations
+  pipe: z.union([
+    PipeSchema, // New format
+    z.array(LegacyQueryPipeStepSchema), // Legacy format (temporary)
+  ]).optional(),
 });
 
-// Event template schema - supports both regular events and tool calls
+// Event template schema - now supports reactive events!
 const EventTemplateSchema = z.object({
-  kind: z.int().nonnegative(),
-  content: z.string().optional(), // Optional for tool calls
+  // For regular events, kind is required. For reactive events (with match), kind is not needed
+  kind: z.int().nonnegative().optional(),
+  content: z.string().optional(),
   tags: z.array(z.array(z.string())).optional(),
-  
-  // Tool call specific fields
-  tool_call: z.boolean().optional(),
-  provider: z.string().optional(), // Provider npub for tool calls
-  tool_name: z.string().optional(), // Name of the tool to execute
-  arguments: z.record(z.string(), z.any()).optional(), // Tool arguments
-  target: z.string().optional(), // Event template to trigger with response
   
   // Regular replaceable event fields
   d: z.string().optional(), // d tag for replaceable events
+  
+  // NEW: Reactive event fields
+  // If 'match' is present, this event subscribes to other events
+  match: z.object({
+    kinds: z.array(z.int().nonnegative()).optional(),
+    authors: z.union([z.array(z.string()), z.string()]).optional(),
+    "#e": z.union([z.array(z.string()), z.string()]).optional(),
+    "#p": z.union([z.array(z.string()), z.string()]).optional(),
+    "#d": z.union([z.array(z.string()), z.string()]).optional(),
+    // ... any Nostr filter field
+  }).optional(),
+  
+  // Pipe to transform matched events before creating new event
+  pipe: PipeSchema.optional(),
+  
+  // Event to create when match fires (after pipe transformation)
+  then: z.object({
+    kind: z.int().nonnegative(),
+    content: z.string(),
+    tags: z.array(z.array(z.string())).optional(),
+    d: z.string().optional(),
+  }).optional(),
+  
+  // DEPRECATED: Old tool call fields (to be removed)
+  tool_call: z.boolean().optional(), // DEPRECATED
+  provider: z.string().optional(), // DEPRECATED
+  tool_name: z.string().optional(), // DEPRECATED
+  arguments: z.record(z.string(), z.any()).optional(), // DEPRECATED
+  target: z.string().optional(), // DEPRECATED
 });
 
 /**
@@ -363,6 +340,9 @@ export const hypernoteSchema = z.object({
 
 // Export the inferred type
 export type Hypernote = z.infer<typeof hypernoteSchema>;
+export type EventTemplate = z.infer<typeof EventTemplateSchema>;
+export type Query = z.infer<typeof QuerySchema>;
+export type AnyElement = z.infer<typeof AnyElementSchema>;
 
 // Export individual element types
 export type Element = z.infer<typeof ElementSchema>;

@@ -1,38 +1,85 @@
 ---
 type: "hypernote"
 title: "ContextVM Counter"
-description: "Interactive counter demonstrating tool calls and state management"
+description: "Interactive counter demonstrating reactive events and state management"
 name: "contextvm-counter"  # Optional: custom slug for 'd' tag (auto-generated from title if omitted)
 
 "$count":
-  kinds: [30078]  # Application state, not a hypernote
+  kinds: [30078]  # Application state
   authors: [user.pubkey]
+  "#d": ["counter"]
   limit: 1
-  live: true
+  pipe:
+    - first
+    - get: content
+    - default: "0"
 
 "@increment":
-  kind: 25910
-  tool_call: true
-  provider: "npub1r86mtnf0eenr5w6fz66zcduvq2qvec4ll5908ppcp6gn2m7078tq82cuah"
-  tool_name: "addone"
-  arguments:
-    a: "{$count.content}"
-  target: "@update_count"
+  kind: 25910  # Tool call event
+  content: |
+    {
+      "jsonrpc": "2.0",
+      "id": "{time.now}",
+      "method": "tools/call",
+      "params": {
+        "name": "addone",
+        "arguments": {
+          "a": "{$count}"
+        }
+      }
+    }
+  tags:
+    - ["p", "1cf0bdaf1a7a719be79fb16e32eea0fccd029e3b49f02e960e61f4e079ab96dd"]
 
 "@decrement":
-  kind: 25910
-  tool_call: true
-  provider: "npub1r86mtnf0eenr5w6fz66zcduvq2qvec4ll5908ppcp6gn2m7078tq82cuah"
-  tool_name: "minusone"
-  arguments:
-    a: "{$count.content}"
-  target: "@update_count"
-
-"@update_count":
-  kind: 30078
-  content: "{response.result}"
+  kind: 25910  # Tool call event
+  content: |
+    {
+      "jsonrpc": "2.0",
+      "id": "{time.now}",
+      "method": "tools/call",
+      "params": {
+        "name": "minusone",
+        "arguments": {
+          "a": "{$count}"
+        }
+      }
+    }
   tags:
-    - ["d", "counter"]
+    - ["p", "1cf0bdaf1a7a719be79fb16e32eea0fccd029e3b49f02e960e61f4e079ab96dd"]
+
+# Reactive event that listens for tool responses and updates the counter
+"@on_increment":
+  match:
+    kinds: [25910]
+    "#e": "{@increment.id}"
+    authors: ["1cf0bdaf1a7a719be79fb16e32eea0fccd029e3b49f02e960e61f4e079ab96dd"]
+  pipe:
+    - first
+    - get: content
+    - json
+    - get: result
+  then:
+    kind: 30078
+    content: "{result}"
+    tags:
+      - ["d", "counter"]
+
+"@on_decrement":
+  match:
+    kinds: [25910]
+    "#e": "{@decrement.id}"
+    authors: ["1cf0bdaf1a7a719be79fb16e32eea0fccd029e3b49f02e960e61f4e079ab96dd"]
+  pipe:
+    - first
+    - get: content
+    - json
+    - get: result
+  then:
+    kind: 30078
+    content: "{result}"
+    tags:
+      - ["d", "counter"]
 
 "@initialize":
   kind: 30078
@@ -44,7 +91,7 @@ name: "contextvm-counter"  # Optional: custom slug for 'd' tag (auto-generated f
 # Counter Example
 
 [div class="text-center"]
-## {$count.content | first}
+## {$count or 0}
 [/div]
 
 [form @increment]

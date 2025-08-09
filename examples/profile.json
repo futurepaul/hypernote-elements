@@ -16,11 +16,22 @@
       "limit": 1,
       "pipe": [
         {
-          "operation": "first"
+          "op": "first"
         },
         {
-          "operation": "parse_json",
+          "op": "get",
           "field": "content"
+        },
+        {
+          "op": "json"
+        },
+        {
+          "op": "defaults",
+          "value": {
+            "name": "Anonymous",
+            "picture": "/avatar.png",
+            "nip05": ""
+          }
         }
       ]
     }
@@ -55,12 +66,12 @@
             {
               "type": "strong",
               "content": [
-                "{$profile.name | default:Anonymous}"
+                "{$profile.name}"
               ]
             },
             " ",
             "- ",
-            "{$profile.nip05 | default:}",
+            "{$profile.nip05}",
             " "
           ]
         }

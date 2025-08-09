@@ -3,6 +3,7 @@ import { tokenize, parseTokens } from './tokenizer';
 import { safeValidateHypernote, type Hypernote } from './schema';
 import { twj } from 'tw-to-css';
 import { safeValidateStyleProperties } from './style-schema';
+import { processPipes } from './pipe-compiler';
 
 // Debug mode can be enabled via environment variable (check if process exists for browser compatibility)
 const DEBUG_MODE = typeof process !== 'undefined' && process.env?.HYPERNOTE_DEBUG === 'true';
@@ -216,9 +217,13 @@ export function compileHypernoteToContent(hnmd: string): Hypernote {
     elementCount: result.elements.length
   });
 
+  // Process pipes to convert compact syntax to full JSON format
+  debugLog('Processing pipes...');
+  const processedResult = processPipes(result);
+  
   // Safely validate the result against the schema
   debugLog('Validating against schema...');
-  const validation = safeValidateHypernote(result);
+  const validation = safeValidateHypernote(processedResult);
   
   if (validation.success) {
     debugLog('Validation successful');
@@ -227,13 +232,13 @@ export function compileHypernoteToContent(hnmd: string): Hypernote {
     // Enhanced error logging
     console.error('Hypernote validation failed:');
     console.error('Input HNMD:', hnmd);
-    console.error('Parsed result before validation:', JSON.stringify(result, null, 2));
+    console.error('Parsed result before validation:', JSON.stringify(processedResult, null, 2));
     console.error('Validation errors:', JSON.stringify(validation.error.issues, null, 2));
     
     // Log specific element validation failures with more context
     validation.error.issues.forEach((issue, index) => {
       // Safely navigate the path to get the actual value
-      let actualValue: any = result;
+      let actualValue: any = processedResult;
       try {
         for (const key of issue.path) {
           if (typeof key === 'string' || typeof key === 'number') {

@@ -2,7 +2,7 @@
   "version": "1.1.0",
   "type": "hypernote",
   "title": "ContextVM Counter",
-  "description": "Interactive counter demonstrating tool calls and state management",
+  "description": "Interactive counter demonstrating reactive events and state management",
   "name": "contextvm-counter",
   "queries": {
     "$count": {
@@ -13,39 +13,118 @@
         "user.pubkey"
       ],
       "limit": 1,
-      "live": true
+      "#d": [
+        "counter"
+      ],
+      "pipe": [
+        {
+          "op": "first"
+        },
+        {
+          "op": "get",
+          "field": "content"
+        },
+        {
+          "op": "default",
+          "value": "0"
+        }
+      ]
     }
   },
   "events": {
     "@increment": {
       "kind": 25910,
-      "tool_call": true,
-      "provider": "npub1r86mtnf0eenr5w6fz66zcduvq2qvec4ll5908ppcp6gn2m7078tq82cuah",
-      "tool_name": "addone",
-      "arguments": {
-        "a": "{$count.content}"
-      },
-      "target": "@update_count"
+      "content": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"{time.now}\",\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"addone\",\n    \"arguments\": {\n      \"a\": \"{$count}\"\n    }\n  }\n}\n",
+      "tags": [
+        [
+          "p",
+          "1cf0bdaf1a7a719be79fb16e32eea0fccd029e3b49f02e960e61f4e079ab96dd"
+        ]
+      ]
     },
     "@decrement": {
       "kind": 25910,
-      "tool_call": true,
-      "provider": "npub1r86mtnf0eenr5w6fz66zcduvq2qvec4ll5908ppcp6gn2m7078tq82cuah",
-      "tool_name": "minusone",
-      "arguments": {
-        "a": "{$count.content}"
-      },
-      "target": "@update_count"
-    },
-    "@update_count": {
-      "kind": 30078,
-      "content": "{response.result}",
+      "content": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"{time.now}\",\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"minusone\",\n    \"arguments\": {\n      \"a\": \"{$count}\"\n    }\n  }\n}\n",
       "tags": [
         [
-          "d",
-          "counter"
+          "p",
+          "1cf0bdaf1a7a719be79fb16e32eea0fccd029e3b49f02e960e61f4e079ab96dd"
         ]
       ]
+    },
+    "@on_increment": {
+      "match": {
+        "kinds": [
+          25910
+        ],
+        "authors": [
+          "1cf0bdaf1a7a719be79fb16e32eea0fccd029e3b49f02e960e61f4e079ab96dd"
+        ],
+        "#e": "{@increment.id}"
+      },
+      "pipe": [
+        {
+          "op": "first"
+        },
+        {
+          "op": "get",
+          "field": "content"
+        },
+        {
+          "op": "json"
+        },
+        {
+          "op": "get",
+          "field": "result"
+        }
+      ],
+      "then": {
+        "kind": 30078,
+        "content": "{result}",
+        "tags": [
+          [
+            "d",
+            "counter"
+          ]
+        ]
+      }
+    },
+    "@on_decrement": {
+      "match": {
+        "kinds": [
+          25910
+        ],
+        "authors": [
+          "1cf0bdaf1a7a719be79fb16e32eea0fccd029e3b49f02e960e61f4e079ab96dd"
+        ],
+        "#e": "{@decrement.id}"
+      },
+      "pipe": [
+        {
+          "op": "first"
+        },
+        {
+          "op": "get",
+          "field": "content"
+        },
+        {
+          "op": "json"
+        },
+        {
+          "op": "get",
+          "field": "result"
+        }
+      ],
+      "then": {
+        "kind": 30078,
+        "content": "{result}",
+        "tags": [
+          [
+            "d",
+            "counter"
+          ]
+        ]
+      }
     },
     "@initialize": {
       "kind": 30078,
@@ -74,7 +153,7 @@
         {
           "type": "h2",
           "content": [
-            "{$count.content | first}"
+            "{$count or 0}"
           ]
         }
       ]
