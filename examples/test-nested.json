@@ -1,0 +1,86 @@
+{
+  "version": "1.1.0",
+  "type": "hypernote",
+  "title": "Test Nested Profile",
+  "description": "Minimal test for nested profile loading",
+  "name": "test-nested",
+  "imports": {
+    "#profile": "naddr1qvzqqqrldqpzqrtvswydevzfhrw5ljxnmrpmhy778k5sh2pguncfezks7dry3z3nqy88wumn8ghj7mn0wvhxcmmv9uq32amnwvaz7tmjv4kxz7fwv3sk6atn9e5k7tcpzamhxue69uhhyetvv9ujuurjd9kkzmpwdejhgtcqp4c8ymmxd9kx2ttzv9jxwegsqyvt2"
+  },
+  "queries": {
+    "$test_note": {
+      "kinds": [
+        1
+      ],
+      "limit": 1,
+      "pipe": [
+        {
+          "op": "first"
+        }
+      ]
+    }
+  },
+  "elements": [
+    {
+      "type": "h1",
+      "content": [
+        "Test Nested Profile Loading"
+      ]
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Test 1: Direct Profile (should work)"
+      ]
+    },
+    {
+      "type": "component",
+      "alias": "profile",
+      "argument": "fb1366abd5420ce2a42aeec2bcc98cb4576b16b5aa7519a5a72e96db357b8821"
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Test 2: Profile with query result (problem case)"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "Query result pubkey: ",
+        "{$test_note.pubkey}"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "Profile component:",
+        " "
+      ]
+    },
+    {
+      "type": "component",
+      "alias": "profile",
+      "argument": "$test_note.pubkey"
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Debug info"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "- Test note: "
+      ]
+    },
+    {
+      "type": "json",
+      "content": [],
+      "attributes": {
+        "variable": "$test_note"
+      }
+    }
+  ]
+}

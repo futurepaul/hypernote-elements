@@ -46,7 +46,7 @@ export async function publishHypernote(
       tags.push(["t", "hypernote-element"]);
     } else {
       tags.push(["hypernote-type", "application"]);
-      tags.push(["t", "hypernote-app"]);
+      tags.push(["t", "hypernote-application"]);
     }
     
     if (metadata?.title) {

@@ -6,6 +6,7 @@ import { useNostrStore } from './stores/nostrStore';
 import { useAuthStore } from './stores/authStore';
 import { useNostrSubscription } from './lib/snstr/hooks';
 import { useQueryExecution } from './hooks/useQueryExecution';
+import { useActionExecution } from './hooks/useActionExecution';
 import type { Hypernote, AnyElement } from './lib/schema';
 import { toast } from 'sonner';
 import { applyPipeOperation } from './lib/jq-parser';
@@ -38,6 +39,9 @@ interface RenderContext {
   // Callbacks (pure functions passed from parent)
   onFormSubmit: (eventName: string) => void;
   onInputChange: (name: string, value: string) => void;
+  
+  // Whether to use pre-resolved queries
+  usePreResolved?: boolean;
 }
 
 // Define the structure of elements based on compiler output
@@ -57,7 +61,7 @@ interface HypernoteElement {
 // (Old RendererProps interface removed - using RenderContext instead)
 
 // (Old ElementRenderer removed - using pure render functions below)
-export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string, relayHandler: RelayHandler }) {
+export function HypernoteRenderer({ markdown, relayHandler, usePreResolved = false }: { markdown: string, relayHandler: RelayHandler, usePreResolved?: boolean }) {
   // Debounce the markdown input to prevent re-rendering on every keystroke
   const [debouncedMarkdown] = useDebounce(markdown || '', 300);
 
@@ -67,11 +71,11 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
     [debouncedMarkdown]
   );
 
-  return <RenderHypernoteContent content={content} />;
+  return <RenderHypernoteContent content={content} usePreResolved={usePreResolved} />;
 }
 
 // New: Render from compiled Hypernote JSON directly
-export function RenderHypernoteContent({ content }: { content: Hypernote }) {
+export function RenderHypernoteContent({ content, usePreResolved = false }: { content: Hypernote, usePreResolved?: boolean }) {
   // Get SNSTR client from store
   const { snstrClient } = useNostrStore();
 
@@ -132,186 +136,57 @@ export function RenderHypernoteContent({ content }: { content: Hypernote }) {
     hashQueries();
   }, [content.queries]);
 
+  // Track published event IDs for action outputs (@action.id references)
+  const [publishedEventIds, setPublishedEventIds] = useState<Record<string, string>>({});
+
   // Memoize queries based on their hash to prevent unnecessary re-fetches
   const memoizedQueries = useMemo(() => {
     console.log('[Renderer] Using memoized queries with hash:', queriesHash.substring(0, 16) + '...');
     return content.queries || {};
   }, [queriesHash]);
 
+  // Use a ref to hold the action executor so queries can trigger it
+  const executeActionRef = useRef<(actionName: string) => Promise<void> | void>();
+
   // Execute all queries with dependency resolution
-  const { queryResults, extractedVariables, loading: queriesLoading, error: queryError } = useQueryExecution(
-    memoizedQueries
-  );
+  const { queryResults, extractedVariables, loading: queriesLoading, error: queryError } = useQueryExecution(memoizedQueries, {
+    actionResults: publishedEventIds,
+    onTriggerAction: (actionName) => {
+      console.log(`[Renderer] Triggering action from query: "${actionName}"`);
+      if (executeActionRef.current) {
+        executeActionRef.current(actionName);
+      }
+    }
+  });
 
   // Debug: Log when queryResults changes
   useEffect(() => {
     console.log('[Renderer] queryResults changed:', Object.keys(queryResults).map(k => `${k}: ${queryResults[k]?.length} items`));
   }, [queryResults]);
 
-  // Get auth store for NIP-07 signing
-  const { isAuthenticated, signEvent, login } = useAuthStore();
-
-  // Set up reactive event subscriptions
-  useEffect(() => {
-    if (!content.events || !snstrClient) return;
-
-    const subscriptions: any[] = [];
-    
-    // Look for events with 'match' field (reactive events)
-    for (const [eventName, eventDef] of Object.entries(content.events)) {
-      if (!eventDef.match) continue;
-      
-      console.log(`[Reactive] Setting up subscription for event: ${eventName}`);
-      
-      // Build context for variable resolution
-      const context = {
-        ...queryResults,
-        ...extractedVariables,
-        form: formData,
-        user: userContext
-      };
-      
-      // Resolve variables in match filter
-      const resolvedFilter = resolveObjectVariables(eventDef.match, context);
-      
-      // Subscribe to matching events
-      const unsubscribe = snstrClient.subscribe(
-        [resolvedFilter],
-        async (matchedEvent: NostrEvent) => {
-          console.log(`[Reactive] Event ${eventName} matched:`, matchedEvent);
-          
-          // Apply pipes if specified
-          let processedData = matchedEvent;
-          if (eventDef.pipe) {
-            processedData = applyPipes(matchedEvent, eventDef.pipe);
-          }
-          
-          // Create context with the processed result
-          const eventContext = {
-            ...context,
-            result: processedData,
-            matched: matchedEvent
-          };
-          
-          // Process the 'then' event template
-          if (eventDef.then) {
-            const newEvent = resolveObjectVariables(eventDef.then, eventContext);
-            
-            // Sign and publish the new event
-            if (isAuthenticated) {
-              try {
-                const unsignedEvent = {
-                  ...newEvent,
-                  created_at: Math.floor(Date.now() / 1000)
-                };
-                
-                const signedEvent = await signEvent(unsignedEvent);
-                const result = await snstrClient.publishEvent(signedEvent);
-                
-                console.log(`[Reactive] Published reactive event: ${result.eventId}`);
-                toast.success('Reactive event triggered!');
-              } catch (error) {
-                console.error(`[Reactive] Failed to publish event:`, error);
-                toast.error('Failed to trigger reactive event');
-              }
-            }
-          }
-        }
-      );
-      
-      subscriptions.push(unsubscribe);
+  // Use the clean action execution hook with query results
+  const { executeAction } = useActionExecution({
+    events: content.events,
+    queryResults: queryResults || {},
+    formData,
+    onActionPublished: (actionName, eventId) => {
+      setPublishedEventIds(prev => ({
+        ...prev,
+        [actionName]: eventId
+      }));
     }
-    
-    // Cleanup subscriptions on unmount
-    return () => {
-      subscriptions.forEach(unsub => {
-        if (typeof unsub === 'function') unsub();
-      });
-    };
-  }, [content.events, snstrClient, queryResults, extractedVariables, formData, userContext, isAuthenticated]);
+  });
 
-  // Process form submission with NIP-07 signing
-  const handleFormSubmit = async (eventName: string) => {
+  // Store the executeAction in ref so queries can use it
+  executeActionRef.current = executeAction;
+
+  // Simple wrapper for form submission
+  const handleFormSubmit = (eventName: string) => {
     if (!eventName) {
       console.log('Form submitted but no event is specified');
       return;
     }
-
-    if (!content.events || !content.events[eventName]) {
-      console.error(`Event ${eventName} not found`);
-      return;
-    }
-
-    // Check if user is authenticated
-    if (!isAuthenticated) {
-      toast.error('Please connect NIP-07 to publish events');
-      // Optionally trigger login
-      login();
-      return;
-    }
-
-    if (!snstrClient) {
-      toast.error('Relay client not initialized');
-      return;
-    }
-
-    const eventTemplate = content.events[eventName];
-
-    // Check if this is a reactive event (has 'match' field)
-    if (eventTemplate.match) {
-      // This is a reactive event - it sets up a subscription, not an immediate action
-      console.log(`[Reactive] Event ${eventName} has match field, setting up subscription`);
-      
-      // The subscription setup is handled in a useEffect below
-      toast.info('Reactive event subscription will be registered');
-      return;
-    }
-
-    // Regular event publishing (not a tool call)
-    // Process template variables
-    let eventContent = eventTemplate.content || '';
-    if (typeof eventContent === 'string') {
-      // Replace {form.fieldName} with actual form values
-      if (eventContent.includes('{form.')) {
-        Object.keys(formData).forEach(key => {
-          eventContent = eventContent.replace(new RegExp(`\\{form\\.${key}\\}`, 'g'), formData[key] || '');
-        });
-      }
-    }
-
-    // Handle 'd' tag for replaceable events
-    const tags = eventTemplate.tags ? [...eventTemplate.tags] : [];
-    if (eventTemplate.d) {
-      tags.push(['d', eventTemplate.d]);
-    }
-
-    // Create event template for signing
-    const unsignedEvent = {
-      kind: eventTemplate.kind,
-      content: eventContent,
-      tags: tags,
-      created_at: Math.floor(Date.now() / 1000)
-    };
-
-    // Sign and publish the event
-    try {
-      // Sign with NIP-07
-      const signedEvent = await signEvent(unsignedEvent);
-
-      // Publish to relays
-      const result = await snstrClient.publishEvent(signedEvent);
-
-      console.log(`Published event: ${result.eventId} to ${result.successCount} relays`);
-      toast.success(`Event published to ${result.successCount} relays!`);
-
-      // Reset form if successful
-      setFormData({});
-
-      // No need to invalidate - subscriptions are reactive and will auto-update!
-    } catch (error) {
-      console.error(`Failed to publish event: ${error}`);
-      toast.error(`Failed to publish: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    executeAction(eventName);
   };
 
   // Handle input changes in forms
@@ -367,7 +242,8 @@ export function RenderHypernoteContent({ content }: { content: Hypernote }) {
     depth: 0,
     loadingQueries,
     onFormSubmit: handleFormSubmit,
-    onInputChange: handleInputChange
+    onInputChange: handleInputChange,
+    usePreResolved
   };
 
   // Show error banner if there was a query error, but still render the page
@@ -512,8 +388,8 @@ function processString(str: string, ctx: RenderContext): string {
   return resolveVariables(str, {
     ...ctx.queryResults,
     ...ctx.extractedVariables,
+    ...ctx.loopVariables, // Spread loop variables directly into context
     form: ctx.formData,
-    loop: ctx.loopVariables,
     user: { pubkey: ctx.userPubkey },
     target: ctx.target
   });
@@ -800,9 +676,15 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
   
   // Resolve the argument to get npub/nevent value
   // Component arguments work like [json $variable] - no braces needed
-  const resolvedArgument = argument.startsWith('{') && argument.endsWith('}') 
-    ? processString(argument, ctx)  // Has braces, use processString
-    : String(resolveExpression(argument, ctx));  // No braces, resolve directly
+  // Use useMemo to ensure it updates when relevant context changes
+  const resolvedArgument = useMemo(() => {
+    const resolved = argument.startsWith('{') && argument.endsWith('}') 
+      ? processString(argument, ctx)  // Has braces, use processString
+      : String(resolveExpression(argument, ctx));  // No braces, resolve directly
+    
+    console.log(`[Component] Resolving argument for ${alias}: "${argument}" -> "${resolved}"`);
+    return resolved;
+  }, [argument, ctx.loopVariables, ctx.queryResults, ctx.extractedVariables, ctx.userPubkey, alias]);
   
   // Parse target context from the argument
   const [targetContext, setTargetContext] = useState<TargetContext | null>(null);
@@ -818,9 +700,19 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
         return;
       }
       
+      // Skip if the resolved argument looks invalid (like "undefined" string or empty)
+      if (resolvedArgument === 'undefined' || resolvedArgument === 'null' || resolvedArgument === '') {
+        console.log(`[Component] Skipping load for ${alias} - invalid argument: "${resolvedArgument}"`);
+        setTargetError('Invalid argument');
+        setTargetLoading(false);
+        return;
+      }
+      
       try {
         setTargetLoading(true);
         setTargetError(null);
+        
+        console.log(`[Component] Loading target for ${alias} with argument: ${resolvedArgument}`);
         
         // Parse the target based on component kind
         const target = await parseTarget(resolvedArgument, componentDef.kind as (0 | 1), componentSnstrClient || undefined);
@@ -865,17 +757,33 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
     );
   }
   
+  // Don't render component until target is ready (prevents bad queries)
+  if (!targetContext) {
+    return (
+      <div style={{ 
+        padding: '0.5rem', 
+        backgroundColor: '#f3f4f6', 
+        borderRadius: '0.25rem',
+        ...element.style 
+      }}>
+        <div style={{ color: '#6b7280', fontSize: '0.875rem' }}>Loading component data...</div>
+      </div>
+    );
+  }
+  
   // Create component context with target
   const componentCtx: RenderContext = {
     ...ctx,
-    target: targetContext || undefined,
+    target: targetContext,
     depth: ctx.depth + 1,
     // Reset loop variables for component scope
     loopVariables: {},
     // Component gets its own query results (queries are scoped)
     queryResults: {},
     extractedVariables: {},
-    loadingQueries: new Set()
+    loadingQueries: new Set(),
+    // Pass down the pre-resolved flag
+    usePreResolved: ctx.usePreResolved
   };
   
   // Recursively render component's elements
@@ -906,9 +814,11 @@ function ComponentRenderer({
   elementStyle?: any;
   elementId?: string;
 }) {
-  // Execute queries for this component with target context
+  // Execute queries - the hook will handle validation of target context
+  // When using pre-resolved, components should have their data passed down
+  // For now, just skip component queries in pre-resolved mode
   const { queryResults, extractedVariables, allLoading } = useQueryExecution(
-    componentDef.queries || {},
+    context.usePreResolved ? {} : componentDef.queries || {},
     {
       target: context.target,
       parentExtracted: context.extractedVariables

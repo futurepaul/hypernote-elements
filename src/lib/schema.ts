@@ -262,46 +262,23 @@ const QuerySchema = z.object({
     PipeSchema, // New format
     z.array(LegacyQueryPipeStepSchema), // Legacy format (temporary)
   ]).optional(),
+  
+  // NEW: Trigger field - action to trigger after query completes
+  triggers: z.string().optional(), // Name of action to trigger (e.g., "@save_count")
 });
 
-// Event template schema - now supports reactive events!
+// Event template schema - simplified!
 const EventTemplateSchema = z.object({
-  // For regular events, kind is required. For reactive events (with match), kind is not needed
-  kind: z.int().nonnegative().optional(),
+  kind: z.int().nonnegative(), // Required for all events
   content: z.string().optional(),
+  json: z.any().optional(), // Structured data that will be stringified as content
   tags: z.array(z.array(z.string())).optional(),
   
   // Regular replaceable event fields
   d: z.string().optional(), // d tag for replaceable events
   
-  // NEW: Reactive event fields
-  // If 'match' is present, this event subscribes to other events
-  match: z.object({
-    kinds: z.array(z.int().nonnegative()).optional(),
-    authors: z.union([z.array(z.string()), z.string()]).optional(),
-    "#e": z.union([z.array(z.string()), z.string()]).optional(),
-    "#p": z.union([z.array(z.string()), z.string()]).optional(),
-    "#d": z.union([z.array(z.string()), z.string()]).optional(),
-    // ... any Nostr filter field
-  }).optional(),
-  
-  // Pipe to transform matched events before creating new event
-  pipe: PipeSchema.optional(),
-  
-  // Event to create when match fires (after pipe transformation)
-  then: z.object({
-    kind: z.int().nonnegative(),
-    content: z.string(),
-    tags: z.array(z.array(z.string())).optional(),
-    d: z.string().optional(),
-  }).optional(),
-  
-  // DEPRECATED: Old tool call fields (to be removed)
-  tool_call: z.boolean().optional(), // DEPRECATED
-  provider: z.string().optional(), // DEPRECATED
-  tool_name: z.string().optional(), // DEPRECATED
-  arguments: z.record(z.string(), z.any()).optional(), // DEPRECATED
-  target: z.string().optional(), // DEPRECATED
+  // NEW: Trigger field - query to refresh after publishing
+  triggers: z.string().optional(), // Name of query to refresh (e.g., "$count")
 });
 
 /**
@@ -353,8 +330,7 @@ export type FormElement = z.infer<typeof FormElementSchema>;
 export type DivElement = z.infer<typeof DivElementSchema>;
 export type ButtonElement = z.infer<typeof ButtonElementSchema>;
 export type SpanElement = z.infer<typeof SpanElementSchema>;
-export type AnyElement = z.infer<typeof AnyElementSchema>;
-export type SupportedElementType = z.infer<typeof SupportedElementType>;
+export type SupportedElementTypeEnum = z.infer<typeof SupportedElementType>;
 
 // Export the supported element type schema for programmatic access
 export { SupportedElementType as supportedElementTypeSchema };

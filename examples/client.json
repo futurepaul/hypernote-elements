@@ -18,8 +18,23 @@
       "limit": 1,
       "pipe": [
         {
-          "operation": "extract",
-          "expression": ".tags[] | select(.[0] == \"p\") | .[1]",
+          "op": "first"
+        },
+        {
+          "op": "get",
+          "field": "tags"
+        },
+        {
+          "op": "whereIndex",
+          "index": 0,
+          "eq": "p"
+        },
+        {
+          "op": "pluckIndex",
+          "index": 1
+        },
+        {
+          "op": "save",
           "as": "followed_pubkeys"
         }
       ]
@@ -30,8 +45,7 @@
       ],
       "authors": "$followed_pubkeys",
       "limit": 20,
-      "since": 0,
-      "live": true
+      "since": 0
     }
   },
   "events": {

@@ -26,7 +26,6 @@ const SimpleOps = z.union([
 const FieldOps = z.union([
   z.object({ op: z.literal("get"), field: z.string() }),
   z.object({ op: z.literal("pluck"), field: z.string() }),
-  z.object({ op: z.literal("save"), as: z.string() }),
 ]);
 
 // Operations with value parameter
@@ -131,63 +130,8 @@ export const PipeOperation = z.union([
   MapOp,
 ]);
 
-// For backward compatibility during migration
-export const LegacyPipeOperation = z.union([
-  z.object({
-    operation: z.literal("extract"),
-    expression: z.string(),
-    as: z.string(),
-  }),
-  z.object({
-    operation: z.literal("reverse"),
-  }),
-  z.object({
-    operation: z.literal("first"),
-  }),
-  z.object({
-    operation: z.literal("field"),
-    name: z.string(),
-  }),
-  z.object({
-    operation: z.literal("default"),
-    value: z.any(),
-  }),
-  z.object({
-    operation: z.literal("json"),
-  }),
-  z.object({
-    operation: z.literal("parse_json"),
-    field: z.string().optional(),
-  }),
-]);
-
 // Pipe array (used in queries and reactive events)
 export const PipeSchema = z.array(PipeOperation);
-
-// Helper to convert legacy operations to new format
-export function convertLegacyPipe(legacy: any[]): any[] {
-  return legacy.map(op => {
-    if (op.operation === "extract") {
-      // Complex extract needs special handling
-      console.warn("Legacy 'extract' operation needs manual conversion:", op);
-      return { op: "get", field: "content" }; // Placeholder
-    }
-    if (op.operation === "field") {
-      return { op: "get", field: op.name };
-    }
-    if (op.operation === "parse_json") {
-      return { op: "json" };
-    }
-    // Simple operations
-    if (["first", "last", "reverse", "json", "unique"].includes(op.operation)) {
-      return { op: op.operation };
-    }
-    if (op.operation === "default") {
-      return { op: "default", value: op.value };
-    }
-    return op;
-  });
-}
 
 export type PipeOperation = z.infer<typeof PipeOperation>;
 export type Pipe = z.infer<typeof PipeSchema>;

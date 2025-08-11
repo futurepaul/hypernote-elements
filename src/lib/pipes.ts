@@ -14,7 +14,6 @@ export function applyPipes(data: any, pipes?: PipeOperation[]): any {
   }
 
   let current = data;
-  const savedValues: Record<string, any> = {};
 
   for (const pipe of pipes) {
     switch (pipe.op) {
@@ -328,25 +327,9 @@ export function applyPipes(data: any, pipes?: PipeOperation[]): any {
         }
         break;
 
-      // Save operation
-      case 'save':
-        savedValues[pipe.as] = current;
-        // Continue with current value
-        break;
-
       default:
         console.warn(`Unknown pipe operation: ${(pipe as any).op}`);
     }
-  }
-
-  // If we have saved values, merge them with the final result
-  if (Object.keys(savedValues).length > 0) {
-    // If current is an object, merge saved values
-    if (typeof current === 'object' && current !== null && !Array.isArray(current)) {
-      return { ...current, ...savedValues };
-    }
-    // Otherwise return object with saved values and _result
-    return { ...savedValues, _result: current };
   }
 
   return current;
@@ -379,7 +362,20 @@ export function resolvePath(context: Record<string, any>, path: string): any {
   
   for (const part of parts) {
     if (current == null) return undefined;
-    current = current[part];
+    
+    // Handle $ prefix for query variables
+    if (part.startsWith('$')) {
+      // Try with $ first (for compatibility)
+      if (part in current) {
+        current = current[part];
+      } else {
+        // Try without $ (queries are stored without prefix)
+        const withoutDollar = part.slice(1);
+        current = current[withoutDollar];
+      }
+    } else {
+      current = current[part];
+    }
   }
   
   return current;
@@ -399,6 +395,11 @@ export function resolveVariables(
   return template.replace(/\{([^}]+)\}/g, (match, varPath) => {
     const trimmed = varPath.trim();
     
+    // Handle special time.now case
+    if (trimmed === 'time.now') {
+      return String(context.time?.now || Date.now());
+    }
+    
     // Handle "or" syntax for fallback values
     if (trimmed.includes(' or ')) {
       const [primary, fallback] = trimmed.split(' or ').map(s => s.trim());
@@ -414,7 +415,14 @@ export function resolveVariables(
     
     // Simple variable resolution
     const value = resolvePath(context, trimmed);
-    return value !== undefined && value !== null ? String(value) : '';
+    if (value !== undefined && value !== null) {
+      // If the value is an object/array, JSON stringify it
+      if (typeof value === 'object') {
+        return JSON.stringify(value);
+      }
+      return String(value);
+    }
+    return '';
   });
 }
 

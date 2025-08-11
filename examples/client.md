@@ -9,15 +9,18 @@ name: "nostr-client"
   authors: [user.pubkey]
   limit: 1
   pipe:
-    - operation: extract
-      expression: '.tags[] | select(.[0] == "p") | .[1]'
-      as: followed_pubkeys
+    - first
+    - get: tags
+    - whereIndex: 
+        index: 0
+        eq: "p"
+    - pluckIndex: 1
+    - save: followed_pubkeys
 
 "$following_feed":
   kinds: [1]
   authors: $followed_pubkeys
-  limit: 20 
-  live: true
+  limit: 20
   since: 0
 
 "@post_note":

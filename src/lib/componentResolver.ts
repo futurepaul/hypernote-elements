@@ -202,8 +202,11 @@ export async function parseTarget(value: string, expectedKind: 0 | 1, client?: S
           limit: 1
         };
         
+        console.log(`[parseTarget] Fetching profile for pubkey: "${pubkey}" (length: ${pubkey.length})`);
+        
         // Use cache for profile fetching
         const events = await queryCache.getOrFetch(filter, async (f) => {
+          console.log(`[parseTarget] Sending filter to relay:`, JSON.stringify(f));
           return await client.fetchEvents([f]);
         });
         if (events.length > 0) {

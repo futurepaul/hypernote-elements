@@ -5,19 +5,19 @@ description: "Browse all your published Hypernotes and Elements"
 name: "hypernotes-browser"
 
 "$my_applications":
-  kinds: [32616]  # All hypernotes use 32616 now
+  kinds: [32616]
   authors: [user.pubkey]
-  "#hypernote-type": ["application"]  # Filter for applications
+  "#t": ["hypernote-application"]
   limit: 10
 
 "$my_elements":
-  kinds: [32616]  # All hypernotes use 32616 now
+  kinds: [32616]
   authors: [user.pubkey]
-  "#hypernote-type": ["element"]  # Filter for elements/components
+  "#t": ["hypernote-element"]
   limit: 10
 
 "$my_state":
-  kinds: [30078]  # Application state (for reference)
+  kinds: [30078]
   authors: [user.pubkey]
   limit: 10
 ---

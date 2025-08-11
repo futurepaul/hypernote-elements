@@ -2,7 +2,7 @@
   "version": "1.1.0",
   "type": "hypernote",
   "title": "ContextVM Counter",
-  "description": "Interactive counter demonstrating reactive events and state management",
+  "description": "Interactive counter demonstrating triggers and state management",
   "name": "contextvm-counter",
   "queries": {
     "$count": {
@@ -29,102 +29,146 @@
           "value": "0"
         }
       ]
+    },
+    "$update_increment": {
+      "kinds": [
+        25910
+      ],
+      "authors": [
+        "19f5b5cd2fce663a3b4916b42c378c0280cce2bffd0af384380e91356fcff1d6"
+      ],
+      "#e": [
+        "@increment"
+      ],
+      "pipe": [
+        {
+          "op": "first"
+        },
+        {
+          "op": "get",
+          "field": "content"
+        },
+        {
+          "op": "json"
+        },
+        {
+          "op": "get",
+          "field": "result"
+        },
+        {
+          "op": "get",
+          "field": "content"
+        },
+        {
+          "op": "first"
+        },
+        {
+          "op": "get",
+          "field": "text"
+        }
+      ],
+      "triggers": "@save_increment"
+    },
+    "$update_decrement": {
+      "kinds": [
+        25910
+      ],
+      "authors": [
+        "19f5b5cd2fce663a3b4916b42c378c0280cce2bffd0af384380e91356fcff1d6"
+      ],
+      "#e": [
+        "@decrement"
+      ],
+      "pipe": [
+        {
+          "op": "first"
+        },
+        {
+          "op": "get",
+          "field": "content"
+        },
+        {
+          "op": "json"
+        },
+        {
+          "op": "get",
+          "field": "result"
+        },
+        {
+          "op": "get",
+          "field": "content"
+        },
+        {
+          "op": "first"
+        },
+        {
+          "op": "get",
+          "field": "text"
+        }
+      ],
+      "triggers": "@save_decrement"
     }
   },
   "events": {
     "@increment": {
       "kind": 25910,
-      "content": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"{time.now}\",\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"addone\",\n    \"arguments\": {\n      \"a\": \"{$count}\"\n    }\n  }\n}\n",
+      "json": {
+        "jsonrpc": "2.0",
+        "id": "{time.now}",
+        "method": "tools/call",
+        "params": {
+          "name": "addone",
+          "arguments": {
+            "a": "{$count or 0}"
+          }
+        }
+      },
       "tags": [
         [
           "p",
-          "1cf0bdaf1a7a719be79fb16e32eea0fccd029e3b49f02e960e61f4e079ab96dd"
+          "19f5b5cd2fce663a3b4916b42c378c0280cce2bffd0af384380e91356fcff1d6"
         ]
       ]
     },
     "@decrement": {
       "kind": 25910,
-      "content": "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": \"{time.now}\",\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"minusone\",\n    \"arguments\": {\n      \"a\": \"{$count}\"\n    }\n  }\n}\n",
+      "json": {
+        "jsonrpc": "2.0",
+        "id": "{time.now}",
+        "method": "tools/call",
+        "params": {
+          "name": "minusone",
+          "arguments": {
+            "a": "{$count or 0}"
+          }
+        }
+      },
       "tags": [
         [
           "p",
-          "1cf0bdaf1a7a719be79fb16e32eea0fccd029e3b49f02e960e61f4e079ab96dd"
+          "19f5b5cd2fce663a3b4916b42c378c0280cce2bffd0af384380e91356fcff1d6"
         ]
       ]
     },
-    "@on_increment": {
-      "match": {
-        "kinds": [
-          25910
-        ],
-        "authors": [
-          "1cf0bdaf1a7a719be79fb16e32eea0fccd029e3b49f02e960e61f4e079ab96dd"
-        ],
-        "#e": "{@increment.id}"
-      },
-      "pipe": [
-        {
-          "op": "first"
-        },
-        {
-          "op": "get",
-          "field": "content"
-        },
-        {
-          "op": "json"
-        },
-        {
-          "op": "get",
-          "field": "result"
-        }
-      ],
-      "then": {
-        "kind": 30078,
-        "content": "{result}",
-        "tags": [
-          [
-            "d",
-            "counter"
-          ]
+    "@save_increment": {
+      "kind": 30078,
+      "content": "{$update_increment}",
+      "tags": [
+        [
+          "d",
+          "counter"
         ]
-      }
+      ]
     },
-    "@on_decrement": {
-      "match": {
-        "kinds": [
-          25910
-        ],
-        "authors": [
-          "1cf0bdaf1a7a719be79fb16e32eea0fccd029e3b49f02e960e61f4e079ab96dd"
-        ],
-        "#e": "{@decrement.id}"
-      },
-      "pipe": [
-        {
-          "op": "first"
-        },
-        {
-          "op": "get",
-          "field": "content"
-        },
-        {
-          "op": "json"
-        },
-        {
-          "op": "get",
-          "field": "result"
-        }
-      ],
-      "then": {
-        "kind": 30078,
-        "content": "{result}",
-        "tags": [
-          [
-            "d",
-            "counter"
-          ]
+    "@save_decrement": {
+      "kind": 30078,
+      "content": "{$update_decrement}",
+      "tags": [
+        [
+          "d",
+          "counter"
         ]
-      }
+      ]
     },
     "@initialize": {
       "kind": 30078,
@@ -153,7 +197,7 @@
         {
           "type": "h2",
           "content": [
-            "{$count or 0}"
+            "Current count: {$count or 0}"
           ]
         }
       ]

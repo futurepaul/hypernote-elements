@@ -130,85 +130,10 @@ export function compileCompactPipe(yamlPipe: any): any[] {
   });
 }
 
-/**
- * Converts legacy pipe operations to new format
- */
-export function convertLegacyPipe(legacyPipe: any[]): any[] {
-  if (!Array.isArray(legacyPipe)) {
-    return legacyPipe;
-  }
-
-  return legacyPipe.map(op => {
-    // Handle legacy 'operation' field
-    if (op.operation) {
-      switch (op.operation) {
-        case 'extract':
-          // Complex extract needs special handling
-          // For now, convert to a series of operations
-          console.warn('Legacy "extract" operation needs manual conversion:', op);
-          // Try to parse simple cases
-          if (op.expression && op.as) {
-            // Simple field extraction
-            if (op.expression.startsWith('.')) {
-              return { op: 'get', field: op.expression.slice(1) };
-            }
-            // Tag filtering - common pattern
-            if (op.expression.includes('tags') && op.expression.includes('select')) {
-              return { op: 'filterTag', tag: 'p', value: '*' };
-            }
-          }
-          return { op: 'get', field: 'content' }; // Fallback
-        
-        case 'field':
-          return { op: 'get', field: op.name };
-        
-        case 'parse_json':
-          return { op: 'json' };
-        
-        case 'first':
-        case 'last':
-        case 'reverse':
-        case 'json':
-        case 'unique':
-        case 'flatten':
-          return { op: op.operation };
-        
-        case 'default':
-          return { op: 'default', value: op.value };
-        
-        case 'sort':
-          return { 
-            op: 'sort', 
-            by: op.by,
-            order: op.order || 'asc'
-          };
-        
-        case 'filter':
-          if (op.expression) {
-            return { op: 'where', expression: op.expression };
-          }
-          return op;
-        
-        case 'map':
-          if (op.expression) {
-            return { op: 'map', pipe: [{ op: 'where', expression: op.expression }] };
-          }
-          return op;
-        
-        default:
-          console.warn('Unknown legacy operation:', op.operation);
-          return op;
-      }
-    }
-
-    // Not a legacy operation
-    return op;
-  });
-}
 
 /**
  * Processes pipes in queries and events
- * Handles both compact YAML syntax and legacy format
+ * Compiles compact YAML syntax into explicit pipe operations
  */
 export function processPipes(data: any): any {
   // Process queries
@@ -216,12 +141,7 @@ export function processPipes(data: any): any {
     for (const queryName in data.queries) {
       const query = data.queries[queryName];
       if (query.pipe) {
-        // Check if it's legacy format (has 'operation' field)
-        if (Array.isArray(query.pipe) && query.pipe[0]?.operation) {
-          query.pipe = convertLegacyPipe(query.pipe);
-        } else {
-          query.pipe = compileCompactPipe(query.pipe);
-        }
+        query.pipe = compileCompactPipe(query.pipe);
       }
     }
   }
@@ -233,18 +153,9 @@ export function processPipes(data: any): any {
       
       // Process reactive event pipes
       if (event.pipe) {
-        if (Array.isArray(event.pipe) && event.pipe[0]?.operation) {
-          event.pipe = convertLegacyPipe(event.pipe);
-        } else {
-          event.pipe = compileCompactPipe(event.pipe);
-        }
+        event.pipe = compileCompactPipe(event.pipe);
       }
       
-      // Convert legacy tool_call to new format
-      if (event.tool_call) {
-        console.warn(`Converting legacy tool_call event: ${eventName}`);
-        // This will be handled in the next phase
-      }
     }
   }
 
