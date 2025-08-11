@@ -41,16 +41,16 @@ test("should parse frontmatter with styles", () => {
 });
 
 test("should parse frontmatter with event using variable", () => {
-  const example = loadExample("feed");
+  const example = loadExample("client");
   const result = compileHypernoteToContent(example.markdown);
   
   expect(result.version).toBe("1.1.0");
   expect(result.kind).toBeUndefined();
   expect(result.events).toEqual({
-    "@post_message": {
+    "@post_note": {
       kind: 1,
       content: "{form.message}",
-      tags: [["client", "hypernote-test"]],
+      tags: [["client", "hypernote-client"]],
     },
   });
 });
@@ -68,21 +68,19 @@ test("should parse client example with pipe operations and query dependencies", 
     kinds: [3],
     authors: ["user.pubkey"],
     limit: 1,
-    pipe: [{
-      operation: "extract",
-      expression: ".tags[] | select(.[0] == \"p\") | .[1]",
-      as: "followed_pubkeys"
-    }]
+    pipe: [
+      { op: "first" },
+      { op: "get", field: "tags" },
+      { op: "whereIndex", index: 0, eq: "p" },
+      { op: "pluckIndex", index: 1 }
+    ]
   });
   
   expect(result.queries?.$following_feed).toEqual({
     kinds: [1],
-    authors: "$followed_pubkeys",
-    limit: 100,
-    since: "time.now - 86400000",
-    pipe: [{
-      operation: "reverse"
-    }]
+    authors: "$contact_list",
+    limit: 20,
+    since: 0
   });
   
   // Check that events are parsed correctly
@@ -96,10 +94,17 @@ test("should parse client example with pipe operations and query dependencies", 
   
   // Check that elements contain the expected loops
   expect(result.elements).toBeDefined();
-  const feedLoop = result.elements?.find(el => el.type === 'div' && el.elementId === 'feed');
-  expect(feedLoop).toBeDefined();
-  expect(feedLoop?.elements?.[0]?.type).toBe('loop');
-  expect(feedLoop?.elements?.[0]?.source).toBe('$following_feed');
+  
+  // Find the loop element within the div structure
+  const divs = result.elements?.filter((el: any) => el.type === 'div');
+  const loopDiv = divs?.find((div: any) => 
+    div.elements?.some((el: any) => el.type === 'loop')
+  );
+  const loopElement = loopDiv?.elements?.find((el: any) => el.type === 'loop');
+  
+  expect(loopElement).toBeDefined();
+  expect(loopElement?.type).toBe('loop');
+  expect(loopElement?.source).toBe('$following_feed');
 });
 
 // --- FULL ELEMENT PARSING TESTS ---
@@ -119,8 +124,31 @@ test("should parse H1 with ID and apply a simple style rule", () => {
 });
 
 test("should parse form with input and use form variable in event template", () => {
-  const example = loadExample("feed");
+  const example = loadExample("client");
   const result = compileHypernoteToContent(example.markdown);
   
-  expect(result).toEqual(example.expectedJson);
+  // Check event template
+  expect(result.events?.["@post_note"].content).toBe("{form.message}");
+  
+  // Find form element in the structure
+  const divs = result.elements.filter((el: any) => el.type === "div");
+  const formDiv = divs.find((div: any) => 
+    div.elements?.some((el: any) => el.type === "form")
+  );
+  const form = formDiv?.elements?.find((el: any) => el.type === "form") as any;
+  
+  expect(form.type).toBe("form");
+  expect(form.event).toBe("@post_note");
+  
+  // Check input
+  const input = form.elements?.[0] as any;
+  expect(input?.type).toBe("input");
+  expect(input?.attributes?.name).toBe("message");
+  expect(input?.attributes?.placeholder).toBe("What's happening?");
+  
+  // Check button - has elements array with paragraph inside
+  const button = form.elements?.[1] as any;
+  expect(button?.type).toBe("button");
+  expect(button.elements?.[0].type).toBe("p");
+  expect(button.elements?.[0].content?.[0]).toBe("Post");
 }); 

@@ -152,28 +152,39 @@ HQL defines Nostr queries and minimal data transformations using YAML syntax in 
 
   # Optional pipeline for data transformations
   pipe:
-    # Supported operations:
-    # - extract: ".jq.path.expression" as $variable_name (for data extraction)
-    # - operation: "reverse" (for reversing result order)
-    # Limited jq syntax: .prop, .[index], .[], | (pipe), select()
-    - extract: ".tags[] | select(.[0] == \"p\") | .[1]" as $followed_pubkeys
+    - first              # Get first event
+    - get: field         # Extract field value
+    - pluckIndex: 1      # Get nth element from arrays
+    - whereIndex:        # Filter by index condition
+        index: 0
+        eq: "p"
+    - reverse            # Reverse order
+    - default: value     # Provide fallback
+    - json              # Parse JSON content
 ---
 ```
 
 ### Key Features:
 
 * **Nostr Filters:** Directly uses standard Nostr filter syntax.
-* **Explicit Inputs:** Queries must explicitly define their parameters (like `authors`, `ids`, `limit`). There are no implicit global variables like `$last_day`. The rendering client *may* provide context (e.g., the viewing user's pubkey) that can be referenced if explicitly designed into the query structure, but this is implementation-dependent.
+* **Explicit Inputs:** Queries must explicitly define their parameters (like `authors`, `ids`, `limit`).
+* **Live by Default:** All queries are live and automatically update when new events are published.
 * **Pipeline (`pipe`):** Allows chaining data transformations. The output of one step becomes the input for the next transformation.
-* **Minimal Extraction (`extract`)**: Uses a *very limited subset* of `jq` syntax for pulling specific data points out of fetched events.
-    * **Supported jq:**
-        * Property access: `.property`
-        * Array index: `.[index]`
-        * Array iteration: `.[]`
-        * Pipe: `|`
-        * Filter: `select(condition)` (conditions should be simple comparisons like `.[0] == "p"`)
-    * **Variable Assignment:** Use `as $name` to store extracted data for use in later pipeline stages or the HNMD body.
-* **Templating Access:** Query results (or extracted variables) are available in the HNMD body using `{$query_name}` or `{$variable_name}`.
+
+#### Pipe Operations
+
+| Operation | Output Type | Description | Example |
+|-----------|-------------|-------------|---------|  
+| (no pipe) | Event[] | Raw events array | - |
+| `first` | Event | First event from array | `- first` |
+| `get: field` | any | Extract field value | `- get: content` |
+| `pluckIndex: n` | any[] | Array of nth elements | `- pluckIndex: 1` |
+| `whereIndex` | any[] | Filter by index condition | `- whereIndex: { index: 0, eq: "p" }` |
+| `default: value` | any | Provide fallback value | `- default: "No content"` |
+| `json` | object | Parse JSON content | `- json` |
+| `reverse` | Event[] | Reverse array order | `- reverse` |
+
+* **Templating Access:** Query results are available in the HNMD body using `{$query_name}`.
 
 ### Context Variable (`user`)
 
@@ -194,23 +205,40 @@ $my_feed:
 
 ```md
 ---
-# Simple query with reverse transformation
-"$my_feed":
-  authors: [user.pubkey] # Current user's pubkey
-  kinds: [1]
-  limit: 20
-  since: time.now - 86400000 # 24 hours ago (in milliseconds)
+# Fetch contact list to get followed pubkeys
+"$contact_list":
+  kinds: [3]
+  authors: [user.pubkey]
+  limit: 1
   pipe:
-    - operation: reverse # Reverse chronological order (newest first becomes oldest first)
+    - first
+    - get: tags
+    - whereIndex: 
+        index: 0
+        eq: "p"
+    - pluckIndex: 1
+
+# Fetch posts from people you follow
+"$following_feed":
+  kinds: [1]
+  authors: $contact_list  # Direct reference to query output
+  limit: 20
+  since: time.now - 86400000 # 24 hours ago
+  pipe:
+    - reverse  # Oldest first
 ---
 
-# My Feed (Oldest First)
+# Following Feed
 
-[each $my_feed as $note]
+[each $following_feed as $note]
   ## {$note.pubkey}
   {$note.content}
   Posted at {$note.created_at}
 ```
+
+### Implicit Dependencies
+
+Queries automatically wait for their dependencies. In the example above, `$following_feed` waits for `$contact_list` to complete before executing, since it references `$contact_list` in its `authors` field.
 
 ## Hypernote Markdown (HNMD)
 
@@ -277,8 +305,27 @@ Define templates in the frontmatter to publish Nostr events triggered by user in
     - ["e", "{target.id}"] # Use component's input event data
     - ["p", "{target.pubkey}"]
     # ... other tags
+  triggers: $refresh_comments  # Optional: trigger query after publishing
 ---
 ```
+
+### Triggers
+
+Events and queries can trigger other actions:
+
+```yaml
+"@increment":
+  kind: 25910
+  content: "{form.value}"
+  triggers: $update_count  # Trigger query after publishing
+
+"$update_count":
+  kinds: [25910]
+  "#e": ["@increment"]  # Reference action's event ID  
+  triggers: @save_count  # Trigger action when query updates
+```
+
+When an event with a trigger is published, the specified query is automatically invalidated and refreshed. Similarly, when a query with a trigger completes, the specified action can be executed.
 
 ### Forms and User Interaction
 
@@ -547,35 +594,29 @@ Hypernote implementations should prioritize clear and precise error reporting. W
 
 This approach aids developers in debugging Hypernotes effectively.
 
-## ContextVM Tool Calls
+## Event Publishing with JSON
 
-Hypernote supports integration with ContextVM for executing tool calls and updating state based on responses. This enables interactive applications with server-side logic while maintaining the declarative nature of Hypernote.
-
-### Tool Call Syntax
-
-Define tool calls in the frontmatter using the `tool_call` flag:
+Events can specify content as JSON for structured data:
 
 ```yaml
 "@increment":
-  kind: 25910              # ContextVM event kind
-  tool_call: true          # Signals special handling
-  provider: "npub1..."     # ContextVM provider pubkey
-  tool_name: "addone"      # Tool to execute
-  arguments:               # Tool-specific arguments
-    current: "{$state.content}"
-  target: "$state"         # Query to update with response
+  kind: 25910
+  json:
+    jsonrpc: "2.0"
+    id: "{time.now}"
+    method: "tools/call"
+    params:
+      name: "addone"
+      arguments:
+        a: "{$count or 0}"
+  tags:
+    - ["p", "provider_pubkey"]
+  triggers: $count  # Refresh count query after publishing
 ```
-
-### How It Works
-
-1. **Tool Call Request**: When a form with a tool call event is submitted, Hypernote creates a JSON-RPC request wrapped in a kind 25910 event
-2. **Provider Processing**: The ContextVM provider executes the tool and returns a response
-3. **State Update**: The response is used to create/update a replaceable event (typically kind 30078)
-4. **UI Refresh**: The targeted query is invalidated, causing the UI to reflect the new state
 
 ### Example: Counter Application
 
-See [`examples/counter.md`](examples/counter.md) for a complete implementation of a counter using ContextVM tool calls:
+See [`examples/counter.md`](examples/counter.md) for a complete implementation using triggers:
 
 ```markdown
 ---
@@ -587,22 +628,17 @@ See [`examples/counter.md`](examples/counter.md) for a complete implementation o
 
 "@increment":
   kind: 25910
-  tool_call: true
-  provider: "npub1..."
-  tool_name: "addone"
-  arguments:
-    a: "{$count.content || '0'}"
-  target: "$count"
+  json:
+    value: "{($count.content or 0) + 1}"
+  triggers: $count
 ---
 
-## Current Count: {$count.content || 0}
+## Current Count: {$count.content or 0}
 
 [form @increment]
   [button]+1[/button]
 [/form]
 ```
-
-This creates a stateful counter where clicking +1 triggers a tool call that updates the count stored in a replaceable Nostr event.
 
 ## Upcoming Features
 

@@ -82,10 +82,10 @@ The `content` field contains a JSON string which, when parsed, results in the fo
       
       // Optional pipe array for data transformations (applied after Nostr query)
       "pipe": [
-        {
-          "operation": "reverse" // Reverse the chronological order
-        }
-      ]
+        { "op": "reverse" }  // Reverse the chronological order
+      ],
+      // Optional trigger to execute after query completes
+      "triggers": "@auto_save"
     },
     "$user_profile": {
         "kinds": [0],
@@ -107,19 +107,29 @@ The `content` field contains a JSON string which, when parsed, results in the fo
         ["e", "{target.id}"],     // Client substitutes target component's event ID
         ["p", "{target.pubkey}"]  // Client substitutes target component's pubkey
         // ... other tags
-      ]
+      ],
+      // Optional trigger to execute after event publishes
+      "triggers": "$refresh_comments"
     },
     
-    // ContextVM Tool Call Event Template
+    // Event with JSON content and triggers
     "@increment": {
-      "kind": 25910,           // ContextVM event kind
-      "tool_call": true,       // Flag indicating this is a tool call (requires special handling)
-      "provider": "npub1...",  // ContextVM provider pubkey
-      "tool_name": "addone",   // Name of the tool to execute
-      "arguments": {           // Tool-specific arguments
-        "a": "{$count.content || '0'}"
+      "kind": 25910,           // Example event kind
+      "json": {                // JSON content instead of plain text
+        "jsonrpc": "2.0",
+        "id": "{time.now}",
+        "method": "tools/call",
+        "params": {
+          "name": "addone",
+          "arguments": {
+            "a": "{$count or 0}"
+          }
+        }
       },
-      "target": "$count"       // Query to update with tool response (creates replaceable event)
+      "tags": [
+        ["p", "provider_pubkey"]
+      ],
+      "triggers": "$count"     // Query to invalidate after publishing
     }
     // ... other named event templates
   },
@@ -373,18 +383,18 @@ The styling system supports a validated subset of CSS-in-JS properties designed 
     * `form.*`: Data submitted from the current form scope.
     * Loop variables (e.g., `note.*` in the example above).
 * **Variable Substitution:** The `{variable.path}` syntax requires the client to look up the variable in the current context and substitute its value. Accessing nested properties (e.g., `note.content`, `target.tags`) should be supported. Variables are used in conditions, content strings, attributes, query parameters, and event templates.
-* **Query Execution:** Clients need to parse the query definitions, substitute context variables, execute the Nostr query (potentially involving multiple steps for `pipe`), and make the results available for loops or variable access. Pipe steps can include standard Nostr filters or operations like `extract` which pull data from previous results.
+* **Implicit Dependencies:** When a query references another query directly (e.g., `authors: $contact_list`), the client must ensure the referenced query completes before executing the dependent query. This creates an implicit dependency graph that must be resolved in topological order.
+* **Query Execution:** Clients need to parse the query definitions, substitute context variables, execute the Nostr query (potentially involving multiple steps for `pipe`), and make the results available for loops or variable access. Pipe operations transform the data sequentially, with each operation receiving the output of the previous one.
 * **Event Publishing:** When a form referencing an event template is submitted, the client must:
     1.  Collect form data into the `form.*` context.
     2.  Substitute variables (`form.*`, `target.*`, `user.*`, etc.) into the referenced event template from the `events` map.
     3.  Construct the final Nostr event.
     4.  **Crucially:** Prompt the user to review, sign, and publish the generated event.
-* **ContextVM Tool Calls:** When an event template includes `tool_call: true`, the client must:
-    1.  Construct a JSON-RPC request with the specified `tool_name` and `arguments`.
-    2.  Wrap the request in a kind 25910 event with a `p` tag for the provider.
-    3.  Subscribe to responses from the provider (kind 25910 with `e` tag matching request).
-    4.  Extract the response content and use it to create/update a replaceable event.
-    5.  If a `target` query is specified, invalidate that query to trigger UI updates.
+    5.  If a `triggers` field is specified, invalidate the referenced query or execute the referenced action.
+* **Trigger Execution:** When an event or query includes a `triggers` field:
+    1.  For events triggering queries: After successful event publication, invalidate the specified query to force a refresh.
+    2.  For queries triggering events: After query completion, optionally execute the specified event template.
+    3.  Action event IDs: When an event is published, store its ID so it can be referenced by queries using `"#e": ["@action_name"]`.
 * **Styling:** Clients need to parse the `style` object and apply the specified styles to elements based on their type, ID, or class. The styling system uses a minimal subset of CSS designed for cross-platform compatibility. See the "Cross-Platform Styling System" section above for detailed property mappings and platform-specific implementation guidance.
 * **Component Loading:** When encountering a `component` element, the client needs to:
     1.  Resolve the `alias` using the `imports` map to get the Nostr identifier (`reference`).
@@ -415,7 +425,14 @@ A new `json` element type will enable syntax-highlighted rendering of JSON data,
 Future versions will include enhanced metadata for Nostr event publishing and standardized component resolution mechanisms via Nostr identifiers.
 
 ### Query Pipeline Extensions  
-The `queries` structure will expand to support multi-stage transformation pipelines with `extract`, `sort`, `filter`, and other jq-like operations.
+The `queries` structure supports transformation pipelines with operations like:
+- `first`: Get first event from array
+- `get: field`: Extract field value
+- `pluckIndex: n`: Get nth element from arrays
+- `whereIndex`: Filter by index condition
+- `default: value`: Provide fallback value
+- `json`: Parse JSON content
+- `reverse`: Reverse array order
 
 ### Lightning Payment Integration
 New element types for Lightning Network payments ("zaps") will enable direct monetization within Hypernote interfaces.

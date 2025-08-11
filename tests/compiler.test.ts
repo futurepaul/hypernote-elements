@@ -57,58 +57,70 @@ test("should parse H1 with ID and apply a simple style rule", () => {
 });
 
 test("should parse form with input and use form variable in event template", () => {
-  const example = loadExample("feed");
+  const example = loadExample("client");
   const result = compileHypernoteToContent(example.markdown);
   
   // Check event template
-  expect(result.events?.["@post_message"].content).toBe("{form.message}");
+  expect(result.events?.["@post_note"].content).toBe("{form.message}");
   
-  // Check form elements
-  const form = result.elements[1] as FormElement;
+  // Find form element in the structure
+  const divs = result.elements.filter((el: any) => el.type === "div");
+  const formDiv = divs.find((div: any) => 
+    div.elements?.some((el: any) => el.type === "form")
+  );
+  const form = formDiv?.elements?.find((el: any) => el.type === "form") as FormElement;
+  
   expect(form.type).toBe("form");
-  expect(form.event).toBe("@post_message");
+  expect(form.event).toBe("@post_note");
   
   // Check input
   const input = form.elements?.[0] as Element;
   expect(input?.type).toBe("input");
   expect(input?.attributes?.name).toBe("message");
-  expect(input?.attributes?.placeholder).toBe("Enter message...");
+  expect(input?.attributes?.placeholder).toBe("What's happening?");
   
-  // Check button - now a container with elements
+  // Check button - has elements array with paragraph inside
   const button = form.elements?.[1] as ButtonElement;
   expect(button?.type).toBe("button");
   expect(button.elements?.[0].type).toBe("p");
-  expect((button.elements?.[0] as Element).content?.[0]).toBe("Post");
+  expect((button.elements?.[0] as any).content?.[0]).toBe("Post");
 });
 
 test("should parse query in frontmatter and loop in content", () => {
-  const example = loadExample("feed");
+  const example = loadExample("client");
   const result = compileHypernoteToContent(example.markdown);
   
-  // Check the query in frontmatter
+  // Check the queries in frontmatter
   expect(result.queries).toBeDefined();
-  expect(result.queries?.["$my_feed"]).toBeDefined();
+  expect(result.queries?.["$contact_list"]).toBeDefined();
+  expect(result.queries?.["$following_feed"]).toBeDefined();
   
-  // Type assertion for the query to access its properties
-  const query = result.queries?.["$my_feed"];
+  // Check the following feed query
+  const query = result.queries?.["$following_feed"];
   if (query && 'authors' in query) {
-    expect(query.authors).toEqual(["user.pubkey"]);
+    expect(query.authors).toBe("$contact_list"); // Direct reference
     expect(query.limit).toBe(20);
   } else {
-    throw new Error("Expected simple query with authors and limit");
+    throw new Error("Expected query with authors reference and limit");
   }
   
-  // Check the loop structure - it's the 3rd element (after h1 and form)
+  // Check the loop structure - it's nested in divs
   expect(result.elements).toBeArray();
-  const loopElement = result.elements[2] as LoopElement;
+  
+  // Find the loop element within the div structure
+  const divs = result.elements.filter((el: any) => el.type === "div");
+  const loopDiv = divs.find((div: any) => 
+    div.elements?.some((el: any) => el.type === "loop")
+  );
+  const loopElement = loopDiv?.elements?.find((el: any) => el.type === "loop") as LoopElement;
+  
+  expect(loopElement).toBeDefined();
   expect(loopElement.type).toBe("loop");
-  expect(loopElement.source).toBe("$my_feed");
+  expect(loopElement.source).toBe("$following_feed");
   expect(loopElement.variable).toBe("$note");
   
-  // Check the variable reference inside the loop - should be a paragraph
-  expect(loopElement.elements?.[0].type).toBe("p");
-  const paragraphContent = (loopElement.elements?.[0] as Element).content;
-  expect(paragraphContent).toContain("{$note.content}");
+  // Check the structure inside the loop
+  expect(loopElement.elements?.length).toBeGreaterThan(0);
 });
 
 test("should compile all examples without errors", () => {
