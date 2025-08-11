@@ -164,7 +164,6 @@ export function App() {
                             <HypernoteRenderer 
                               markdown={markdownStates[template]} 
                               relayHandler={relayHandler}
-                              usePreResolved={true}
                             />
                           )}
                         </div>

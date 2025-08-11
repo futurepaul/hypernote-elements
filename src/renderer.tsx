@@ -144,7 +144,7 @@ export function RenderHypernoteContent({ content }: { content: Hypernote }) {
   }, [queriesHash]);
 
   // Use a ref to hold the action executor so queries can trigger it
-  const executeActionRef = useRef<(actionName: string) => Promise<void> | void>();
+  const executeActionRef = useRef<(actionName: string) => Promise<void> | void>(() => {});
 
   // Execute all queries with dependency resolution
   const { queryResults, extractedVariables, loading: queriesLoading, error: queryError } = useQueryExecution(memoizedQueries, {
