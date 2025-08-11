@@ -32,10 +32,6 @@
         {
           "op": "pluckIndex",
           "index": 1
-        },
-        {
-          "op": "save",
-          "as": "followed_pubkeys"
         }
       ]
     },
@@ -43,7 +39,7 @@
       "kinds": [
         1
       ],
-      "authors": "$followed_pubkeys",
+      "authors": "$contact_list",
       "limit": 20,
       "since": 0
     }

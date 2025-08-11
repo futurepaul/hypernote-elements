@@ -40,8 +40,6 @@ interface RenderContext {
   onFormSubmit: (eventName: string) => void;
   onInputChange: (name: string, value: string) => void;
   
-  // Whether to use pre-resolved queries
-  usePreResolved?: boolean;
 }
 
 // Define the structure of elements based on compiler output
@@ -61,7 +59,7 @@ interface HypernoteElement {
 // (Old RendererProps interface removed - using RenderContext instead)
 
 // (Old ElementRenderer removed - using pure render functions below)
-export function HypernoteRenderer({ markdown, relayHandler, usePreResolved = false }: { markdown: string, relayHandler: RelayHandler, usePreResolved?: boolean }) {
+export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string, relayHandler: RelayHandler }) {
   // Debounce the markdown input to prevent re-rendering on every keystroke
   const [debouncedMarkdown] = useDebounce(markdown || '', 300);
 
@@ -71,11 +69,11 @@ export function HypernoteRenderer({ markdown, relayHandler, usePreResolved = fal
     [debouncedMarkdown]
   );
 
-  return <RenderHypernoteContent content={content} usePreResolved={usePreResolved} />;
+  return <RenderHypernoteContent content={content} />;
 }
 
 // New: Render from compiled Hypernote JSON directly
-export function RenderHypernoteContent({ content, usePreResolved = false }: { content: Hypernote, usePreResolved?: boolean }) {
+export function RenderHypernoteContent({ content }: { content: Hypernote }) {
   // Get SNSTR client from store
   const { snstrClient } = useNostrStore();
 
@@ -242,8 +240,7 @@ export function RenderHypernoteContent({ content, usePreResolved = false }: { co
     depth: 0,
     loadingQueries,
     onFormSubmit: handleFormSubmit,
-    onInputChange: handleInputChange,
-    usePreResolved
+    onInputChange: handleInputChange
   };
 
   // Show error banner if there was a query error, but still render the page
@@ -683,8 +680,9 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
       : String(resolveExpression(argument, ctx));  // No braces, resolve directly
     
     console.log(`[Component] Resolving argument for ${alias}: "${argument}" -> "${resolved}"`);
+    console.log(`[Component] Component def kind: ${componentDef.kind}`);
     return resolved;
-  }, [argument, ctx.loopVariables, ctx.queryResults, ctx.extractedVariables, ctx.userPubkey, alias]);
+  }, [argument, ctx.loopVariables, ctx.queryResults, ctx.extractedVariables, ctx.userPubkey, alias, componentDef.kind]);
   
   // Parse target context from the argument
   const [targetContext, setTargetContext] = useState<TargetContext | null>(null);
@@ -716,6 +714,7 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
         
         // Parse the target based on component kind
         const target = await parseTarget(resolvedArgument, componentDef.kind as (0 | 1), componentSnstrClient || undefined);
+        console.log(`[Component] Parsed target for ${alias}:`, target);
         setTargetContext(target);
       } catch (error) {
         console.error(`Failed to parse target for component ${alias}:`, error);
@@ -781,9 +780,7 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
     // Component gets its own query results (queries are scoped)
     queryResults: {},
     extractedVariables: {},
-    loadingQueries: new Set(),
-    // Pass down the pre-resolved flag
-    usePreResolved: ctx.usePreResolved
+    loadingQueries: new Set()
   };
   
   // Recursively render component's elements
@@ -815,15 +812,17 @@ function ComponentRenderer({
   elementId?: string;
 }) {
   // Execute queries - the hook will handle validation of target context
-  // When using pre-resolved, components should have their data passed down
-  // For now, just skip component queries in pre-resolved mode
   const { queryResults, extractedVariables, allLoading } = useQueryExecution(
-    context.usePreResolved ? {} : componentDef.queries || {},
+    componentDef.queries || {},
     {
       target: context.target,
       parentExtracted: context.extractedVariables
     }
   );
+  
+  // Debug log query results
+  console.log(`[ComponentRenderer] Query results for component:`, queryResults);
+  console.log(`[ComponentRenderer] Loading state:`, allLoading);
   
   // Merge the query results into context
   const componentCtx: RenderContext = {

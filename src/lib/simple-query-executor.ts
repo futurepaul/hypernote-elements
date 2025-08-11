@@ -66,15 +66,20 @@ export class SimpleQueryExecutor {
     const hasUnresolvedRefs = this.hasUnresolvedReferences(resolvedFilter);
     if (hasUnresolvedRefs) {
       console.log(`[SimpleQueryExecutor] Skipping query ${queryName} - has unresolved references:`, resolvedFilter);
+      console.log(`[SimpleQueryExecutor] Target context:`, this.context.target);
       return [];
     }
     
     // Fetch events
+    console.log(`[SimpleQueryExecutor] Fetching events for ${queryName} with filter:`, resolvedFilter);
     const events = await this.fetchEvents(resolvedFilter);
+    console.log(`[SimpleQueryExecutor] Got ${events.length} events for ${queryName}`);
     
     // Apply pipes if any
     if (pipe && pipe.length > 0) {
-      return applyPipes(events, pipe);
+      const result = applyPipes(events, pipe);
+      console.log(`[SimpleQueryExecutor] After pipes for ${queryName}:`, result);
+      return result;
     }
     
     return events;
@@ -160,9 +165,17 @@ export class SimpleQueryExecutor {
   }
   
   private hasUnresolvedReferences(obj: any): boolean {
-    // Check if any value in the object starts with @ or $ or is user.pubkey (unresolved reference)
+    // Check if any value in the object starts with @ or $ or is an unresolved built-in variable
     if (typeof obj === 'string') {
-      return obj.startsWith('@') || obj.startsWith('$') || obj === 'user.pubkey';
+      // Check for unresolved references
+      if (obj.startsWith('@') || obj.startsWith('$')) return true;
+      
+      // Check for unresolved built-in variables (these stay as strings when unresolved)
+      if (obj === 'user.pubkey') return true;
+      if (obj === 'target.pubkey') return true;
+      if (obj === 'target.id') return true;
+      
+      return false;
     }
     if (Array.isArray(obj)) {
       return obj.some(item => this.hasUnresolvedReferences(item));
@@ -176,6 +189,11 @@ export class SimpleQueryExecutor {
   private resolveFilterVariables(filter: any): any {
     const resolved = { ...filter };
     
+    // Debug: log target context if present
+    if (this.context.target) {
+      console.log('[SimpleQueryExecutor] Target context available:', this.context.target);
+    }
+    
     // Resolve simple variables like "user.pubkey"
     for (const [key, value] of Object.entries(resolved)) {
       if (typeof value === 'string') {
@@ -186,10 +204,12 @@ export class SimpleQueryExecutor {
           } else {
             resolved[key] = this.context.user.pubkey;
           }
-        } else if (value === 'target.pubkey' && this.context.target?.pubkey) {
-          resolved[key] = this.context.target.pubkey;
-        } else if (value === 'target.id' && this.context.target?.id) {
-          resolved[key] = this.context.target.id;
+        } else if (value === 'target.pubkey') {
+          // Only resolve if target context has pubkey, otherwise keep as unresolved
+          resolved[key] = this.context.target?.pubkey || 'target.pubkey';
+        } else if (value === 'target.id') {
+          // Only resolve if target context has id, otherwise keep as unresolved
+          resolved[key] = this.context.target?.id || 'target.id';
         } else if (value.includes('time.')) {
           // Handle time expressions
           try {
@@ -207,8 +227,14 @@ export class SimpleQueryExecutor {
               // Keep as unresolved if user not logged in
               return this.context.user.pubkey || 'user.pubkey';
             }
-            if (item === 'target.pubkey' && this.context.target?.pubkey) return this.context.target.pubkey;
-            if (item === 'target.id' && this.context.target?.id) return this.context.target.id;
+            if (item === 'target.pubkey') {
+              // Only resolve if target context has pubkey, otherwise keep as unresolved
+              return this.context.target?.pubkey || 'target.pubkey';
+            }
+            if (item === 'target.id') {
+              // Only resolve if target context has id, otherwise keep as unresolved
+              return this.context.target?.id || 'target.id';
+            }
           }
           return item;
         });

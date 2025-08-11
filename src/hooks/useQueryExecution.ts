@@ -117,15 +117,21 @@ export function useQueryExecution(
     
     // Skip if target is invalid (for components)
     if (options?.target && (!options.target.pubkey || options.target.pubkey === 'undefined')) {
-      console.log('[useQueryExecution] Skipping - invalid target context');
+      console.log('[useQueryExecution] Skipping - invalid target context:', options.target);
       setLoading(false);
       return;
+    }
+    
+    // Log target if present for debugging
+    if (options?.target) {
+      console.log('[useQueryExecution] Target context:', options.target);
     }
     
     let cancelled = false;
     
     const executeQueries = async () => {
       console.log('[useQueryExecution] Executing queries, hash:', queriesHash.substring(0, 16) + '...');
+      console.log('[useQueryExecution] Number of queries:', Object.keys(queries).length);
       
       try {
         setLoading(true);
@@ -182,6 +188,7 @@ export function useQueryExecution(
         
         // Execute all queries
         const results = await executor.executeAll();
+        console.log('[useQueryExecution] Executor returned results Map:', results);
         
         if (!cancelled) {
           // Convert Map to object
@@ -189,6 +196,7 @@ export function useQueryExecution(
           results.forEach((value, key) => {
             resultsObject[key] = value;
           });
+          console.log('[useQueryExecution] Setting query results:', resultsObject);
           setQueryResults(resultsObject);
           
           // Set up live subscriptions (all queries are live by default)

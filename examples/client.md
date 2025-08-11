@@ -15,11 +15,10 @@ name: "nostr-client"
         index: 0
         eq: "p"
     - pluckIndex: 1
-    - save: followed_pubkeys
 
 "$following_feed":
   kinds: [1]
-  authors: $followed_pubkeys
+  authors: $contact_list  # Direct reference to contact_list query output
   limit: 20
   since: 0
 
