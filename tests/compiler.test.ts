@@ -145,9 +145,9 @@ test("should compile chess example with board rendering", () => {
   expect(result.version).toBe("1.1.0");
   expect(result.queries).toBeDefined();
   expect(result.queries?.["$board_state"]).toBeDefined();
-  expect(result.queries?.["$parsed_board"]).toBeDefined();
+  expect(result.queries?.["$move_result"]).toBeDefined();
   expect(result.events?.["@make_move"]).toBeDefined();
-  expect(result.events?.["@reset_board"]).toBeDefined();
+  expect(result.events?.["@save_board"]).toBeDefined();
   
   // Check for chess-specific tool call
   const makeMoveEvent = result.events?.["@make_move"];

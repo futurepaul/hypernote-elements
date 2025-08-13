@@ -71,13 +71,14 @@ test("should tokenize each loop with variable references", async () => {
 });
 
 test("should tokenize form event correctly", () => {
-  const input = "[form @post_hello]";
+  const input = "[form @post_hello]\n[/form]";
   const tokens = tokenize(input);
   
-  expect(tokens.length).toBe(2); // form token + EOF
+  expect(tokens.length).toBe(4); // form start + newline + form end + EOF
   expect(tokens[0].type).toBe(TokenType.FORM_START);
   expect(tokens[0].value).toBe("form");
   expect(tokens[0].attributes?.event).toBe("@post_hello");
+  expect(tokens[2].type).toBe(TokenType.FORM_END);
 });
 
 test("should handle multiple heading levels", () => {

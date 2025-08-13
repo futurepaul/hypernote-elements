@@ -1,5 +1,5 @@
 import * as yaml from 'js-yaml';
-import { tokenize, parseTokens } from './tokenizer';
+import { tokenize, parseTokens, TokenizerError } from './tokenizer';
 import { safeValidateHypernote, type Hypernote } from './schema';
 import { parseTailwindClasses } from './tailwind-parser';
 import { processPipes } from './pipe-compiler';
@@ -100,9 +100,10 @@ function processElementStyles(element: any): any {
 /**
  * Compiles Hypernote Markdown to content object
  * @param hnmd Hypernote Markdown string
+ * @param options Compiler options (strictValidation defaults to true)
  * @returns Content object or fallback structure if validation fails
  */
-export function compileHypernoteToContent(hnmd: string): Hypernote {
+export function compileHypernoteToContent(hnmd: string, options?: { strictValidation?: boolean }): Hypernote {
   debugLog('Starting compilation');
   debugLog('Input HNMD length:', hnmd.length);
   
@@ -198,9 +199,20 @@ export function compileHypernoteToContent(hnmd: string): Hypernote {
   }
   
   debugLog('Tokenizing content...');
-  // Tokenize and parse the markdown content
-  const tokens = tokenize(content);
-  debugLog(`Generated ${tokens.length} tokens`);
+  // Tokenize and parse the markdown content with strict validation
+  const strictValidation = options?.strictValidation !== false; // Default to true
+  let tokens;
+  try {
+    tokens = tokenize(content, strictValidation);
+    debugLog(`Generated ${tokens.length} tokens`);
+  } catch (error) {
+    if (error instanceof TokenizerError) {
+      // Re-throw with better formatting for development
+      console.error(`[Hypernote Validation Error] ${error.message}`);
+      throw error;
+    }
+    throw error;
+  }
   
   debugLog('Parsing tokens...');
   let elements = parseTokens(tokens);

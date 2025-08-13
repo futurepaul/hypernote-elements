@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useDebounce } from 'use-debounce';
 import { RelayHandler } from './lib/relayHandler';
-import { compileHypernoteToContent } from './lib/compiler';
+import { safeCompileHypernote } from './lib/safe-compiler';
 import { useNostrStore } from './stores/nostrStore';
 import { useAuthStore } from './stores/authStore';
 import { useNostrSubscription } from './lib/snstr/hooks';
@@ -63,12 +63,17 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
   // Debounce the markdown input to prevent re-rendering on every keystroke
   const [debouncedMarkdown] = useDebounce(markdown || '', 300);
 
-  // Compile markdown to content object - memoize to prevent unnecessary recompilation
-  const content: Hypernote = useMemo(
-    () => compileHypernoteToContent(debouncedMarkdown || ''),
+  // Compile markdown to content object safely - memoize to prevent unnecessary recompilation
+  const compileResult = useMemo(
+    () => safeCompileHypernote(debouncedMarkdown || ''),
     [debouncedMarkdown]
   );
 
+  // Show error banner if compilation failed but we have stale data
+  const content = compileResult.data;
+  const error = compileResult.error;
+
+  // Just render the content - errors are shown in the JSON output area
   return <RenderHypernoteContent content={content} />;
 }
 
@@ -280,15 +285,38 @@ export function HypernoteJsonOutput({ markdown }: { markdown: string }) {
   
   // Memoize the compilation to prevent unnecessary recompilation
   // Use empty string fallback to ensure hooks are always called
-  const content: Hypernote = useMemo(
+  const compileResult = useMemo(
     () => {
       if (!debouncedMarkdown || typeof debouncedMarkdown !== 'string') {
-        return { elements: [], style: {} } as Hypernote;
+        return { success: true, data: { elements: [], style: {} } as Hypernote };
       }
-      return compileHypernoteToContent(debouncedMarkdown);
+      return safeCompileHypernote(debouncedMarkdown);
     },
     [debouncedMarkdown]
   );
+  
+  // If compilation failed, show error in the JSON area
+  if (!compileResult.success && compileResult.error) {
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-4 rounded overflow-auto">
+        <div className="font-bold mb-2">⚠️ Syntax Error</div>
+        <div className="font-mono">{compileResult.error.message}</div>
+        {compileResult.error.line && compileResult.error.column && (
+          <div className="text-red-500 mt-1">Line {compileResult.error.line}, Column {compileResult.error.column}</div>
+        )}
+        {compileResult.isStale && (
+          <div className="text-orange-600 mt-2 text-xs">Showing last valid JSON below:</div>
+        )}
+        {compileResult.isStale && (
+          <pre className="mt-2 bg-white p-2 rounded border border-red-100">
+            {JSON.stringify(compileResult.data, null, 2)}
+          </pre>
+        )}
+      </div>
+    );
+  }
+  
+  const content = compileResult.data;
   
   return (
     <pre className="bg-slate-100 text-green-900 text-xs p-4 rounded overflow-auto">

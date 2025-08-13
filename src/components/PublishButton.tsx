@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useNostrStore } from '../stores/nostrStore';
 import { publishHypernote } from '../lib/publishHypernote';
-import { compileHypernoteToContent } from '../lib/compiler';
+import { safeCompileHypernote } from '../lib/safe-compiler';
 import { toast } from 'sonner';
 import { Upload } from 'lucide-react';
 
@@ -23,8 +23,18 @@ export function PublishButton({ markdown }: PublishButtonProps) {
     setIsPublishing(true);
     
     try {
-      // Compile the markdown to JSON
-      const hypernote = compileHypernoteToContent(markdown);
+      // Compile the markdown to JSON safely
+      const compileResult = safeCompileHypernote(markdown);
+      
+      if (!compileResult.success && !compileResult.isStale) {
+        toast.error('Cannot publish - syntax errors', {
+          description: compileResult.error?.message || 'Please fix syntax errors before publishing'
+        });
+        setIsPublishing(false);
+        return;
+      }
+      
+      const hypernote = compileResult.data;
       
       // Extract metadata from the compiled hypernote
       const documentType = hypernote.type || (hypernote.kind !== undefined ? 'element' : 'hypernote');

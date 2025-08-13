@@ -103,7 +103,7 @@ name: "chess-game"
 [each $board_state.rows as $row]
   [div class="flex"]
   [each $row as $square]
-    [div class="flex flex-row"]
+    [div class="flex flex-row"
     [if $square.color == "dark"]
       [div class="w-16 h-16 flex items-center justify-center text-4xl font-bold border border-amber-900 bg-amber-700"]
         [if $square.piece == "K"]♔[/if]

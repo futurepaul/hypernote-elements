@@ -9,6 +9,7 @@
  */
 
 import { compileHypernoteToContent } from './compiler';
+import { TokenizerError } from './tokenizer';
 import type { Hypernote } from './schema';
 
 export interface SafeCompileResult {
@@ -17,6 +18,9 @@ export interface SafeCompileResult {
   error?: {
     message: string;
     phase?: 'tokenization' | 'parsing' | 'validation' | 'unknown';
+    line?: number;
+    column?: number;
+    code?: string;
     details?: any;
   };
   isStale?: boolean; // True if returning cached last valid state
@@ -37,8 +41,8 @@ export function safeCompileHypernote(
   returnLastValid: boolean = true
 ): SafeCompileResult {
   try {
-    // Try to compile (validation is already disabled in compiler.ts)
-    const result = compileHypernoteToContent(hnmd);
+    // Always use strict validation to get proper error messages
+    const result = compileHypernoteToContent(hnmd, { strictValidation: true });
     
     // Success! Update the cached valid result
     lastValidResult = result;
@@ -53,9 +57,19 @@ export function safeCompileHypernote(
     // Compilation failed - determine the phase
     let phase: SafeCompileResult['error']['phase'] = 'unknown';
     let message = 'Compilation failed';
+    let line: number | undefined;
+    let column: number | undefined;
+    let code: string | undefined;
     let details = undefined;
     
-    if (error.message) {
+    // Handle TokenizerError specifically
+    if (error instanceof TokenizerError) {
+      phase = 'tokenization';
+      message = error.message;
+      line = error.line;
+      column = error.column;
+      code = error.code;
+    } else if (error.message) {
       message = error.message;
       
       // Try to determine which phase failed
@@ -89,13 +103,63 @@ export function safeCompileHypernote(
         error: {
           message,
           phase,
+          line,
+          column,
+          code,
           details
         },
         isStale: true
       };
     }
     
-    // No last valid state - return a minimal valid structure
+    // No last valid state - return a minimal valid structure with error display
+    const errorElements: any[] = [
+      {
+        type: "p" as const,
+        content: ["⚠️ Syntax Error"],
+        style: {
+          fontWeight: 700,
+          color: "rgb(127,29,29)",
+          marginBottom: "0.5rem"
+        }
+      },
+      {
+        type: "p" as const,
+        content: [message],
+        style: {
+          fontSize: "0.875rem",
+          color: "rgb(153,27,27)",
+          fontFamily: "monospace"
+        }
+      }
+    ];
+
+    // Add location info if available
+    if (line !== undefined && column !== undefined) {
+      errorElements.push({
+        type: "p" as const,
+        content: [`Line ${line}, Column ${column}`],
+        style: {
+          fontSize: "0.75rem",
+          color: "rgb(113,113,122)",
+          marginTop: "0.5rem"
+        }
+      });
+    }
+
+    // Add error code if available
+    if (code) {
+      errorElements.push({
+        type: "p" as const,
+        content: [`Error code: ${code}`],
+        style: {
+          fontSize: "0.75rem",
+          color: "rgb(113,113,122)",
+          marginTop: "0.25rem"
+        }
+      });
+    }
+
     const fallback: Hypernote = {
       version: "1.1.0",
       elements: [
@@ -108,25 +172,7 @@ export function safeCompileHypernote(
             borderWidth: "1px",
             borderColor: "rgb(239,68,68)"
           },
-          elements: [
-            {
-              type: "p" as const,
-              content: ["⚠️ Syntax Error"],
-              style: {
-                fontWeight: 700,
-                color: "rgb(127,29,29)",
-                marginBottom: "0.5rem"
-              }
-            },
-            {
-              type: "p" as const,
-              content: [message],
-              style: {
-                fontSize: "0.875rem",
-                color: "rgb(153,27,27)"
-              }
-            }
-          ]
+          elements: errorElements
         }
       ]
     };
@@ -137,6 +183,9 @@ export function safeCompileHypernote(
       error: {
         message,
         phase,
+        line,
+        column,
+        code,
         details
       },
       isStale: false

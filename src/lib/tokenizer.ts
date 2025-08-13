@@ -1,3 +1,19 @@
+import {
+  TokenizerError,
+  SourcePosition,
+  ValidationState,
+  validateElementName,
+  validateAttribute,
+  validateIfCondition,
+  validateEachLoop,
+  validateFormEvent,
+  validateVariableReference,
+  checkUnclosedQuotes
+} from './tokenizer-validator';
+
+// Re-export TokenizerError for consumers
+export { TokenizerError } from './tokenizer-validator';
+
 /**
  * Token types in Hypernote Markdown
  */
@@ -43,13 +59,196 @@ export interface Token {
 }
 
 /**
- * Tokenizes Hypernote Markdown content
- * @param content The markdown content to tokenize
- * @returns Array of tokens
+ * Helper function to check if we found a closing bracket
+ * Always throws error if we hit end of content - we can't continue safely
  */
-export function tokenize(content: string): Token[] {
+function checkClosingBracket(
+  pos: number,
+  content: string,
+  elementType: string,
+  elementStart: number,
+  strict: boolean,
+  sourcePosition: SourcePosition | null
+): void {
+  if (pos >= content.length) {
+    // We ran out of content looking for ]
+    const position = sourcePosition ? sourcePosition.getPosition(elementStart, content) : { line: 1, column: elementStart + 1 };
+    throw new TokenizerError(
+      `Unclosed element [${elementType}] - missing closing bracket`,
+      position.line,
+      position.column,
+      'UNCLOSED_ELEMENT'
+    );
+  }
+}
+
+/**
+ * Parse attributes inside brackets until we hit ]
+ * Returns the new position and the attributes object
+ */
+function parseAttributes(
+  content: string,
+  startPos: number,
+  elementStart: number,
+  strict: boolean,
+  sourcePosition: SourcePosition | null
+): { pos: number; attributes: Record<string, string> } {
+  let pos = startPos;
+  const attributes: Record<string, string> = {};
+  
+  while (pos < content.length && content[pos] !== ']') {
+    // Skip whitespace
+    if (content[pos] === ' ') {
+      pos++;
+      continue;
+    }
+    
+    // Handle quoted content attribute (e.g., [button "Text"])
+    if (content[pos] === '"') {
+      pos++; // Skip opening quote
+      let attributeValue = '';
+      
+      while (pos < content.length && content[pos] !== '"') {
+        attributeValue += content[pos];
+        pos++;
+      }
+      
+      if (pos >= content.length) {
+        if (strict && sourcePosition) {
+          const position = sourcePosition.getPosition(pos - 1, content);
+          throw new TokenizerError(
+            'Unclosed quote in attribute',
+            position.line,
+            position.column,
+            'UNCLOSED_QUOTE'
+          );
+        }
+      }
+      
+      pos++; // Skip closing quote
+      attributes['content'] = attributeValue;
+      continue;
+    }
+    
+    // Handle named attribute (e.g., [div class="value"])
+    const attrStart = pos;
+    let attributeName = '';
+    while (pos < content.length && content[pos] !== '=' && content[pos] !== ' ' && content[pos] !== ']') {
+      attributeName += content[pos];
+      pos++;
+    }
+    
+    if (attributeName && pos < content.length && content[pos] === '=') {
+      pos++; // Skip '='
+      
+      // Handle quoted attribute value
+      if (pos < content.length && content[pos] === '"') {
+        pos++; // Skip opening quote
+        let attributeValue = '';
+        const quoteStart = pos;
+        
+        while (pos < content.length && content[pos] !== '"') {
+          attributeValue += content[pos];
+          pos++;
+        }
+        
+        // Check for unclosed quote
+        if (pos >= content.length) {
+          if (strict && sourcePosition) {
+            const position = sourcePosition.getPosition(quoteStart - 1, content);
+            throw new TokenizerError(
+              'Unclosed quote in attribute',
+              position.line,
+              position.column,
+              'UNCLOSED_QUOTE'
+            );
+          }
+        }
+        
+        pos++; // Skip closing quote
+        attributes[attributeName] = attributeValue;
+        
+        // Validate attribute if in strict mode
+        if (strict && sourcePosition) {
+          const position = sourcePosition.getPosition(attrStart, content);
+          try {
+            validateAttribute(attributeName, attributeValue, true, position.line, position.column);
+          } catch (error) {
+            if (error instanceof TokenizerError) {
+              throw error;
+            }
+          }
+        }
+      } else if (strict && sourcePosition) {
+        // In strict mode, attributes must be quoted
+        const position = sourcePosition.getPosition(attrStart, content);
+        throw new TokenizerError(
+          `Attribute value for "${attributeName}" must be quoted`,
+          position.line,
+          position.column,
+          'UNQUOTED_ATTRIBUTE'
+        );
+      }
+    }
+  }
+  
+  return { pos, attributes };
+}
+
+/**
+ * Process a container element (div, button, span)
+ * These all follow the same pattern: [element attrs] ... [/element]
+ */
+function processContainerElement(
+  elementType: string,
+  tokenType: TokenType,
+  content: string,
+  startPos: number,
+  elementStart: number,
+  strict: boolean,
+  sourcePosition: SourcePosition | null,
+  validationState: ValidationState | null,
+  tokens: Token[]
+): number {
+  let pos = startPos;
+  
+  // Parse attributes
+  const { pos: newPos, attributes } = parseAttributes(content, pos, elementStart, strict, sourcePosition);
+  pos = newPos;
+  
+  // Check closing bracket
+  checkClosingBracket(pos, content, elementType, elementStart, strict, sourcePosition);
+  pos++; // Skip ']'
+  
+  // Track opening tag if in strict mode
+  if (strict && validationState && sourcePosition) {
+    const position = sourcePosition.getPosition(elementStart, content);
+    validationState.pushTag(elementType, elementType, position.line, position.column);
+  }
+  
+  tokens.push({ 
+    type: tokenType, 
+    value: elementType,
+    attributes
+  });
+  
+  return pos;
+}
+
+/**
+ * Tokenizes Hypernote Markdown content with strict validation
+ * @param content The markdown content to tokenize
+ * @param strict Enable strict validation mode (default: true)
+ * @returns Array of tokens
+ * @throws TokenizerError if validation fails in strict mode
+ */
+export function tokenize(content: string, strict: boolean = true): Token[] {
   const tokens: Token[] = [];
   let pos = 0;
+  
+  // Initialize validation state if in strict mode
+  const sourcePosition = strict ? new SourcePosition(content) : null;
+  const validationState = strict ? new ValidationState() : null;
   
   while (pos < content.length) {
     const char = content[pos];
@@ -141,6 +340,7 @@ export function tokenize(content: string): Token[] {
                         restOfContent.startsWith('form.');
       
       if (isVariable) {
+        const varStart = pos;
         let variableName = '{';
         pos++; // Skip '{'
         while (pos < content.length && content[pos] !== '}') {
@@ -149,6 +349,18 @@ export function tokenize(content: string): Token[] {
         }
         variableName += '}'; // Include closing brace
         pos++; // Skip '}'
+        
+        // Validate variable reference if in strict mode
+        if (strict && sourcePosition) {
+          const position = sourcePosition.getPosition(varStart, content);
+          try {
+            validateVariableReference(variableName, position.line, position.column);
+          } catch (error) {
+            if (error instanceof TokenizerError) {
+              throw error;
+            }
+          }
+        }
         
         tokens.push({ 
           type: TokenType.VARIABLE_REFERENCE, 
@@ -168,7 +380,18 @@ export function tokenize(content: string): Token[] {
         pos++;
       }
       
-      if (content[pos] === ']') pos++; // Skip ']'
+      // Check if we found the closing bracket
+      if (pos >= content.length) {
+        // Invalid image syntax - incomplete
+        pos -= (2 + altText.length); // Go back to start
+        let text = '';
+        text += content[pos];
+        pos++;
+        tokens.push({ type: TokenType.TEXT, value: text });
+        continue;
+      }
+      
+      if (pos < content.length && content[pos] === ']') pos++; // Skip ']'
       
       // Expect opening parenthesis for src
       if (content[pos] === '(') {
@@ -205,6 +428,7 @@ export function tokenize(content: string): Token[] {
       
       // Check if this is a closing tag (e.g., [/form])
       if (content[pos] === '/') {
+        const closeTagStart = pos - 1; // Position of '['
         pos++; // Skip '/'
         let elementType = '';
         
@@ -214,7 +438,30 @@ export function tokenize(content: string): Token[] {
           pos++;
         }
         
-        if (content[pos] === ']') pos++; // Skip ']'
+        // Check if we found the closing bracket
+        if (pos >= content.length) {
+          const position = sourcePosition ? sourcePosition.getPosition(closeTagStart, content) : { line: 1, column: closeTagStart + 1 };
+          throw new TokenizerError(
+            `Unclosed closing tag [/${elementType}] - missing closing bracket`,
+            position.line,
+            position.column,
+            'UNCLOSED_ELEMENT'
+          );
+        }
+        
+        if (pos < content.length && content[pos] === ']') pos++; // Skip ']'
+        
+        // Validate closing tag if in strict mode
+        if (strict && validationState && sourcePosition) {
+          const position = sourcePosition.getPosition(closeTagStart, content);
+          try {
+            validationState.popTag(elementType, position.line, position.column);
+          } catch (error) {
+            if (error instanceof TokenizerError) {
+              throw error;
+            }
+          }
+        }
         
         // Generate appropriate END token
         switch (elementType) {
@@ -261,7 +508,18 @@ export function tokenize(content: string): Token[] {
           pos++;
         }
         
-        if (content[pos] === ']') pos++; // Skip ']'
+        // Check if we found the closing bracket
+        if (pos >= content.length) {
+          const position = sourcePosition ? sourcePosition.getPosition(pos - argument.length - 1, content) : { line: 1, column: pos - argument.length };
+          throw new TokenizerError(
+            `Unclosed component reference - missing closing bracket`,
+            position.line,
+            position.column,
+            'UNCLOSED_ELEMENT'
+          );
+        }
+        
+        if (pos < content.length && content[pos] === ']') pos++; // Skip ']'
         
         tokens.push({
           type: TokenType.COMPONENT,
@@ -271,12 +529,25 @@ export function tokenize(content: string): Token[] {
         continue;
       }
       
+      const elementStart = pos - 1; // Position of '['
       let elementType = '';
       
       // Collect element type
       while (pos < content.length && content[pos] !== ' ' && content[pos] !== ']' && content[pos] !== '@') {
         elementType += content[pos];
         pos++;
+      }
+      
+      // Validate element name if in strict mode
+      if (strict && sourcePosition) {
+        const position = sourcePosition.getPosition(elementStart, content);
+        try {
+          validateElementName(elementType, position.line, position.column);
+        } catch (error) {
+          if (error instanceof TokenizerError) {
+            throw error;
+          }
+        }
       }
       
       if (elementType === 'form') {
@@ -294,7 +565,28 @@ export function tokenize(content: string): Token[] {
           }
         }
         
-        if (content[pos] === ']') pos++; // Skip ']'
+        // Check if we found the closing bracket
+        checkClosingBracket(pos, content, elementType, elementStart, strict, sourcePosition);
+        
+        // Validate form event if in strict mode
+        if (strict && sourcePosition) {
+          const position = sourcePosition.getPosition(elementStart, content);
+          try {
+            validateFormEvent(event, position.line, position.column);
+          } catch (error) {
+            if (error instanceof TokenizerError) {
+              throw error;
+            }
+          }
+        }
+        
+        if (pos < content.length && content[pos] === ']') pos++; // Skip ']'
+        
+        // Track opening tag if in strict mode
+        if (strict && validationState && sourcePosition) {
+          const position = sourcePosition.getPosition(elementStart, content);
+          validationState.pushTag('form', elementType, position.line, position.column);
+        }
         
         tokens.push({ 
           type: TokenType.FORM_START, 
@@ -303,142 +595,13 @@ export function tokenize(content: string): Token[] {
         });
         continue;
       } else if (elementType === 'div') {
-        // Handle div container element
-        let attributes: Record<string, string> = {};
-        
-        // Process attributes until we hit closing bracket
-        while (pos < content.length && content[pos] !== ']') {
-          // Skip whitespace
-          if (content[pos] === ' ') {
-            pos++;
-            continue;
-          }
-          
-          // Handle named attribute (e.g., [div class="value"])
-          let attributeName = '';
-          while (pos < content.length && content[pos] !== '=' && content[pos] !== ' ' && content[pos] !== ']') {
-            attributeName += content[pos];
-            pos++;
-          }
-          
-          if (attributeName && content[pos] === '=') {
-            pos++; // Skip '='
-            
-            // Handle quoted attribute value
-            if (content[pos] === '"') {
-              pos++; // Skip opening quote
-              let attributeValue = '';
-              
-              while (pos < content.length && content[pos] !== '"') {
-                attributeValue += content[pos];
-                pos++;
-              }
-              
-              pos++; // Skip closing quote
-              attributes[attributeName] = attributeValue;
-            }
-          }
-        }
-        
-        if (content[pos] === ']') pos++; // Skip ']'
-        
-        tokens.push({ 
-          type: TokenType.DIV_START, 
-          value: elementType,
-          attributes
-        });
+        pos = processContainerElement('div', TokenType.DIV_START, content, pos, elementStart, strict, sourcePosition, validationState, tokens);
         continue;
       } else if (elementType === 'button') {
-        // Handle button container element
-        let attributes: Record<string, string> = {};
-        
-        // Process attributes until we hit closing bracket
-        while (pos < content.length && content[pos] !== ']') {
-          // Skip whitespace
-          if (content[pos] === ' ') {
-            pos++;
-            continue;
-          }
-          
-          // Handle named attribute (e.g., [button class="value"])
-          let attributeName = '';
-          while (pos < content.length && content[pos] !== '=' && content[pos] !== ' ' && content[pos] !== ']') {
-            attributeName += content[pos];
-            pos++;
-          }
-          
-          if (attributeName && content[pos] === '=') {
-            pos++; // Skip '='
-            
-            // Handle quoted attribute value
-            if (content[pos] === '"') {
-              pos++; // Skip opening quote
-              let attributeValue = '';
-              
-              while (pos < content.length && content[pos] !== '"') {
-                attributeValue += content[pos];
-                pos++;
-              }
-              
-              pos++; // Skip closing quote
-              attributes[attributeName] = attributeValue;
-            }
-          }
-        }
-        
-        if (content[pos] === ']') pos++; // Skip ']'
-        
-        tokens.push({ 
-          type: TokenType.BUTTON_START, 
-          value: elementType,
-          attributes
-        });
+        pos = processContainerElement('button', TokenType.BUTTON_START, content, pos, elementStart, strict, sourcePosition, validationState, tokens);
         continue;
       } else if (elementType === 'span') {
-        // Handle span container element
-        let attributes: Record<string, string> = {};
-        
-        // Process attributes until we hit closing bracket
-        while (pos < content.length && content[pos] !== ']') {
-          // Skip whitespace
-          if (content[pos] === ' ') {
-            pos++;
-            continue;
-          }
-          
-          // Handle named attribute (e.g., [span class="value"])
-          let attributeName = '';
-          while (pos < content.length && content[pos] !== '=' && content[pos] !== ' ' && content[pos] !== ']') {
-            attributeName += content[pos];
-            pos++;
-          }
-          
-          if (attributeName && content[pos] === '=') {
-            pos++; // Skip '='
-            
-            // Handle quoted attribute value
-            if (content[pos] === '"') {
-              pos++; // Skip opening quote
-              let attributeValue = '';
-              
-              while (pos < content.length && content[pos] !== '"') {
-                attributeValue += content[pos];
-                pos++;
-              }
-              
-              pos++; // Skip closing quote
-              attributes[attributeName] = attributeValue;
-            }
-          }
-        }
-        
-        if (content[pos] === ']') pos++; // Skip ']'
-        
-        tokens.push({ 
-          type: TokenType.SPAN_START, 
-          value: elementType,
-          attributes
-        });
+        pos = processContainerElement('span', TokenType.SPAN_START, content, pos, elementStart, strict, sourcePosition, validationState, tokens);
         continue;
       } else if (elementType === 'each') {
         // Handle [each $source as $variable]
@@ -463,7 +626,28 @@ export function tokenize(content: string): Token[] {
           pos++;
         }
         
-        if (content[pos] === ']') pos++; // Skip ']'
+        // Validate loop syntax if in strict mode
+        if (strict && sourcePosition) {
+          const position = sourcePosition.getPosition(elementStart, content);
+          try {
+            validateEachLoop(source, variable, position.line, position.column);
+          } catch (error) {
+            if (error instanceof TokenizerError) {
+              throw error;
+            }
+          }
+        }
+        
+        // Check if we found the closing bracket
+        checkClosingBracket(pos, content, elementType, elementStart, strict, sourcePosition);
+        
+        if (pos < content.length && content[pos] === ']') pos++; // Skip ']'
+        
+        // Track opening tag if in strict mode
+        if (strict && validationState && sourcePosition) {
+          const position = sourcePosition.getPosition(elementStart, content);
+          validationState.pushTag('each', elementType, position.line, position.column);
+        }
         
         tokens.push({ 
           type: TokenType.EACH_START, 
@@ -482,7 +666,28 @@ export function tokenize(content: string): Token[] {
           pos++;
         }
         
-        if (content[pos] === ']') pos++; // Skip ']'
+        // Validate condition if in strict mode
+        if (strict && sourcePosition) {
+          const position = sourcePosition.getPosition(elementStart, content);
+          try {
+            validateIfCondition(condition.trim(), position.line, position.column);
+          } catch (error) {
+            if (error instanceof TokenizerError) {
+              throw error;
+            }
+          }
+        }
+        
+        // Check if we found the closing bracket
+        checkClosingBracket(pos, content, elementType, elementStart, strict, sourcePosition);
+        
+        if (pos < content.length && content[pos] === ']') pos++; // Skip ']'
+        
+        // Track opening tag if in strict mode
+        if (strict && validationState && sourcePosition) {
+          const position = sourcePosition.getPosition(elementStart, content);
+          validationState.pushTag('if', elementType, position.line, position.column);
+        }
         
         tokens.push({ 
           type: TokenType.IF_START, 
@@ -509,7 +714,10 @@ export function tokenize(content: string): Token[] {
           attributes['variable'] = variable;
         }
         
-        if (content[pos] === ']') pos++; // Skip ']'
+        // Check if we found the closing bracket
+        checkClosingBracket(pos, content, elementType, elementStart, strict, sourcePosition);
+        
+        if (pos < content.length && content[pos] === ']') pos++; // Skip ']'
         
         tokens.push({ 
           type: TokenType.ELEMENT_START, 
@@ -570,7 +778,10 @@ export function tokenize(content: string): Token[] {
           }
         }
         
-        if (content[pos] === ']') pos++; // Skip ']'
+        // Check if we found the closing bracket
+        checkClosingBracket(pos, content, elementType, elementStart, strict, sourcePosition);
+        
+        if (pos < content.length && content[pos] === ']') pos++; // Skip ']'
         
         tokens.push({ 
           type: TokenType.ELEMENT_START, 
@@ -663,6 +874,17 @@ export function tokenize(content: string): Token[] {
     // If we didn't make progress, move to the next character
     if (pos < content.length && char === content[pos]) {
       pos++;
+    }
+  }
+  
+  // Check for unclosed tags at end of document
+  if (strict && validationState) {
+    try {
+      validationState.checkUnclosedTags();
+    } catch (error) {
+      if (error instanceof TokenizerError) {
+        throw error;
+      }
     }
   }
   
