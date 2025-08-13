@@ -31,6 +31,21 @@ describe("Tailwind Parser", () => {
     });
   });
 
+  test("parses flex direction classes", () => {
+    expect(parseTailwindClasses("flex-row")).toEqual({
+      flexDirection: "row"
+    });
+    expect(parseTailwindClasses("flex-col")).toEqual({
+      flexDirection: "column"
+    });
+    expect(parseTailwindClasses("flex-row-reverse")).toEqual({
+      flexDirection: "row-reverse"
+    });
+    expect(parseTailwindClasses("flex-col-reverse")).toEqual({
+      flexDirection: "column-reverse"
+    });
+  });
+
   test("parses border classes", () => {
     const result = parseTailwindClasses("border-4 border-amber-900 rounded");
     expect(result).toEqual({

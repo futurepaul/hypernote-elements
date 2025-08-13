@@ -8,7 +8,7 @@ import { processPipes } from './pipe-compiler';
 const DEBUG_MODE = typeof process !== 'undefined' && process.env?.HYPERNOTE_DEBUG === 'true';
 
 // Skip validation for performance (you can flip this to false for development speed)
-const ENABLE_VALIDATION = true; // Set to false to skip Zod validation
+const ENABLE_VALIDATION = false; // Set to false to skip Zod validation
 
 function debugLog(message: string, data?: any) {
   if (DEBUG_MODE) {

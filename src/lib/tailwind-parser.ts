@@ -208,9 +208,15 @@ export function parseTailwindClasses(classes: string): HypernoteStyle | null {
     const prefix = parts[0];
     
     switch (prefix) {
-      // Display
+      // Display and Flexbox direction
       case 'flex':
-        style.display = 'flex';
+        if (parts.length === 1) {
+          style.display = 'flex';
+        } else if (parts[1] === 'row') {
+          style.flexDirection = parts[2] === 'reverse' ? 'row-reverse' : 'row';
+        } else if (parts[1] === 'col') {
+          style.flexDirection = parts[2] === 'reverse' ? 'column-reverse' : 'column';
+        }
         break;
       case 'hidden':
         style.display = 'none';
