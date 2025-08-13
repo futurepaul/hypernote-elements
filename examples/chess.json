@@ -230,355 +230,346 @@
                       "variable": "$square",
                       "elements": [
                         {
-                          "type": "div",
-                          "style": {
-                            "display": "flex",
-                            "flexDirection": "row"
-                          },
+                          "type": "if",
+                          "condition": "$square.color == \"dark\"",
                           "elements": [
                             {
-                              "type": "if",
-                              "condition": "$square.color == \"dark\"",
+                              "type": "div",
+                              "style": {
+                                "display": "flex",
+                                "width": "4rem",
+                                "height": "4rem",
+                                "justifyContent": "center",
+                                "alignItems": "center",
+                                "backgroundColor": "rgb(180,83,9)",
+                                "borderColor": "rgb(120,53,15)",
+                                "fontSize": "2.25rem",
+                                "fontWeight": 700,
+                                "lineHeight": "2.5rem",
+                                "borderWidth": "1px"
+                              },
                               "elements": [
                                 {
-                                  "type": "div",
-                                  "style": {
-                                    "display": "flex",
-                                    "width": "4rem",
-                                    "height": "4rem",
-                                    "justifyContent": "center",
-                                    "alignItems": "center",
-                                    "backgroundColor": "rgb(180,83,9)",
-                                    "borderColor": "rgb(120,53,15)",
-                                    "fontSize": "2.25rem",
-                                    "fontWeight": 700,
-                                    "lineHeight": "2.5rem",
-                                    "borderWidth": "1px"
-                                  },
+                                  "type": "if",
+                                  "condition": "$square.piece == \"K\"",
                                   "elements": [
                                     {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"K\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♔"
-                                          ]
-                                        }
+                                      "type": "p",
+                                      "content": [
+                                        "♔"
                                       ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"Q\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♕"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"R\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♖"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"B\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♗"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"N\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♘"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"P\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♙"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"k\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♚"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"q\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♛"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"r\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♜"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"b\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♝"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"n\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♞"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"p\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♟"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \" \"",
-                                      "elements": []
                                     }
                                   ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"Q\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♕"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"R\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♖"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"B\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♗"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"N\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♘"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"P\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♙"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"k\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♚"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"q\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♛"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"r\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♜"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"b\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♝"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"n\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♞"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"p\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♟"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \" \"",
+                                  "elements": []
                                 }
                               ]
-                            },
+                            }
+                          ]
+                        },
+                        {
+                          "type": "if",
+                          "condition": "$square.color == \"light\"",
+                          "elements": [
                             {
-                              "type": "if",
-                              "condition": "$square.color == \"light\"",
+                              "type": "div",
+                              "style": {
+                                "display": "flex",
+                                "width": "4rem",
+                                "height": "4rem",
+                                "justifyContent": "center",
+                                "alignItems": "center",
+                                "backgroundColor": "rgb(253,230,138)",
+                                "borderColor": "rgb(120,53,15)",
+                                "fontSize": "2.25rem",
+                                "fontWeight": 700,
+                                "lineHeight": "2.5rem",
+                                "borderWidth": "1px"
+                              },
                               "elements": [
                                 {
-                                  "type": "div",
-                                  "style": {
-                                    "display": "flex",
-                                    "width": "4rem",
-                                    "height": "4rem",
-                                    "justifyContent": "center",
-                                    "alignItems": "center",
-                                    "backgroundColor": "rgb(253,230,138)",
-                                    "borderColor": "rgb(120,53,15)",
-                                    "fontSize": "2.25rem",
-                                    "fontWeight": 700,
-                                    "lineHeight": "2.5rem",
-                                    "borderWidth": "1px"
-                                  },
+                                  "type": "if",
+                                  "condition": "$square.piece == \"K\"",
                                   "elements": [
                                     {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"K\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♔"
-                                          ]
-                                        }
+                                      "type": "p",
+                                      "content": [
+                                        "♔"
                                       ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"Q\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♕"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"R\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♖"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"B\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♗"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"N\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♘"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"P\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♙"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"k\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♚"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"q\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♛"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"r\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♜"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"b\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♝"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"n\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♞"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \"p\"",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♟"
-                                          ]
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "type": "if",
-                                      "condition": "$square.piece == \" \"",
-                                      "elements": []
                                     }
                                   ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"Q\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♕"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"R\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♖"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"B\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♗"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"N\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♘"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"P\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♙"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"k\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♚"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"q\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♛"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"r\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♜"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"b\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♝"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"n\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♞"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \"p\"",
+                                  "elements": [
+                                    {
+                                      "type": "p",
+                                      "content": [
+                                        "♟"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "if",
+                                  "condition": "$square.piece == \" \"",
+                                  "elements": []
                                 }
                               ]
                             }

@@ -137,7 +137,6 @@ name: "chess-game"
         [if $square.piece == " "] [/if]
       [/div]
     [/if]
-    [/div]
   [/each]
   [/div]
 [/each]
