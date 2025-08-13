@@ -6,6 +6,8 @@ import { useNostrStore } from './stores/nostrStore';
 import { useAuthStore } from './stores/authStore';
 import { useNostrSubscription } from './lib/snstr/hooks';
 import { useQueryExecution } from './hooks/useQueryExecution';
+import { useQueryExecutionWithPlanner } from './hooks/useQueryExecutionWithPlanner';
+import { QueryPlannerProvider } from './hooks/useQueryPlanner';
 import { useActionExecution } from './hooks/useActionExecution';
 import type { Hypernote, AnyElement } from './lib/schema';
 import { toast } from 'sonner';
@@ -277,26 +279,29 @@ export function RenderHypernoteContent({ content }: { content: Hypernote }) {
     </div>
   ) : null;
 
+  // Wrap in QueryPlannerProvider to enable batching
   return (
-    <>
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
-      `}</style>
-      {errorBanner}
-      <div 
-        className={`hypernote-content ${themeClass}`.trim()} 
-        style={rootStyles as React.CSSProperties}
-      >
-        {content.elements.map((element, index) => (
-          <React.Fragment key={index}>
-            {renderElement(element, context)}
-          </React.Fragment>
-        ))}
-      </div>
-    </>
+    <QueryPlannerProvider queries={content.queries} enabled={true}>
+      <>
+        <style>{`
+          @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+          }
+        `}</style>
+        {errorBanner}
+        <div 
+          className={`hypernote-content ${themeClass}`.trim()} 
+          style={rootStyles as React.CSSProperties}
+        >
+          {content.elements.map((element, index) => (
+            <React.Fragment key={index}>
+              {renderElement(element, context)}
+            </React.Fragment>
+          ))}
+        </div>
+      </>
+    </QueryPlannerProvider>
   );
 }
 
@@ -781,6 +786,35 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
   const [targetError, setTargetError] = useState<string | null>(null);
   const { snstrClient: componentSnstrClient } = useNostrStore();
   
+  // Pre-resolved queries for ANY component with target data
+  // MUST be called before any conditional returns to maintain hook order
+  const preResolvedQueries = useMemo(() => {
+    const queries: Record<string, any> = {};
+    
+    // If we have target context with actual data, provide it to the component
+    // This works for ANY kind of component, not just profiles
+    if (targetContext && Object.keys(targetContext).length > 1) { // More than just 'raw'
+      // The component can reference this data however it needs
+      // For kind:0 it might use target.name, target.picture
+      // For kind:1 it might use target.content, target.created_at
+      // etc.
+      
+      // For now, keep the simple heuristic but make it extensible
+      if (componentDef.kind === 0 && targetContext.name) {
+        queries['$profile'] = {
+          name: targetContext.name,
+          picture: targetContext.picture,
+          nip05: targetContext.nip05
+        };
+      } else if (componentDef.kind === 1 && targetContext.content) {
+        queries['$note'] = targetContext;
+      }
+      // Add more patterns as needed
+    }
+    
+    return queries;
+  }, [componentDef.kind, targetContext]);
+  
   useEffect(() => {
     const loadTarget = async () => {
       if (!resolvedArgument) {
@@ -881,15 +915,15 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
     );
   }
   
-  // Create component context with target
+  // Create component context - keep callbacks from parent
   const componentCtx: RenderContext = {
     ...ctx,
     target: targetContext,
     depth: ctx.depth + 1,
     // Reset loop variables for component scope
     loopVariables: {},
-    // Component gets its own query results (queries are scoped)
-    queryResults: {},
+    // Pre-populate with any resolved data to skip redundant queries
+    queryResults: preResolvedQueries,
     extractedVariables: {},
     loadingQueries: new Set()
   };
@@ -922,14 +956,40 @@ function ComponentRenderer({
   elementStyle?: any;
   elementId?: string;
 }) {
-  // Memoize query options to prevent re-executions
+  // Check if we need to execute queries at all
+  const hasPrePopulatedData = context.queryResults && Object.keys(context.queryResults).length > 0;
+  const hasQueries = componentDef.queries && Object.keys(componentDef.queries).length > 0;
+  
+  // For ANY component with pre-populated data, skip all query logic
+  // This prevents infinite re-render loops when parent components update
+  if (hasPrePopulatedData) {
+    // Directly use the pre-populated data without any hooks or effects
+    const componentCtx: RenderContext = {
+      ...context,
+      queryResults: context.queryResults,
+      extractedVariables: context.extractedVariables,
+      loadingQueries: new Set()
+    };
+    
+    // Render the component's elements
+    return (
+      <div id={elementId} style={elementStyle}>
+        {componentDef.elements?.map((el, i) => (
+          <React.Fragment key={i}>
+            {renderElement(el as HypernoteElement, componentCtx)}
+          </React.Fragment>
+        ))}
+      </div>
+    );
+  }
+  
+  // Only run query execution for components that actually need it
   const queryOptions = useMemo(() => ({
     target: context.target,
     parentExtracted: context.extractedVariables
   }), [context.target, context.extractedVariables]);
 
-  // Execute queries - the hook will handle validation of target context
-  const { queryResults, extractedVariables, allLoading } = useQueryExecution(
+  const { queryResults, extractedVariables, allLoading } = useQueryExecutionWithPlanner(
     componentDef.queries || {},
     queryOptions
   );
@@ -938,10 +998,15 @@ function ComponentRenderer({
   // console.log(`[ComponentRenderer] Query results for component:`, queryResults);
   // console.log(`[ComponentRenderer] Loading state:`, allLoading);
   
-  // Merge the query results into context
+  // Merge the query results with any pre-resolved data from parent
+  const mergedQueryResults = {
+    ...context.queryResults,  // Pre-resolved data from parent
+    ...queryResults            // New query results
+  };
+  
   const componentCtx: RenderContext = {
     ...context,
-    queryResults,
+    queryResults: mergedQueryResults,
     extractedVariables,
     loadingQueries: allLoading ? new Set(Object.keys(componentDef.queries || {})) : new Set()
   };

@@ -110,6 +110,14 @@ class QueryCache {
   }
   
   /**
+   * Invalidate a specific cache entry
+   */
+  invalidate(filter: Filter) {
+    const key = this.getCacheKey(filter);
+    this.cache.delete(key);
+  }
+  
+  /**
    * Clear all cache entries
    */
   clear() {

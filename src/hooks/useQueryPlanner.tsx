@@ -41,6 +41,9 @@ export function QueryPlannerProvider({
   // Track if we've started execution
   const executionStarted = useRef(false);
   
+  // Maintain cache across re-renders
+  const cacheRef = useRef(new Map<string, NostrEvent[]>());
+  
   const registerQuery = useCallback((
     id: string,
     filter: Filter,
@@ -71,11 +74,15 @@ export function QueryPlannerProvider({
       console.log('[QueryPlannerProvider] Starting execution phase');
       
       try {
-        await plannerRef.current.execute(async (filter) => {
-          return await snstrClient.fetchEvents([filter]);
-        });
+        await plannerRef.current.execute(
+          async (filter) => {
+            return await snstrClient.fetchEvents([filter]);
+          },
+          cacheRef.current // Pass the cache
+        );
         
         console.log('[QueryPlannerProvider] Execution complete');
+        console.log(`[QueryPlannerProvider] Cache size: ${cacheRef.current.size} entries`);
         setPhase('complete');
         // Trigger re-render to show results
         setRenderTrigger(prev => prev + 1);
@@ -119,14 +126,8 @@ export function QueryPlannerProvider({
 export function useQueryPlanner() {
   const context = useContext(QueryPlannerContext);
   if (!context) {
-    // Return a dummy context if not in provider (backwards compatibility)
-    return {
-      planner: null,
-      phase: 'complete' as const,
-      registerQuery: () => {},
-      getResults: () => undefined,
-      isReady: false
-    };
+    // Return null to indicate no planner available
+    return null;
   }
   return context;
 }
@@ -143,8 +144,14 @@ export function usePlannedQuery(
   data: NostrEvent[] | undefined; 
   loading: boolean;
 } {
-  const { registerQuery, getResults, phase, isReady } = useQueryPlanner();
+  const plannerContext = useQueryPlanner();
   const registered = useRef(false);
+  
+  if (!plannerContext) {
+    return { data: undefined, loading: false };
+  }
+  
+  const { registerQuery, getResults, phase, isReady } = plannerContext;
   
   // Register query during planning phase
   useEffect(() => {

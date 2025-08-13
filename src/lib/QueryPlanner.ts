@@ -194,10 +194,11 @@ export class QueryPlanner {
   }
   
   /**
-   * Execute all planned queries
+   * Execute all planned queries with smart caching
    */
   async execute(
-    fetchEvents: (filter: Filter) => Promise<NostrEvent[]>
+    fetchEvents: (filter: Filter) => Promise<NostrEvent[]>,
+    cache?: Map<string, NostrEvent[]> // Optional cache from previous execution
   ): Promise<void> {
     if (this.executed) {
       console.warn('[QueryPlanner] Already executed');
@@ -210,8 +211,48 @@ export class QueryPlanner {
     // Execute each batch
     for (const batch of batches) {
       for (const filter of batch.filters) {
-        console.log('[QueryPlanner] Executing batched query:', filter);
-        const events = await fetchEvents(filter);
+        let events: NostrEvent[] = [];
+        
+        // Smart caching for author queries
+        if (filter.authors && cache) {
+          const cachedEvents: NostrEvent[] = [];
+          const uncachedAuthors: string[] = [];
+          
+          // Check cache for each author
+          for (const author of filter.authors) {
+            const cacheKey = JSON.stringify({ ...filter, authors: [author] });
+            const cached = cache.get(cacheKey);
+            
+            if (cached) {
+              console.log(`[QueryPlanner] Using cached events for author ${author.substring(0, 8)}...`);
+              cachedEvents.push(...cached);
+            } else {
+              uncachedAuthors.push(author);
+            }
+          }
+          
+          // Only fetch uncached authors
+          if (uncachedAuthors.length > 0) {
+            console.log(`[QueryPlanner] Fetching ${uncachedAuthors.length} uncached authors (had ${filter.authors.length - uncachedAuthors.length} cached)`);
+            const newEvents = await fetchEvents({ ...filter, authors: uncachedAuthors });
+            
+            // Update cache for individual authors
+            for (const author of uncachedAuthors) {
+              const authorEvents = newEvents.filter(e => e.pubkey === author);
+              const cacheKey = JSON.stringify({ ...filter, authors: [author] });
+              cache.set(cacheKey, authorEvents);
+            }
+            
+            events = [...cachedEvents, ...newEvents];
+          } else {
+            console.log(`[QueryPlanner] All ${filter.authors.length} authors were cached!`);
+            events = cachedEvents;
+          }
+        } else {
+          // No caching possible, fetch everything
+          console.log('[QueryPlanner] Executing batched query:', filter);
+          events = await fetchEvents(filter);
+        }
         
         // Distribute results to original queries
         for (const queryId of batch.queryIds) {

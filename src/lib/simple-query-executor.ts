@@ -19,6 +19,7 @@ export class SimpleQueryExecutor {
   private queries: Record<string, any>;
   private context: QueryContext;
   private fetchEvents: (filter: any) => Promise<NostrEvent[]>;
+  private resolvedFilters: Map<string, any> = new Map();
   
   constructor(
     queries: Record<string, any>,
@@ -36,7 +37,7 @@ export class SimpleQueryExecutor {
     this.fetchEvents = fetchEvents;
   }
   
-  async executeAll(): Promise<Map<string, any>> {
+  async executeAll(): Promise<{ results: Map<string, any>, resolvedFilters: Map<string, any> }> {
     const results = new Map<string, any>();
     
     // Execute queries one by one (will handle dependencies)
@@ -46,7 +47,7 @@ export class SimpleQueryExecutor {
       this.context.queryResults.set(queryName, result);
     }
     
-    return results;
+    return { results, resolvedFilters: this.resolvedFilters };
   }
   
   async executeQuery(queryName: string, queryConfig: any): Promise<any> {
@@ -61,6 +62,9 @@ export class SimpleQueryExecutor {
     
     // Resolve variables in the filter
     const resolvedFilter = this.resolveFilterVariables(filter);
+    
+    // Store the resolved filter for live subscriptions
+    this.resolvedFilters.set(queryName, resolvedFilter);
     
     // Safety check: Don't send queries with unresolved @ or $ values
     const hasUnresolvedRefs = this.hasUnresolvedReferences(resolvedFilter);

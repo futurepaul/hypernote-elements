@@ -3,6 +3,7 @@ import type { Hypernote } from './schema';
 import type { SNSTRClient } from './snstr/client';
 import type { Filter } from './snstr/client';
 import { queryCache } from './queryCache';
+import { getTargetBatcher } from './TargetBatcher';
 
 /**
  * Manages fetching and caching of Hypernote components
@@ -200,15 +201,28 @@ export async function parseTarget(value: string, expectedKind: 0 | 1, client?: S
         }
       }
       
-      // If we have a client, fetch the profile data
-      if (client) {
+      // Try to use the batcher first for profile fetching
+      const batcher = getTargetBatcher(client);
+      if (batcher) {
+        console.log(`[parseTarget] Using batcher for profile: "${pubkey.substring(0, 8)}..."`);
+        try {
+          const target = await batcher.getTarget(pubkey);
+          return { ...target, raw: value };
+        } catch (error) {
+          console.error(`[parseTarget] Batcher failed for ${pubkey}:`, error);
+          // Fall through to direct fetch
+        }
+      }
+      
+      // Fallback: If we have a client but no batcher, fetch directly
+      if (client && !batcher) {
         const filter: Filter = {
           kinds: [0],
           authors: [pubkey],
           limit: 1
         };
         
-        console.log(`[parseTarget] Fetching profile for pubkey: "${pubkey}" (length: ${pubkey.length})`);
+        console.log(`[parseTarget] Direct fetch for profile: "${pubkey}" (length: ${pubkey.length})`);
         
         // Use cache for profile fetching
         const events = await queryCache.getOrFetch(filter, async (f) => {
