@@ -63,11 +63,45 @@ describe("Tailwind Parser", () => {
     });
   });
 
+  test("parses min/max width and height classes", () => {
+    expect(parseTailwindClasses("min-w-32 max-w-96")).toEqual({
+      minWidth: "8rem",
+      maxWidth: "24rem"
+    });
+    expect(parseTailwindClasses("min-h-16 max-h-32")).toEqual({
+      minHeight: "4rem",
+      maxHeight: "8rem"
+    });
+    expect(parseTailwindClasses("max-w-full max-h-full")).toEqual({
+      maxWidth: "100%",
+      maxHeight: "100%"
+    });
+    expect(parseTailwindClasses("max-w-none max-h-none")).toEqual({
+      maxWidth: "none",
+      maxHeight: "none"
+    });
+  });
+
   test("parses font classes", () => {
     const result = parseTailwindClasses("text-4xl font-bold");
     expect(result).toEqual({
       fontSize: "2.25rem",
       fontWeight: 700
+    });
+  });
+
+  test("parses overflow classes", () => {
+    expect(parseTailwindClasses("overflow-auto")).toEqual({
+      overflow: "auto"
+    });
+    expect(parseTailwindClasses("overflow-hidden")).toEqual({
+      overflow: "hidden"
+    });
+    expect(parseTailwindClasses("overflow-visible")).toEqual({
+      overflow: "visible"
+    });
+    expect(parseTailwindClasses("overflow-scroll")).toEqual({
+      overflow: "scroll"
     });
   });
 

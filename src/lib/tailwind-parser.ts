@@ -80,9 +80,13 @@ const COLORS: Record<string, Record<string | number, string>> = {
   amber: { 50: 'rgb(255,251,235)', 100: 'rgb(254,243,199)', 200: 'rgb(253,230,138)', 300: 'rgb(252,211,77)', 400: 'rgb(251,191,36)', 500: 'rgb(245,158,11)', 600: 'rgb(217,119,6)', 700: 'rgb(180,83,9)', 800: 'rgb(146,64,14)', 900: 'rgb(120,53,15)', 950: 'rgb(69,26,3)' },
   blue: { 50: 'rgb(239,246,255)', 100: 'rgb(219,234,254)', 200: 'rgb(191,219,254)', 300: 'rgb(147,197,253)', 400: 'rgb(96,165,250)', 500: 'rgb(59,130,246)', 600: 'rgb(37,99,235)', 700: 'rgb(29,78,216)', 800: 'rgb(30,64,175)', 900: 'rgb(30,58,138)', 950: 'rgb(23,37,84)' },
   green: { 50: 'rgb(240,253,244)', 100: 'rgb(220,252,231)', 200: 'rgb(187,247,208)', 300: 'rgb(134,239,172)', 400: 'rgb(74,222,128)', 500: 'rgb(34,197,94)', 600: 'rgb(22,163,74)', 700: 'rgb(21,128,61)', 800: 'rgb(22,101,52)', 900: 'rgb(20,83,45)', 950: 'rgb(5,46,22)' },
-  white: 'rgb(255,255,255)',
-  black: 'rgb(0,0,0)',
-  transparent: 'transparent'
+  pink: { 50: 'rgb(255,240,245)', 100: 'rgb(254,226,236)', 200: 'rgb(254,202,229)', 300: 'rgb(253,164,175)', 400: 'rgb(251,113,133)', 500: 'rgb(244,63,94)', 600: 'rgb(215,24,98)', 700: 'rgb(190,24,93)', 800: 'rgb(157,23,77)', 900: 'rgb(131,24,67)', 950: 'rgb(74,10,35)' },
+  yellow: { 50: 'rgb(255,251,235)', 100: 'rgb(254,243,199)', 200: 'rgb(253,230,138)', 300: 'rgb(252,211,77)', 400: 'rgb(251,191,36)', 500: 'rgb(245,158,11)', 600: 'rgb(217,119,6)', 700: 'rgb(180,83,9)', 800: 'rgb(146,64,14)', 900: 'rgb(120,53,15)', 950: 'rgb(69,26,3)' },
+  // Special cases: white, black, transparent are not true palettes in Tailwind, but are valid color names.
+  // They do not have shades, but for compatibility we provide only the 500 key.
+  white: { 500: 'rgb(255,255,255)' },
+  black: { 500: 'rgb(0,0,0)' },
+  transparent: { 500: 'transparent' }
 };
 
 // Spacing scale (in rem)
@@ -234,6 +238,29 @@ export function parseTailwindClasses(classes: string): HypernoteStyle | null {
         if (parts[1] === 'full') style.height = '100%';
         else if (parts[1] === 'auto') style.height = 'auto';
         else if (parts[1]) style.height = parseSpacing(parts[1]);
+        break;
+        
+      // Min/Max Width and Height
+      case 'min':
+        if (parts[1] === 'w' && parts[2]) {
+          if (parts[2] === 'full') style.minWidth = '100%';
+          else style.minWidth = parseSpacing(parts[2]);
+        } else if (parts[1] === 'h' && parts[2]) {
+          if (parts[2] === 'full') style.minHeight = '100%';
+          else style.minHeight = parseSpacing(parts[2]);
+        }
+        break;
+        
+      case 'max':
+        if (parts[1] === 'w' && parts[2]) {
+          if (parts[2] === 'full') style.maxWidth = '100%';
+          else if (parts[2] === 'none') style.maxWidth = 'none';
+          else style.maxWidth = parseSpacing(parts[2]);
+        } else if (parts[1] === 'h' && parts[2]) {
+          if (parts[2] === 'full') style.maxHeight = '100%';
+          else if (parts[2] === 'none') style.maxHeight = 'none';
+          else style.maxHeight = parseSpacing(parts[2]);
+        }
         break;
         
       // Padding
