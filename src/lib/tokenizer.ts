@@ -83,6 +83,126 @@ function checkClosingBracket(
 }
 
 /**
+ * Parse a quoted string value
+ * Returns the string content and new position
+ */
+function parseQuotedString(
+  content: string,
+  startPos: number,
+  strict: boolean,
+  sourcePosition: SourcePosition | null,
+  errorContext: string
+): { value: string; pos: number } {
+  let pos = startPos;
+  
+  if (content[pos] !== '"') {
+    return { value: '', pos };
+  }
+  
+  pos++; // Skip opening quote
+  const quoteStart = pos;
+  let value = '';
+  
+  while (pos < content.length && content[pos] !== '"') {
+    value += content[pos];
+    pos++;
+  }
+  
+  // Check for unclosed quote
+  if (pos >= content.length) {
+    if (strict && sourcePosition) {
+      const position = sourcePosition.getPosition(quoteStart - 1, content);
+      throw new TokenizerError(
+        `Unclosed quote in ${errorContext}`,
+        position.line,
+        position.column,
+        'UNCLOSED_QUOTE'
+      );
+    }
+  }
+  
+  pos++; // Skip closing quote
+  return { value, pos };
+}
+
+/**
+ * Parse a single attribute (name="value" or just "value" for content)
+ */
+function parseSingleAttribute(
+  content: string,
+  startPos: number,
+  elementStart: number,
+  strict: boolean,
+  sourcePosition: SourcePosition | null
+): { name?: string; value?: string; pos: number } | null {
+  let pos = startPos;
+  
+  // Skip whitespace
+  while (pos < content.length && content[pos] === ' ') {
+    pos++;
+  }
+  
+  // Check if we're at the end
+  if (pos >= content.length || content[pos] === ']') {
+    return null;
+  }
+  
+  // Handle quoted content attribute (e.g., [button "Text"])
+  if (content[pos] === '"') {
+    const { value, pos: newPos } = parseQuotedString(content, pos, strict, sourcePosition, 'attribute');
+    return { name: 'content', value, pos: newPos };
+  }
+  
+  // Handle named attribute (e.g., [div class="value"])
+  const attrStart = pos;
+  let attributeName = '';
+  
+  while (pos < content.length && content[pos] !== '=' && content[pos] !== ' ' && content[pos] !== ']') {
+    attributeName += content[pos];
+    pos++;
+  }
+  
+  if (!attributeName) {
+    return null;
+  }
+  
+  // Check for = sign
+  if (pos < content.length && content[pos] === '=') {
+    pos++; // Skip '='
+    
+    // Parse the value
+    if (pos < content.length && content[pos] === '"') {
+      const { value, pos: newPos } = parseQuotedString(content, pos, strict, sourcePosition, 'attribute value');
+      
+      // Validate attribute if in strict mode
+      if (strict && sourcePosition) {
+        const position = sourcePosition.getPosition(attrStart, content);
+        try {
+          validateAttribute(attributeName, value, true, position.line, position.column);
+        } catch (error) {
+          if (error instanceof TokenizerError) {
+            throw error;
+          }
+        }
+      }
+      
+      return { name: attributeName, value, pos: newPos };
+    } else if (strict && sourcePosition) {
+      // In strict mode, attributes must be quoted
+      const position = sourcePosition.getPosition(attrStart, content);
+      throw new TokenizerError(
+        `Attribute value for "${attributeName}" must be quoted`,
+        position.line,
+        position.column,
+        'UNQUOTED_ATTRIBUTE'
+      );
+    }
+  }
+  
+  return null;
+}
+
+/**
  * Parse attributes inside brackets until we hit ]
  * Returns the new position and the attributes object
  */
@@ -97,99 +217,21 @@ function parseAttributes(
   const attributes: Record<string, string> = {};
   
   while (pos < content.length && content[pos] !== ']') {
-    // Skip whitespace
-    if (content[pos] === ' ') {
-      pos++;
-      continue;
-    }
+    const result = parseSingleAttribute(content, pos, elementStart, strict, sourcePosition);
     
-    // Handle quoted content attribute (e.g., [button "Text"])
-    if (content[pos] === '"') {
-      pos++; // Skip opening quote
-      let attributeValue = '';
-      
-      while (pos < content.length && content[pos] !== '"') {
-        attributeValue += content[pos];
+    if (!result) {
+      // Skip any remaining whitespace
+      if (pos < content.length && content[pos] === ' ') {
         pos++;
+        continue;
       }
-      
-      if (pos >= content.length) {
-        if (strict && sourcePosition) {
-          const position = sourcePosition.getPosition(pos - 1, content);
-          throw new TokenizerError(
-            'Unclosed quote in attribute',
-            position.line,
-            position.column,
-            'UNCLOSED_QUOTE'
-          );
-        }
-      }
-      
-      pos++; // Skip closing quote
-      attributes['content'] = attributeValue;
-      continue;
+      break;
     }
     
-    // Handle named attribute (e.g., [div class="value"])
-    const attrStart = pos;
-    let attributeName = '';
-    while (pos < content.length && content[pos] !== '=' && content[pos] !== ' ' && content[pos] !== ']') {
-      attributeName += content[pos];
-      pos++;
+    if (result.name && result.value !== undefined) {
+      attributes[result.name] = result.value;
     }
-    
-    if (attributeName && pos < content.length && content[pos] === '=') {
-      pos++; // Skip '='
-      
-      // Handle quoted attribute value
-      if (pos < content.length && content[pos] === '"') {
-        pos++; // Skip opening quote
-        let attributeValue = '';
-        const quoteStart = pos;
-        
-        while (pos < content.length && content[pos] !== '"') {
-          attributeValue += content[pos];
-          pos++;
-        }
-        
-        // Check for unclosed quote
-        if (pos >= content.length) {
-          if (strict && sourcePosition) {
-            const position = sourcePosition.getPosition(quoteStart - 1, content);
-            throw new TokenizerError(
-              'Unclosed quote in attribute',
-              position.line,
-              position.column,
-              'UNCLOSED_QUOTE'
-            );
-          }
-        }
-        
-        pos++; // Skip closing quote
-        attributes[attributeName] = attributeValue;
-        
-        // Validate attribute if in strict mode
-        if (strict && sourcePosition) {
-          const position = sourcePosition.getPosition(attrStart, content);
-          try {
-            validateAttribute(attributeName, attributeValue, true, position.line, position.column);
-          } catch (error) {
-            if (error instanceof TokenizerError) {
-              throw error;
-            }
-          }
-        }
-      } else if (strict && sourcePosition) {
-        // In strict mode, attributes must be quoted
-        const position = sourcePosition.getPosition(attrStart, content);
-        throw new TokenizerError(
-          `Attribute value for "${attributeName}" must be quoted`,
-          position.line,
-          position.column,
-          'UNQUOTED_ATTRIBUTE'
-        );
-      }
-    }
+    pos = result.pos;
   }
   
   return { pos, attributes };
@@ -233,6 +275,186 @@ function processContainerElement(
   });
   
   return pos;
+}
+
+/**
+ * Tokenize inline content (text with bold/italic/code) recursively
+ * Returns array of mixed strings and inline tokens
+ */
+function tokenizeInlineContent(
+  content: string,
+  startPos: number,
+  endPos: number,
+  strict: boolean,
+  sourcePosition: SourcePosition | null
+): Array<string | Token> {
+  const inlineTokens: Array<string | Token> = [];
+  let pos = startPos;
+  let currentText = '';
+  
+  while (pos < endPos) {
+    const char = content[pos];
+    
+    // Handle inline code first (highest precedence, no nesting)
+    if (char === '`') {
+      // Flush any accumulated text
+      if (currentText) {
+        inlineTokens.push(currentText);
+        currentText = '';
+      }
+      
+      pos++; // Skip opening '`'
+      let codeText = '';
+      while (pos < endPos && content[pos] !== '`') {
+        codeText += content[pos];
+        pos++;
+      }
+      if (pos < endPos && content[pos] === '`') {
+        pos++; // Skip closing '`'
+        inlineTokens.push({
+          type: TokenType.INLINE_CODE,
+          value: codeText
+        });
+      } else {
+        // No closing backtick, treat as regular text
+        currentText += '`' + codeText;
+      }
+      continue;
+    }
+    
+    // Handle bold (**text**)
+    if (char === '*' && pos + 1 < endPos && content[pos + 1] === '*' && 
+        pos + 2 < endPos && content[pos + 2] !== '*') {
+      // Flush any accumulated text
+      if (currentText) {
+        inlineTokens.push(currentText);
+        currentText = '';
+      }
+      
+      pos += 2; // Skip '**'
+      
+      // Find closing '**'
+      let boldEnd = pos;
+      while (boldEnd < endPos - 1) {
+        if (content[boldEnd] === '*' && content[boldEnd + 1] === '*') {
+          break;
+        }
+        boldEnd++;
+      }
+      
+      if (boldEnd < endPos - 1 && content[boldEnd] === '*' && content[boldEnd + 1] === '*') {
+        // Recursively tokenize content inside bold
+        const nestedTokens = tokenizeInlineContent(content, pos, boldEnd, strict, sourcePosition);
+        inlineTokens.push({
+          type: TokenType.BOLD,
+          value: '', // Will be handled differently
+          attributes: { nested: nestedTokens }
+        });
+        pos = boldEnd + 2; // Skip closing '**'
+      } else {
+        // No closing **, treat as regular text
+        currentText += '**';
+      }
+      continue;
+    }
+    
+    // Handle italic (*text* but not **text**)
+    if (char === '*' && (pos + 1 >= endPos || content[pos + 1] !== '*') && 
+        (pos === startPos || content[pos - 1] !== '*')) {
+      // Flush any accumulated text
+      if (currentText) {
+        inlineTokens.push(currentText);
+        currentText = '';
+      }
+      
+      pos++; // Skip '*'
+      
+      // Find closing '*' (but not if it's part of **)
+      let italicEnd = pos;
+      while (italicEnd < endPos) {
+        if (content[italicEnd] === '*') {
+          // Check if this * is followed by another * (making it part of **)
+          if (italicEnd + 1 < endPos && content[italicEnd + 1] === '*') {
+            // Skip past the ** 
+            italicEnd += 2;
+            continue;
+          }
+          // Also check if this * is preceded by another * (making it the second * of **)
+          if (italicEnd > pos && content[italicEnd - 1] === '*') {
+            italicEnd++;
+            continue;
+          }
+          // This is a standalone *, so it's our closing delimiter
+          break;
+        }
+        italicEnd++;
+      }
+      
+      if (italicEnd < endPos && content[italicEnd] === '*') {
+        // Recursively tokenize content inside italic
+        const nestedTokens = tokenizeInlineContent(content, pos, italicEnd, strict, sourcePosition);
+        inlineTokens.push({
+          type: TokenType.ITALIC,
+          value: '', // Will be handled differently
+          attributes: { nested: nestedTokens }
+        });
+        pos = italicEnd + 1; // Skip closing '*'
+      } else {
+        // No closing *, treat as regular text
+        currentText += '*';
+      }
+      continue;
+    }
+    
+    // Handle variable references
+    if (char === '{' && pos + 1 < endPos) {
+      const nextChar = content[pos + 1];
+      const restOfContent = content.slice(pos + 1, endPos);
+      const isVariable = nextChar === '$' || 
+                        restOfContent.startsWith('user.') ||
+                        restOfContent.startsWith('time.') ||
+                        restOfContent.startsWith('target.') ||
+                        restOfContent.startsWith('form.');
+      
+      if (isVariable) {
+        // Flush any accumulated text
+        if (currentText) {
+          inlineTokens.push(currentText);
+          currentText = '';
+        }
+        
+        let variableName = '{';
+        pos++; // Skip '{'
+        while (pos < endPos && content[pos] !== '}') {
+          variableName += content[pos];
+          pos++;
+        }
+        if (pos < endPos && content[pos] === '}') {
+          variableName += '}';
+          pos++; // Skip '}'
+          inlineTokens.push({
+            type: TokenType.VARIABLE_REFERENCE,
+            value: variableName
+          });
+        } else {
+          // No closing }, treat as regular text
+          currentText += variableName;
+        }
+        continue;
+      }
+    }
+    
+    // Regular text
+    currentText += char;
+    pos++;
+  }
+  
+  // Flush any remaining text
+  if (currentText) {
+    inlineTokens.push(currentText);
+  }
+  
+  return inlineTokens;
 }
 
 /**
@@ -727,56 +949,8 @@ export function tokenize(content: string, strict: boolean = true): Token[] {
         continue;
       } else {
         // Handle other elements (e.g., [button "Text"])
-        let attributes: Record<string, string> = {};
-        
-        // Process attributes until we hit closing bracket
-        while (pos < content.length && content[pos] !== ']') {
-          // Skip whitespace
-          if (content[pos] === ' ') {
-            pos++;
-            continue;
-          }
-          
-          // Handle quoted attribute (e.g., [input "value"])
-          if (content[pos] === '"') {
-            pos++; // Skip opening quote
-            let attributeValue = '';
-            
-            while (pos < content.length && content[pos] !== '"') {
-              attributeValue += content[pos];
-              pos++;
-            }
-            
-            pos++; // Skip closing quote
-            attributes['content'] = attributeValue;
-            continue;
-          } 
-          
-          // Handle named attribute (e.g., [input name="value"])
-          let attributeName = '';
-          while (pos < content.length && content[pos] !== '=' && content[pos] !== ' ' && content[pos] !== ']') {
-            attributeName += content[pos];
-            pos++;
-          }
-          
-          if (attributeName && content[pos] === '=') {
-            pos++; // Skip '='
-            
-            // Handle quoted attribute value
-            if (content[pos] === '"') {
-              pos++; // Skip opening quote
-              let attributeValue = '';
-              
-              while (pos < content.length && content[pos] !== '"') {
-                attributeValue += content[pos];
-                pos++;
-              }
-              
-              pos++; // Skip closing quote
-              attributes[attributeName] = attributeValue;
-            }
-          }
-        }
+        const { pos: newPos, attributes } = parseAttributes(content, pos, elementStart, strict, sourcePosition);
+        pos = newPos;
         
         // Check if we found the closing bracket
         checkClosingBracket(pos, content, elementType, elementStart, strict, sourcePosition);
@@ -812,63 +986,34 @@ export function tokenize(content: string, strict: boolean = true): Token[] {
       continue;
     }
     
-    // Handle bold syntax (**text**)
-    if (char === '*' && content[pos + 1] === '*' && 
-        pos + 2 < content.length && content[pos + 2] !== '*') {
-      pos += 2; // Skip '**'
+    // Handle plain text and inline formatting together
+    let textEnd = pos;
+    while (textEnd < content.length && 
+           content[textEnd] !== '\n' && 
+           content[textEnd] !== '#' && 
+           content[textEnd] !== '[' && 
+           !(content[textEnd] === '{' && textEnd + 1 < content.length && content[textEnd + 1] === '#') && // Stop at ID markers
+           !(content[textEnd] === '{' && textEnd + 1 < content.length && content.slice(textEnd, textEnd + 6) === '{class') && // Stop at style markers
+           !(content[textEnd] === '!' && textEnd + 1 < content.length && content[textEnd + 1] === '[')) {
+      textEnd++;
+    }
+    
+    if (textEnd > pos) {
+      // Tokenize this text segment for inline formatting
+      const inlineTokens = tokenizeInlineContent(content, pos, textEnd, strict, sourcePosition);
       
-      let boldText = '';
-      while (pos < content.length - 1) {
-        if (content[pos] === '*' && content[pos + 1] === '*') {
-          pos += 2; // Skip closing '**'
-          tokens.push({
-            type: TokenType.BOLD,
-            value: boldText
-          });
-          break;
+      // Add the inline tokens to our main token stream
+      for (const inlineToken of inlineTokens) {
+        if (typeof inlineToken === 'string') {
+          if (inlineToken.length > 0) {
+            tokens.push({ type: TokenType.TEXT, value: inlineToken });
+          }
+        } else {
+          tokens.push(inlineToken);
         }
-        boldText += content[pos];
-        pos++;
       }
-      continue;
-    }
-    
-    // Handle italic syntax (*text* but not **text**)
-    if (char === '*' && content[pos + 1] !== '*' && pos > 0 && content[pos - 1] !== '*') {
-      pos++; // Skip '*'
       
-      let italicText = '';
-      while (pos < content.length) {
-        if (content[pos] === '*' && (pos + 1 >= content.length || content[pos + 1] !== '*')) {
-          pos++; // Skip closing '*'
-          tokens.push({
-            type: TokenType.ITALIC,
-            value: italicText
-          });
-          break;
-        }
-        italicText += content[pos];
-        pos++;
-      }
-      continue;
-    }
-    
-    // Handle plain text
-    let text = '';
-    while (pos < content.length && 
-           content[pos] !== '\n' && 
-           content[pos] !== '#' && 
-           content[pos] !== '[' && 
-           content[pos] !== '{' &&
-           content[pos] !== '*' &&
-           content[pos] !== '`' &&
-           !(content[pos] === '!' && content[pos + 1] === '[')) {
-      text += content[pos];
-      pos++;
-    }
-    
-    if (text.length > 0) {
-      tokens.push({ type: TokenType.TEXT, value: text });
+      pos = textEnd;
     }
     
     // If we didn't make progress, move to the next character
@@ -893,6 +1038,164 @@ export function tokenize(content: string, strict: boolean = true): Token[] {
 }
 
 /**
+ * Apply pending style to an element
+ */
+function applyStyleToElement(element: any, style: string | null): void {
+  if (style) {
+    if (!element.attributes) {
+      element.attributes = {};
+    }
+    element.attributes.class = style;
+  }
+}
+
+/**
+ * Apply pending ID to an element
+ */
+function applyIdToElement(element: any, id: string | null): void {
+  if (id) {
+    element.elementId = id;
+  }
+}
+
+/**
+ * Apply both ID and style to an element, clearing them afterward
+ */
+function applyIdAndStyle(
+  element: any,
+  currentId: { value: string | null },
+  currentStyle: { value: string | null }
+): void {
+  applyIdToElement(element, currentId.value);
+  applyStyleToElement(element, currentStyle.value);
+  currentId.value = null;
+  currentStyle.value = null;
+}
+
+/**
+ * Process inline token and add to buffer
+ */
+function processInlineToken(token: Token, inlineBuffer: any[]): void {
+  switch (token.type) {
+    case TokenType.TEXT:
+    case TokenType.VARIABLE_REFERENCE:
+      inlineBuffer.push(token.value);
+      break;
+    case TokenType.INLINE_CODE:
+      inlineBuffer.push({
+        type: 'code',
+        content: [token.value]
+      });
+      break;
+    case TokenType.BOLD: {
+      const content: any[] = [];
+      if (token.attributes?.nested) {
+        // Process nested tokens
+        const nested = token.attributes.nested as Array<string | Token>;
+        for (const nestedItem of nested) {
+          if (typeof nestedItem === 'string') {
+            content.push(nestedItem);
+          } else {
+            // Recursively process nested inline tokens
+            const nestedBuffer: any[] = [];
+            processInlineToken(nestedItem, nestedBuffer);
+            content.push(...nestedBuffer);
+          }
+        }
+      } else {
+        // Fallback to simple text value
+        content.push(token.value);
+      }
+      inlineBuffer.push({
+        type: 'strong',
+        content
+      });
+      break;
+    }
+    case TokenType.ITALIC: {
+      const content: any[] = [];
+      if (token.attributes?.nested) {
+        // Process nested tokens
+        const nested = token.attributes.nested as Array<string | Token>;
+        for (const nestedItem of nested) {
+          if (typeof nestedItem === 'string') {
+            content.push(nestedItem);
+          } else {
+            // Recursively process nested inline tokens
+            const nestedBuffer: any[] = [];
+            processInlineToken(nestedItem, nestedBuffer);
+            content.push(...nestedBuffer);
+          }
+        }
+      } else {
+        // Fallback to simple text value
+        content.push(token.value);
+      }
+      inlineBuffer.push({
+        type: 'em',
+        content
+      });
+      break;
+    }
+  }
+}
+
+/**
+ * Create a paragraph from inline buffer if it has non-whitespace content
+ */
+function createParagraphFromBuffer(inlineBuffer: any[]): any | null {
+  if (inlineBuffer.length === 0) {
+    return null;
+  }
+  
+  // Skip paragraphs that are only whitespace
+  const hasNonWhitespace = inlineBuffer.some(item => 
+    typeof item === 'string' ? item.trim().length > 0 : true
+  );
+  
+  if (!hasNonWhitespace) {
+    return null;
+  }
+  
+  return {
+    type: 'p',
+    content: [...inlineBuffer]
+  };
+}
+
+/**
+ * Handle newline tokens - single newline adds space, double creates paragraph
+ */
+function handleNewline(
+  tokens: Token[],
+  currentIndex: number,
+  inlineBuffer: any[],
+  flushFn: () => void
+): number {
+  currentIndex++; // Skip the newline
+  
+  // Check if the next token is also a newline (blank line = new paragraph)
+  if (currentIndex < tokens.length && tokens[currentIndex].type === TokenType.NEWLINE) {
+    flushFn();
+    currentIndex++; // Skip the second newline
+  } else {
+    // Single newline - treat as a space (markdown convention)
+    // Only add space if buffer has content and doesn't end with space
+    if (inlineBuffer.length > 0) {
+      const lastItem = inlineBuffer[inlineBuffer.length - 1];
+      if (typeof lastItem === 'string' && !lastItem.endsWith(' ')) {
+        inlineBuffer.push(' ');
+      } else if (typeof lastItem !== 'string') {
+        // Last item was a bold/italic element, add space
+        inlineBuffer.push(' ');
+      }
+    }
+  }
+  
+  return currentIndex;
+}
+
+/**
  * Parses tokens into an elements array using explicit closing tags
  * @param tokens Array of tokens to parse
  * @returns Array of element objects
@@ -907,29 +1210,15 @@ export function parseTokens(tokens: Token[]): any[] {
   let inlineBuffer: any[] = [];
 
   function flushParagraph() {
-    if (inlineBuffer.length > 0) {
-      // Skip paragraphs that are only whitespace
-      const hasNonWhitespace = inlineBuffer.some(item => 
-        typeof item === 'string' ? item.trim().length > 0 : true
-      );
-      
-      if (hasNonWhitespace) {
-        const paragraph = {
-          type: 'p',
-          content: [...inlineBuffer],
-        };
-        if (currentId) {
-          paragraph['elementId'] = currentId;
-          currentId = null;
-        }
-        if (currentStyle) {
-          paragraph['attributes'] = { class: currentStyle };
-          currentStyle = null;
-        }
-        elements.push(paragraph);
-      }
-      inlineBuffer = [];
+    const paragraph = createParagraphFromBuffer(inlineBuffer);
+    if (paragraph) {
+      applyIdToElement(paragraph, currentId);
+      applyStyleToElement(paragraph, currentStyle);
+      currentId = null;
+      currentStyle = null;
+      elements.push(paragraph);
     }
+    inlineBuffer = [];
   }
 
   // Helper function to parse container elements with explicit closing tags
@@ -940,17 +1229,11 @@ export function parseTokens(tokens: Token[]): any[] {
     let containerInlineBuffer: any[] = [];
 
     function flushContainerParagraph() {
-      if (containerInlineBuffer.length > 0) {
-        // Skip paragraphs that are only whitespace
-        const hasNonWhitespace = containerInlineBuffer.some(item => 
-          typeof item === 'string' ? item.trim().length > 0 : true
-        );
-        
-        if (hasNonWhitespace) {
-          containerElements.push({ type: 'p', content: [...containerInlineBuffer] });
-        }
-        containerInlineBuffer = [];
+      const paragraph = createParagraphFromBuffer(containerInlineBuffer);
+      if (paragraph) {
+        containerElements.push(paragraph);
       }
+      containerInlineBuffer = [];
     }
 
     // Track pending style for next element in container
@@ -976,57 +1259,26 @@ export function parseTokens(tokens: Token[]): any[] {
       }
       
       // Handle nested containers
-      if (t.type === TokenType.FORM_START) {
-        flushContainerParagraph();
-        const nestedForm = parseContainer(TokenType.FORM_START, TokenType.FORM_END, 'form', t);
-        // Apply pending style if present
-        if (containerStyle) {
-          if (!nestedForm.attributes) nestedForm.attributes = {};
-          nestedForm.attributes.class = containerStyle;
-          containerStyle = null;
-        }
-        containerElements.push(nestedForm);
-        continue;
-      }
+      const containerMap: Array<[TokenType, TokenType, string]> = [
+        [TokenType.FORM_START, TokenType.FORM_END, 'form'],
+        [TokenType.DIV_START, TokenType.DIV_END, 'div'],
+        [TokenType.BUTTON_START, TokenType.BUTTON_END, 'button'],
+        [TokenType.SPAN_START, TokenType.SPAN_END, 'span']
+      ];
       
-      if (t.type === TokenType.DIV_START) {
-        flushContainerParagraph();
-        const nestedDiv = parseContainer(TokenType.DIV_START, TokenType.DIV_END, 'div', t);
-        // Apply pending style if present
-        if (containerStyle) {
-          if (!nestedDiv.attributes) nestedDiv.attributes = {};
-          nestedDiv.attributes.class = containerStyle;
+      let handledContainer = false;
+      for (const [startType, endType, elementType] of containerMap) {
+        if (t.type === startType) {
+          flushContainerParagraph();
+          const nestedElement = parseContainer(startType, endType, elementType, t);
+          applyStyleToElement(nestedElement, containerStyle);
           containerStyle = null;
+          containerElements.push(nestedElement);
+          handledContainer = true;
+          break;
         }
-        containerElements.push(nestedDiv);
-        continue;
       }
-      
-      if (t.type === TokenType.BUTTON_START) {
-        flushContainerParagraph();
-        const nestedButton = parseContainer(TokenType.BUTTON_START, TokenType.BUTTON_END, 'button', t);
-        // Apply pending style if present
-        if (containerStyle) {
-          if (!nestedButton.attributes) nestedButton.attributes = {};
-          nestedButton.attributes.class = containerStyle;
-          containerStyle = null;
-        }
-        containerElements.push(nestedButton);
-        continue;
-      }
-      
-      if (t.type === TokenType.SPAN_START) {
-        flushContainerParagraph();
-        const nestedSpan = parseContainer(TokenType.SPAN_START, TokenType.SPAN_END, 'span', t);
-        // Apply pending style if present
-        if (containerStyle) {
-          if (!nestedSpan.attributes) nestedSpan.attributes = {};
-          nestedSpan.attributes.class = containerStyle;
-          containerStyle = null;
-        }
-        containerElements.push(nestedSpan);
-        continue;
-      }
+      if (handledContainer) continue;
       
       // Handle headings
       if (t.type === TokenType.HEADING) {
@@ -1035,11 +1287,8 @@ export function parseTokens(tokens: Token[]): any[] {
           type: `h${t.level}`,
           content: [t.value]
         };
-        // Apply pending style if present
-        if (containerStyle) {
-          heading['attributes'] = { class: containerStyle };
-          containerStyle = null;
-        }
+        applyStyleToElement(heading, containerStyle);
+        containerStyle = null;
         containerElements.push(heading);
         currentIndex++;
         continue;
@@ -1094,98 +1343,33 @@ export function parseTokens(tokens: Token[]): any[] {
         continue;
       }
       
-      // Handle loops
-      if (t.type === TokenType.EACH_START) {
+      // Handle loops and conditionals
+      if (t.type === TokenType.EACH_START || t.type === TokenType.IF_START) {
         flushContainerParagraph();
-        const loopElement = parseContainer(TokenType.EACH_START, TokenType.EACH_END, 'loop', t);
-        // Apply pending style if present
-        if (containerStyle) {
-          if (!loopElement.attributes) loopElement.attributes = {};
-          loopElement.attributes.class = containerStyle;
-          containerStyle = null;
-        }
-        containerElements.push(loopElement);
+        const [startType, endType, elementType] = t.type === TokenType.EACH_START 
+          ? [TokenType.EACH_START, TokenType.EACH_END, 'loop']
+          : [TokenType.IF_START, TokenType.IF_END, 'if'];
+        const element = parseContainer(startType, endType, elementType, t);
+        applyStyleToElement(element, containerStyle);
+        containerStyle = null;
+        containerElements.push(element);
         continue;
       }
       
-      // Handle conditionals
-      if (t.type === TokenType.IF_START) {
-        flushContainerParagraph();
-        const ifElement = parseContainer(TokenType.IF_START, TokenType.IF_END, 'if', t);
-        // Apply pending style if present
-        if (containerStyle) {
-          if (!ifElement.attributes) ifElement.attributes = {};
-          ifElement.attributes.class = containerStyle;
-          containerStyle = null;
-        }
-        containerElements.push(ifElement);
-        continue;
-      }
-      
-      // Handle variable references
-      if (t.type === TokenType.VARIABLE_REFERENCE) {
-        containerInlineBuffer.push(t.value);
-        currentIndex++;
-        continue;
-      }
-      
-      // Handle text
-      if (t.type === TokenType.TEXT) {
-        containerInlineBuffer.push(t.value);
-        currentIndex++;
-        continue;
-      }
-      
-      // Handle inline code
-      if (t.type === TokenType.INLINE_CODE) {
-        containerInlineBuffer.push({
-          type: 'code',
-          content: [t.value]
-        });
-        currentIndex++;
-        continue;
-      }
-      
-      // Handle bold text
-      if (t.type === TokenType.BOLD) {
-        containerInlineBuffer.push({
-          type: 'strong',
-          content: [t.value]
-        });
-        currentIndex++;
-        continue;
-      }
-      
-      // Handle italic text
-      if (t.type === TokenType.ITALIC) {
-        containerInlineBuffer.push({
-          type: 'em',
-          content: [t.value]
-        });
+      // Handle inline content (text, variables, formatting)
+      if (t.type === TokenType.VARIABLE_REFERENCE ||
+          t.type === TokenType.TEXT ||
+          t.type === TokenType.INLINE_CODE ||
+          t.type === TokenType.BOLD ||
+          t.type === TokenType.ITALIC) {
+        processInlineToken(t, containerInlineBuffer);
         currentIndex++;
         continue;
       }
       
       // Handle newlines - check for double newline (paragraph break)
       if (t.type === TokenType.NEWLINE) {
-        currentIndex++;
-        // Check if the next token is also a newline (blank line = new paragraph)
-        if (currentIndex < tokens.length && tokens[currentIndex].type === TokenType.NEWLINE) {
-          flushContainerParagraph();
-          currentIndex++; // Skip the second newline
-        } else {
-          // Single newline - treat as a space (markdown convention)
-          // Only add space if buffer has content and doesn't end with space
-          if (containerInlineBuffer.length > 0) {
-            const lastItem = containerInlineBuffer[containerInlineBuffer.length - 1];
-            if (typeof lastItem === 'string' && !lastItem.endsWith(' ')) {
-              containerInlineBuffer.push(' ');
-            } else if (typeof lastItem !== 'string') {
-              // Last item was a bold/italic element, add space
-              containerInlineBuffer.push(' ');
-            }
-          }
-        }
+        currentIndex = handleNewline(tokens, currentIndex, containerInlineBuffer, flushContainerParagraph);
         continue;
       }
       
@@ -1272,121 +1456,40 @@ export function parseTokens(tokens: Token[]): any[] {
         type: `h${token.level}`,
         content: [token.value]
       };
-      if (currentId) {
-        heading['elementId'] = currentId;
-        currentId = null;
-      }
-      if (currentStyle) {
-        heading['attributes'] = { class: currentStyle };
-        currentStyle = null;
-      }
+      applyIdToElement(heading, currentId);
+      applyStyleToElement(heading, currentStyle);
+      currentId = null;
+      currentStyle = null;
       elements.push(heading);
       currentIndex++;
       continue;
     }
 
     // Handle container elements with explicit closing tags
-    if (token.type === TokenType.FORM_START) {
-      const formElement = parseContainer(TokenType.FORM_START, TokenType.FORM_END, 'form', token);
-      if (currentId) {
-        formElement.elementId = currentId;
-        currentId = null;
-      }
-      if (currentStyle) {
-        if (!formElement.attributes) {
-          formElement.attributes = {};
-        }
-        formElement.attributes.class = currentStyle;
-        currentStyle = null;
-      }
-      elements.push(formElement);
-      continue;
-    }
-
-    if (token.type === TokenType.DIV_START) {
-      const divElement = parseContainer(TokenType.DIV_START, TokenType.DIV_END, 'div', token);
-      if (currentId) {
-        divElement.elementId = currentId;
-        currentId = null;
-      }
-      if (currentStyle) {
-        if (!divElement.attributes) {
-          divElement.attributes = {};
-        }
-        divElement.attributes.class = currentStyle;
-        currentStyle = null;
-      }
-      elements.push(divElement);
-      continue;
-    }
-
-    if (token.type === TokenType.BUTTON_START) {
-      const buttonElement = parseContainer(TokenType.BUTTON_START, TokenType.BUTTON_END, 'button', token);
-      if (currentId) {
-        buttonElement.elementId = currentId;
-        currentId = null;
-      }
-      if (currentStyle) {
-        if (!buttonElement.attributes) {
-          buttonElement.attributes = {};
-        }
-        buttonElement.attributes.class = currentStyle;
-        currentStyle = null;
-      }
-      elements.push(buttonElement);
-      continue;
-    }
-
-    if (token.type === TokenType.SPAN_START) {
-      const spanElement = parseContainer(TokenType.SPAN_START, TokenType.SPAN_END, 'span', token);
-      if (currentId) {
-        spanElement.elementId = currentId;
-        currentId = null;
-      }
-      if (currentStyle) {
-        if (!spanElement.attributes) {
-          spanElement.attributes = {};
-        }
-        spanElement.attributes.class = currentStyle;
-        currentStyle = null;
-      }
-      elements.push(spanElement);
-      continue;
-    }
-
-    if (token.type === TokenType.EACH_START) {
-      const loopElement = parseContainer(TokenType.EACH_START, TokenType.EACH_END, 'loop', token);
-      if (currentId) {
-        loopElement.elementId = currentId;
-        currentId = null;
-      }
-      if (currentStyle) {
-        if (!loopElement.attributes) {
-          loopElement.attributes = {};
-        }
-        loopElement.attributes.class = currentStyle;
-        currentStyle = null;
-      }
-      elements.push(loopElement);
-      continue;
-    }
+    const containerTypes: Array<[TokenType, TokenType, string]> = [
+      [TokenType.FORM_START, TokenType.FORM_END, 'form'],
+      [TokenType.DIV_START, TokenType.DIV_END, 'div'],
+      [TokenType.BUTTON_START, TokenType.BUTTON_END, 'button'],
+      [TokenType.SPAN_START, TokenType.SPAN_END, 'span'],
+      [TokenType.EACH_START, TokenType.EACH_END, 'loop'],
+      [TokenType.IF_START, TokenType.IF_END, 'if']
+    ];
     
-    if (token.type === TokenType.IF_START) {
-      const ifElement = parseContainer(TokenType.IF_START, TokenType.IF_END, 'if', token);
-      if (currentId) {
-        ifElement.elementId = currentId;
-        currentId = null;
+    let handledContainer = false;
+    for (const [startType, endType, elementType] of containerTypes) {
+      if (token.type === startType) {
+        const element = parseContainer(startType, endType, elementType, token);
+        const idRef = { value: currentId };
+        const styleRef = { value: currentStyle };
+        applyIdAndStyle(element, idRef, styleRef);
+        currentId = idRef.value;
+        currentStyle = styleRef.value;
+        elements.push(element);
+        handledContainer = true;
+        break;
       }
-      if (currentStyle) {
-        if (!ifElement.attributes) {
-          ifElement.attributes = {};
-        }
-        ifElement.attributes.class = currentStyle;
-        currentStyle = null;
-      }
-      elements.push(ifElement);
-      continue;
     }
+    if (handledContainer) continue;
 
     // Handle component references
     if (token.type === TokenType.COMPONENT) {
@@ -1395,10 +1498,8 @@ export function parseTokens(tokens: Token[]): any[] {
         alias: token.value,
         argument: token.attributes?.argument || ''
       };
-      if (currentId) {
-        componentElement['elementId'] = currentId;
-        currentId = null;
-      }
+      applyIdToElement(componentElement, currentId);
+      currentId = null;
       elements.push(componentElement);
       currentIndex++;
       continue;
@@ -1418,17 +1519,10 @@ export function parseTokens(tokens: Token[]): any[] {
       if (element.attributes && Object.keys(element.attributes).length === 0) {
         delete element.attributes;
       }
-      if (currentId) {
-        element['elementId'] = currentId;
-        currentId = null;
-      }
-      if (currentStyle) {
-        if (!element.attributes) {
-          element.attributes = {};
-        }
-        element.attributes.class = currentStyle;
-        currentStyle = null;
-      }
+      applyIdToElement(element, currentId);
+      applyStyleToElement(element, currentStyle);
+      currentId = null;
+      currentStyle = null;
       elements.push(element);
       currentIndex++;
       continue;
@@ -1441,82 +1535,29 @@ export function parseTokens(tokens: Token[]): any[] {
         type: 'img',
         attributes: { ...token.attributes }
       };
-      if (currentId) {
-        imageElement['elementId'] = currentId;
-        currentId = null;
-      }
-      if (currentStyle) {
-        imageElement.attributes.class = currentStyle;
-        currentStyle = null;
-      }
+      applyIdToElement(imageElement, currentId);
+      applyStyleToElement(imageElement, currentStyle);
+      currentId = null;
+      currentStyle = null;
       elements.push(imageElement);
       currentIndex++;
       continue;
     }
 
-    // Handle inline content (text and variable references)
-    if (token.type === TokenType.TEXT) {
-      inlineBuffer.push(token.value);
-      currentIndex++;
-      continue;
-    }
-
-    if (token.type === TokenType.VARIABLE_REFERENCE) {
-      inlineBuffer.push(token.value);
-      currentIndex++;
-      continue;
-    }
-    
-    // Handle inline code
-    if (token.type === TokenType.INLINE_CODE) {
-      inlineBuffer.push({
-        type: 'code',
-        content: [token.value]
-      });
-      currentIndex++;
-      continue;
-    }
-    
-    // Handle bold text
-    if (token.type === TokenType.BOLD) {
-      inlineBuffer.push({
-        type: 'strong',
-        content: [token.value]
-      });
-      currentIndex++;
-      continue;
-    }
-    
-    // Handle italic text
-    if (token.type === TokenType.ITALIC) {
-      inlineBuffer.push({
-        type: 'em',
-        content: [token.value]
-      });
+    // Handle inline content (text, variables, formatting)
+    if (token.type === TokenType.TEXT ||
+        token.type === TokenType.VARIABLE_REFERENCE ||
+        token.type === TokenType.INLINE_CODE ||
+        token.type === TokenType.BOLD ||
+        token.type === TokenType.ITALIC) {
+      processInlineToken(token, inlineBuffer);
       currentIndex++;
       continue;
     }
     
     // Handle newlines
     if (token.type === TokenType.NEWLINE) {
-      currentIndex++;
-      // Check if the next token is also a newline (blank line = new paragraph)
-      if (currentIndex < tokens.length && tokens[currentIndex].type === TokenType.NEWLINE) {
-        flushParagraph();
-        currentIndex++; // Skip the second newline
-      } else {
-        // Single newline - treat as a space (markdown convention)
-        // Only add space if buffer has content and doesn't end with space
-        if (inlineBuffer.length > 0) {
-          const lastItem = inlineBuffer[inlineBuffer.length - 1];
-          if (typeof lastItem === 'string' && !lastItem.endsWith(' ')) {
-            inlineBuffer.push(' ');
-          } else if (typeof lastItem !== 'string') {
-            // Last item was a bold/italic element, add space
-            inlineBuffer.push(' ');
-          }
-        }
-      }
+      currentIndex = handleNewline(tokens, currentIndex, inlineBuffer, flushParagraph);
       continue;
     }
 

@@ -41,95 +41,279 @@
         {
           "type": "strong",
           "content": [
-            "bold with *italic* inside"
+            "bold with ",
+            {
+              "type": "em",
+              "content": [
+                "italic"
+              ]
+            },
+            " inside"
           ]
         },
         " or ",
         {
           "type": "em",
           "content": [
-            "italic with *"
+            "italic with ",
+            {
+              "type": "strong",
+              "content": [
+                "bold"
+              ]
+            },
+            " inside"
           ]
         },
-        "bold",
-        {
-          "type": "strong",
-          "content": [
-            " inside*.\n\n## In Variables\n\nLet's say we have a user named "
-          ]
-        },
-        "{user.pubkey}",
-        {
-          "type": "strong",
-          "content": [
-            ".\n\nThe current time is *{time.now}*.\n\n## In Lists\n\n- "
-          ]
-        },
-        "Bold item",
-        {
-          "type": "strong",
-          "content": [
-            "\n- *Italic item*\n- Normal item with "
-          ]
-        },
-        "bold",
-        {
-          "type": "strong",
-          "content": [
-            " and *italic* words\n\n## In Complex Elements\n\n[div class=\"bg-gray-100 p-4 rounded\"]\n"
-          ]
-        },
-        "Important Notice:",
-        {
-          "type": "strong",
-          "content": [
-            " This is a *styled* div with "
-          ]
-        },
-        "bold",
-        {
-          "type": "strong",
-          "content": [
-            " and *italic* text.\n\nYou can use formatting with variables too: "
-          ]
-        },
-        "User:",
-        {
-          "type": "strong",
-          "content": [
-            " {user.pubkey}\n[/div]\n\n## Edge Cases\n\n"
-          ]
-        },
-        "Bold at start",
-        {
-          "type": "strong",
-          "content": [
-            " of paragraph.\n\nParagraph ending with "
-          ]
-        },
-        "bold at end",
-        {
-          "type": "strong",
-          "content": [
-            ".\n\n*Italic at start* of paragraph.\n\nParagraph ending with *italic at end*.\n\nMultiple "
-          ]
-        },
-        "bold",
-        {
-          "type": "strong",
-          "content": [
-            " words "
-          ]
-        },
-        "scattered",
-        {
-          "type": "strong",
-          "content": [
-            " throughout "
-          ]
-        },
-        "the",
         "."
+      ]
+    },
+    {
+      "type": "h2",
+      "content": [
+        "In Variables"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "Let's say we have a user named ",
+        {
+          "type": "strong",
+          "content": [
+            "{user.pubkey}"
+          ]
+        },
+        "."
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "The current time is ",
+        {
+          "type": "em",
+          "content": [
+            "{time.now}"
+          ]
+        },
+        "."
+      ]
+    },
+    {
+      "type": "h2",
+      "content": [
+        "In Lists"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "- ",
+        {
+          "type": "strong",
+          "content": [
+            "Bold item"
+          ]
+        },
+        " ",
+        "- ",
+        {
+          "type": "em",
+          "content": [
+            "Italic item"
+          ]
+        },
+        " ",
+        "- Normal item with ",
+        {
+          "type": "strong",
+          "content": [
+            "bold"
+          ]
+        },
+        " and ",
+        {
+          "type": "em",
+          "content": [
+            "italic"
+          ]
+        },
+        " words"
+      ]
+    },
+    {
+      "type": "h2",
+      "content": [
+        "In Complex Elements"
+      ]
+    },
+    {
+      "type": "div",
+      "elements": [
+        {
+          "type": "p",
+          "content": [
+            {
+              "type": "strong",
+              "content": [
+                "Important Notice:"
+              ]
+            },
+            " This is a ",
+            {
+              "type": "em",
+              "content": [
+                "styled"
+              ]
+            },
+            " div with ",
+            {
+              "type": "strong",
+              "content": [
+                "bold"
+              ]
+            },
+            " and ",
+            {
+              "type": "em",
+              "content": [
+                "italic"
+              ]
+            },
+            " text."
+          ]
+        },
+        {
+          "type": "p",
+          "content": [
+            "You can use formatting with variables too: ",
+            {
+              "type": "strong",
+              "content": [
+                "User:"
+              ]
+            },
+            " ",
+            "{user.pubkey}",
+            " "
+          ]
+        }
+      ],
+      "style": {
+        "backgroundColor": "rgb(243,244,246)",
+        "padding": "1rem",
+        "borderRadius": "0.25rem"
+      }
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Edge Cases"
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        {
+          "type": "strong",
+          "content": [
+            "Bold at start"
+          ]
+        },
+        " of paragraph."
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "Paragraph ending with ",
+        {
+          "type": "strong",
+          "content": [
+            "bold at end"
+          ]
+        },
+        "."
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        {
+          "type": "em",
+          "content": [
+            "Italic at start"
+          ]
+        },
+        " of paragraph."
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "Paragraph ending with ",
+        {
+          "type": "em",
+          "content": [
+            "italic at end"
+          ]
+        },
+        "."
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "Multiple ",
+        {
+          "type": "strong",
+          "content": [
+            "bold"
+          ]
+        },
+        " words ",
+        {
+          "type": "strong",
+          "content": [
+            "scattered"
+          ]
+        },
+        " throughout ",
+        {
+          "type": "strong",
+          "content": [
+            "the"
+          ]
+        },
+        " text."
+      ]
+    },
+    {
+      "type": "p",
+      "content": [
+        "Multiple ",
+        {
+          "type": "em",
+          "content": [
+            "italic"
+          ]
+        },
+        " words ",
+        {
+          "type": "em",
+          "content": [
+            "scattered"
+          ]
+        },
+        " throughout ",
+        {
+          "type": "em",
+          "content": [
+            "the"
+          ]
+        },
+        " text."
       ]
     }
   ],
