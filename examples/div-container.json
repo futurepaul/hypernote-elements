@@ -1,20 +1,6 @@
 {
   "version": "1.1.0",
-  "type": "hypernote",
-  "title": "Div Container Demo",
-  "description": "Demonstrates nested div containers with styling",
-  "name": "div-container",
-  "style": {
-    "padding": "1rem",
-    "backgroundColor": "rgb(243,244,246)"
-  },
-  "events": {
-    "@submit_feedback": {
-      "kind": 1,
-      "content": "Thanks for your feedback: {form.message}",
-      "tags": []
-    }
-  },
+  "component_kind": null,
   "elements": [
     {
       "type": "h1",
@@ -30,14 +16,6 @@
     },
     {
       "type": "div",
-      "elementId": "card-container",
-      "style": {
-        "padding": "1.5rem",
-        "backgroundColor": "rgb(255,255,255)",
-        "borderWidth": "1px",
-        "borderRadius": "0.5rem",
-        "boxShadow": "0 0 #0000, 0 0 #0000, 0 4px 6px -1px rgb(0,0,0,0.1), 0 2px 4px -2px rgb(0,0,0,0.1)"
-      },
       "elements": [
         {
           "type": "h2",
@@ -58,14 +36,6 @@
         },
         {
           "type": "div",
-          "style": {
-            "marginTop": "1rem",
-            "padding": "0.75rem",
-            "backgroundColor": "rgb(254,249,195)",
-            "borderColor": "rgb(234,179,8)",
-            "borderRadius": "0.25rem",
-            "borderLeftWidth": "4px"
-          },
           "elements": [
             {
               "type": "span",
@@ -91,11 +61,17 @@
                 "  "
               ]
             }
-          ]
+          ],
+          "style": {
+            "backgroundColor": "rgb(254,243,199)",
+            "padding": "0.75rem",
+            "marginTop": "1rem",
+            "borderRadius": "0.25rem",
+            "borderColor": "rgb(245,158,11)"
+          }
         },
         {
           "type": "form",
-          "event": "@submit_feedback",
           "elements": [
             {
               "type": "input",
@@ -107,16 +83,6 @@
             },
             {
               "type": "button",
-              "style": {
-                "marginTop": "0.5rem",
-                "paddingTop": "0.5rem",
-                "paddingRight": "1rem",
-                "paddingBottom": "0.5rem",
-                "paddingLeft": "1rem",
-                "color": "rgb(255,255,255)",
-                "backgroundColor": "rgb(59,130,246)",
-                "borderRadius": "0.25rem"
-              },
               "elements": [
                 {
                   "type": "p",
@@ -124,11 +90,44 @@
                     "Submit"
                   ]
                 }
-              ]
+              ],
+              "style": {
+                "backgroundColor": "rgb(59,130,246)",
+                "color": "rgb(255,255,255)",
+                "paddingLeft": "1rem",
+                "paddingRight": "1rem",
+                "paddingTop": "0.5rem",
+                "paddingBottom": "0.5rem",
+                "borderRadius": "0.25rem",
+                "marginTop": "0.5rem"
+              }
             }
-          ]
+          ],
+          "event": "@submit_feedback"
         }
-      ]
+      ],
+      "elementId": "card-container",
+      "style": {
+        "backgroundColor": "rgb(255,255,255)",
+        "padding": "1.5rem",
+        "borderRadius": "0.5rem",
+        "borderWidth": "1px"
+      }
     }
-  ]
+  ],
+  "type": "hypernote",
+  "title": "Div Container Demo",
+  "description": "Demonstrates nested div containers with styling",
+  "name": "div-container",
+  "style": {
+    "padding": "1rem",
+    "backgroundColor": "rgb(243,244,246)"
+  },
+  "events": {
+    "@submit_feedback": {
+      "kind": 1,
+      "content": "Thanks for your feedback: {form.message}",
+      "tags": []
+    }
+  }
 }

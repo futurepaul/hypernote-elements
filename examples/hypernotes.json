@@ -1,44 +1,6 @@
 {
   "version": "1.1.0",
-  "type": "hypernote",
-  "title": "My Hypernotes Browser",
-  "description": "Browse all your published Hypernotes and Elements",
-  "name": "hypernotes-browser",
-  "queries": {
-    "$my_applications": {
-      "kinds": [
-        32616
-      ],
-      "authors": [
-        "user.pubkey"
-      ],
-      "limit": 10,
-      "#t": [
-        "hypernote-application"
-      ]
-    },
-    "$my_elements": {
-      "kinds": [
-        32616
-      ],
-      "authors": [
-        "user.pubkey"
-      ],
-      "limit": 10,
-      "#t": [
-        "hypernote-element"
-      ]
-    },
-    "$my_state": {
-      "kinds": [
-        30078
-      ],
-      "authors": [
-        "user.pubkey"
-      ],
-      "limit": 10
-    }
-  },
+  "component_kind": null,
   "elements": [
     {
       "type": "h1",
@@ -73,20 +35,9 @@
     },
     {
       "type": "loop",
-      "source": "$my_applications",
-      "variable": "$doc",
       "elements": [
         {
           "type": "div",
-          "style": {
-            "marginBottom": "1rem",
-            "padding": "1rem",
-            "backgroundColor": "rgb(255,255,255)",
-            "borderColor": "rgb(59,130,246)",
-            "borderRadius": "0.5rem",
-            "borderLeftWidth": "4px",
-            "boxShadow": "0 0 #0000, 0 0 #0000, 0 1px 3px 0 rgb(0,0,0,0.1), 0 1px 2px -1px rgb(0,0,0,0.1)"
-          },
           "elements": [
             {
               "type": "p",
@@ -128,16 +79,6 @@
             },
             {
               "type": "div",
-              "style": {
-                "overflow": "auto",
-                "maxHeight": "8rem",
-                "padding": "0.5rem",
-                "backgroundColor": "rgb(249,250,251)",
-                "fontFamily": "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace",
-                "fontSize": "0.75rem",
-                "lineHeight": "1rem",
-                "borderRadius": "0.25rem"
-              },
               "elements": [
                 {
                   "type": "p",
@@ -146,7 +87,15 @@
                     " "
                   ]
                 }
-              ]
+              ],
+              "style": {
+                "backgroundColor": "rgb(249,250,251)",
+                "padding": "0.5rem",
+                "borderRadius": "0.25rem",
+                "fontSize": "0.75rem",
+                "maxHeight": "8rem",
+                "overflow": "auto"
+              }
             },
             {
               "type": "p",
@@ -167,9 +116,18 @@
                 "variable": "$doc.tags"
               }
             }
-          ]
+          ],
+          "style": {
+            "backgroundColor": "rgb(255,255,255)",
+            "padding": "1rem",
+            "borderRadius": "0.5rem",
+            "marginBottom": "1rem",
+            "borderColor": "rgb(59,130,246)"
+          }
         }
-      ]
+      ],
+      "source": "$my_applications",
+      "variable": "$doc"
     },
     {
       "type": "h2",
@@ -185,20 +143,9 @@
     },
     {
       "type": "loop",
-      "source": "$my_elements",
-      "variable": "$elem",
       "elements": [
         {
           "type": "div",
-          "style": {
-            "marginBottom": "1rem",
-            "padding": "1rem",
-            "backgroundColor": "rgb(255,255,255)",
-            "borderColor": "rgb(34,197,94)",
-            "borderRadius": "0.5rem",
-            "borderLeftWidth": "4px",
-            "boxShadow": "0 0 #0000, 0 0 #0000, 0 1px 3px 0 rgb(0,0,0,0.1), 0 1px 2px -1px rgb(0,0,0,0.1)"
-          },
           "elements": [
             {
               "type": "p",
@@ -240,16 +187,6 @@
             },
             {
               "type": "div",
-              "style": {
-                "overflow": "auto",
-                "maxHeight": "8rem",
-                "padding": "0.5rem",
-                "backgroundColor": "rgb(249,250,251)",
-                "fontFamily": "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace",
-                "fontSize": "0.75rem",
-                "lineHeight": "1rem",
-                "borderRadius": "0.25rem"
-              },
               "elements": [
                 {
                   "type": "p",
@@ -258,7 +195,15 @@
                     " "
                   ]
                 }
-              ]
+              ],
+              "style": {
+                "backgroundColor": "rgb(249,250,251)",
+                "padding": "0.5rem",
+                "borderRadius": "0.25rem",
+                "fontSize": "0.75rem",
+                "maxHeight": "8rem",
+                "overflow": "auto"
+              }
             },
             {
               "type": "p",
@@ -279,9 +224,18 @@
                 "variable": "$elem.tags"
               }
             }
-          ]
+          ],
+          "style": {
+            "backgroundColor": "rgb(255,255,255)",
+            "padding": "1rem",
+            "borderRadius": "0.5rem",
+            "marginBottom": "1rem",
+            "borderColor": "rgb(34,197,94)"
+          }
         }
-      ]
+      ],
+      "source": "$my_elements",
+      "variable": "$elem"
     },
     {
       "type": "h2",
@@ -297,19 +251,9 @@
     },
     {
       "type": "loop",
-      "source": "$my_state",
-      "variable": "$state",
       "elements": [
         {
           "type": "div",
-          "style": {
-            "marginBottom": "0.5rem",
-            "padding": "0.5rem",
-            "backgroundColor": "rgb(243,244,246)",
-            "fontSize": "0.875rem",
-            "lineHeight": "1.25rem",
-            "borderRadius": "0.25rem"
-          },
           "elements": [
             {
               "type": "p",
@@ -334,9 +278,57 @@
                 " "
               ]
             }
-          ]
+          ],
+          "style": {
+            "backgroundColor": "rgb(243,244,246)",
+            "padding": "0.5rem",
+            "borderRadius": "0.25rem",
+            "marginBottom": "0.5rem",
+            "fontSize": "0.875rem"
+          }
         }
-      ]
+      ],
+      "source": "$my_state",
+      "variable": "$state"
     }
-  ]
+  ],
+  "type": "hypernote",
+  "title": "My Hypernotes Browser",
+  "description": "Browse all your published Hypernotes and Elements",
+  "name": "hypernotes-browser",
+  "queries": {
+    "$my_applications": {
+      "kinds": [
+        32616
+      ],
+      "authors": [
+        "user.pubkey"
+      ],
+      "#t": [
+        "hypernote-application"
+      ],
+      "limit": 10
+    },
+    "$my_elements": {
+      "kinds": [
+        32616
+      ],
+      "authors": [
+        "user.pubkey"
+      ],
+      "#t": [
+        "hypernote-element"
+      ],
+      "limit": 10
+    },
+    "$my_state": {
+      "kinds": [
+        30078
+      ],
+      "authors": [
+        "user.pubkey"
+      ],
+      "limit": 10
+    }
+  }
 }

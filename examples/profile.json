@@ -1,5 +1,48 @@
 {
   "version": "1.1.0",
+  "component_kind": null,
+  "elements": [
+    {
+      "type": "div",
+      "elements": [
+        {
+          "type": "img",
+          "attributes": {
+            "alt": "{$profile.name}",
+            "src": "{$profile.picture}"
+          },
+          "style": {
+            "width": "2.5rem",
+            "height": "2.5rem",
+            "borderRadius": "9999px"
+          }
+        },
+        {
+          "type": "p",
+          "content": [
+            {
+              "type": "strong",
+              "content": [
+                "{$profile.name}"
+              ]
+            },
+            " ",
+            "- ",
+            "{$profile.nip05}",
+            " "
+          ]
+        }
+      ],
+      "style": {
+        "backgroundColor": "rgb(243,244,246)",
+        "padding": "1rem",
+        "borderRadius": "0.5rem",
+        "flexDirection": "row",
+        "alignItems": "center",
+        "gap": "0.5rem"
+      }
+    }
+  ],
   "type": "element",
   "title": "Profile Badge",
   "description": "A compact profile badge component",
@@ -35,47 +78,5 @@
         }
       ]
     }
-  },
-  "elements": [
-    {
-      "type": "div",
-      "style": {
-        "padding": "1rem",
-        "flexDirection": "row",
-        "alignItems": "center",
-        "gap": "0.5rem",
-        "backgroundColor": "rgb(243,244,246)",
-        "borderRadius": "0.5rem"
-      },
-      "elements": [
-        {
-          "type": "img",
-          "style": {
-            "width": "2.5rem",
-            "height": "2.5rem",
-            "borderRadius": "9999px"
-          },
-          "attributes": {
-            "alt": "{$profile.name}",
-            "src": "{$profile.picture}"
-          }
-        },
-        {
-          "type": "p",
-          "content": [
-            {
-              "type": "strong",
-              "content": [
-                "{$profile.name}"
-              ]
-            },
-            " ",
-            "- ",
-            "{$profile.nip05}",
-            " "
-          ]
-        }
-      ]
-    }
-  ]
+  }
 }

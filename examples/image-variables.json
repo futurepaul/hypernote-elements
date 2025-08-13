@@ -1,12 +1,6 @@
 {
   "version": "1.1.0",
-  "type": "hypernote",
-  "title": "Image Variable Test",
-  "description": "Testing variable resolution in image URLs",
-  "name": "image-variables",
-  "style": {
-    "backgroundColor": "rgb(243,244,246)"
-  },
+  "component_kind": null,
   "elements": [
     {
       "type": "h1",
@@ -16,14 +10,21 @@
     },
     {
       "type": "img",
-      "style": {
-        "width": "8rem",
-        "height": "8rem"
-      },
       "attributes": {
         "alt": "User avatar",
         "src": "https://robohash.org/{user.pubkey}?size=150x150"
+      },
+      "style": {
+        "width": "8rem",
+        "height": "8rem"
       }
     }
-  ]
+  ],
+  "type": "hypernote",
+  "title": "Image Variable Test",
+  "description": "Testing variable resolution in image URLs",
+  "name": "image-variables",
+  "style": {
+    "backgroundColor": "rgb(243,244,246)"
+  }
 }

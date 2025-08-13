@@ -1,13 +1,6 @@
 {
   "version": "1.1.0",
-  "type": "hypernote",
-  "title": "Text Formatting Demo",
-  "description": "Examples of bold, italic, and inline code formatting",
-  "name": "text-formatting",
-  "style": {
-    "padding": "2rem",
-    "backgroundColor": "rgb(255,255,255)"
-  },
+  "component_kind": null,
   "elements": [
     {
       "type": "h1",
@@ -139,5 +132,13 @@
         "."
       ]
     }
-  ]
+  ],
+  "type": "hypernote",
+  "title": "Text Formatting Demo",
+  "description": "Examples of bold, italic, and inline code formatting",
+  "name": "text-formatting",
+  "style": {
+    "backgroundColor": "rgb(255,255,255)",
+    "padding": "2rem"
+  }
 }

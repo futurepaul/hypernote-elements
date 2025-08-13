@@ -1,16 +1,6 @@
 {
   "version": "1.1.0",
-  "type": "hypernote",
-  "title": "Hello World",
-  "description": "A simple hello world example",
-  "name": "hello-world",
-  "events": {
-    "@post_hello": {
-      "kind": 1,
-      "content": "hello world",
-      "tags": []
-    }
-  },
+  "component_kind": null,
   "elements": [
     {
       "type": "h1",
@@ -20,7 +10,6 @@
     },
     {
       "type": "form",
-      "event": "@post_hello",
       "elements": [
         {
           "type": "button",
@@ -33,7 +22,19 @@
             }
           ]
         }
-      ]
+      ],
+      "event": "@post_hello"
     }
-  ]
+  ],
+  "type": "hypernote",
+  "title": "Hello World",
+  "description": "A simple hello world example",
+  "name": "hello-world",
+  "events": {
+    "@post_hello": {
+      "kind": 1,
+      "content": "hello world",
+      "tags": []
+    }
+  }
 }
