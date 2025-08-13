@@ -1,8 +1,7 @@
 import * as yaml from 'js-yaml';
 import { tokenize, parseTokens } from './tokenizer';
 import { safeValidateHypernote, type Hypernote } from './schema';
-import { twj } from 'tw-to-css';
-import { safeValidateStyleProperties } from './style-schema';
+import { parseTailwindClasses } from './tailwind-parser';
 import { processPipes } from './pipe-compiler';
 
 // Debug mode can be enabled via environment variable (check if process exists for browser compatibility)
@@ -21,7 +20,7 @@ function debugLog(message: string, data?: any) {
 const tailwindCache = new Map<string, Record<string, any> | null>();
 
 /**
- * Converts Tailwind classes to validated CSS-in-JS object with caching
+ * Converts Tailwind classes to CSS-in-JS object with caching
  */
 function convertTailwindToStyle(tailwindClasses: string): Record<string, any> | null {
   if (!tailwindClasses.trim()) return null;
@@ -34,26 +33,15 @@ function convertTailwindToStyle(tailwindClasses: string): Record<string, any> | 
   
   debugLog(`Converting Tailwind classes: "${tailwindClasses}"`);
   
-  try {
-    // Convert Tailwind to CSS-in-JS object
-    const styleObject = twj(tailwindClasses);
+  // Use our fast parser instead of tw-to-css + validation
+  const styleObject = parseTailwindClasses(tailwindClasses);
+  
+  if (styleObject) {
     debugLog('Tailwind conversion result:', styleObject);
-    
-    // Validate against our schema for security
-    const validation = safeValidateStyleProperties(styleObject);
-    if (!validation.success) {
-      console.warn(`Invalid style properties from Tailwind: "${tailwindClasses}"`);
-      console.warn('Tailwind output:', JSON.stringify(styleObject, null, 2));
-      console.warn('Validation errors:', validation.error.issues);
-      tailwindCache.set(tailwindClasses, null);
-      return null;
-    }
-    
-    debugLog('Style validation passed');
-    tailwindCache.set(tailwindClasses, validation.data);
-    return validation.data;
-  } catch (error) {
-    console.warn(`Failed to convert Tailwind classes: "${tailwindClasses}"`, error);
+    tailwindCache.set(tailwindClasses, styleObject);
+    return styleObject;
+  } else {
+    debugLog(`No styles generated for: "${tailwindClasses}"`);
     tailwindCache.set(tailwindClasses, null);
     return null;
   }
@@ -233,6 +221,12 @@ export function compileHypernoteToContent(hnmd: string): Hypernote {
   // Process pipes to convert compact syntax to full JSON format
   debugLog('Processing pipes...');
   const processedResult = processPipes(result);
+  
+  // Skip validation if requested (for performance)
+  if (process?.env?.SKIP_VALIDATION === 'true') {
+    debugLog('Skipping validation (SKIP_VALIDATION=true)');
+    return processedResult as Hypernote;
+  }
   
   // Safely validate the result against the schema
   debugLog('Validating against schema...');

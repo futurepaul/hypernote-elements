@@ -1,6 +1,9 @@
 import { z } from "zod/v4";
-import { StyleSheetSchema, StylePropertiesSchema } from "./style-schema";
+import { HypernoteStyle } from "./style-schema";
 import { PipeSchema, PipeOperation } from "./pipe-schema";
+
+// Simple style schema - just any object for now since we validate elsewhere
+const StylePropertiesSchema = z.record(z.string(), z.any()).optional();
 
 // Nostr event kind constants
 export const HYPERNOTE_KIND = 32616;          // All Hypernote documents and components

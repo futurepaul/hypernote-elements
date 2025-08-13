@@ -169,22 +169,32 @@ This is because:
 2. Recursive validation of deeply nested structures
 3. Discriminated unions require checking multiple branches
 
-## Solution Options
+## Solution Implemented
 
-### Quick Fix: Skip Validation in Development
-Add a flag to skip Zod validation during development:
+### 1. Custom Tailwind Parser (✅ Completed)
+- Removed `tw-to-css` dependency
+- Created minimal `tailwind-parser.ts` that directly maps Tailwind classes to supported properties
+- No Zod validation overhead for style properties
+
+### 2. Skip Validation Flag (✅ Completed)  
+Added `SKIP_VALIDATION` environment variable:
 ```typescript
-if (process.env.SKIP_VALIDATION) {
+if (process.env.SKIP_VALIDATION === 'true') {
   return processedResult as Hypernote;
 }
 ```
 
-### Medium Term: Optimize Schema
-1. Simplify union types where possible
-2. Use `.passthrough()` for known-safe sections
-3. Consider lazy validation for nested elements
+### Results
+Chess example compilation times:
+- **Before optimization**: 2512ms
+- **After Tailwind parser**: 1341ms (1.9x faster)
+- **With validation skipped**: 0.25ms (10,000x faster!)
 
-### Long Term: Alternative Validation
-1. Replace Zod with a faster validator (e.g., TypeBox)
-2. Implement custom validation optimized for our use case
-3. Validate only structure, not content
+The remaining bottleneck is entirely Zod schema validation. For development:
+- Use `SKIP_VALIDATION=true` for hot reload
+- Run validation only in production/tests
+
+### Future Options
+1. Replace Zod with a faster validator (e.g., TypeBox, Ajv)
+2. Implement streaming validation
+3. Cache validation results for unchanged sections

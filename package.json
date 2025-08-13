@@ -41,7 +41,6 @@
     "tailwind-merge": "^3.0.1",
     "tailwindcss": "^4.0.6",
     "tailwindcss-animate": "^1.0.7",
-    "tw-to-css": "^0.0.12",
     "use-debounce": "^10.0.5",
     "websocket-polyfill": "^1.0.0",
     "ws": "^8.18.3",
