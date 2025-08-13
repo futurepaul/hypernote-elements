@@ -5,6 +5,10 @@ import { PipeSchema, PipeOperation } from "./pipe-schema";
 // Simple style schema - just any object for now since we validate elsewhere
 const StylePropertiesSchema = z.record(z.string(), z.any()).optional();
 
+// Reusable schemas to avoid recreation
+const ElementIdSchema = z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, "Invalid elementId format");
+const MinStringSchema = z.string().min(1);
+
 // Nostr event kind constants
 export const HYPERNOTE_KIND = 32616;          // All Hypernote documents and components
 export const HYPERNOTE_ELEMENT_KIND = 32616;  // Hypernote components (same as HYPERNOTE_KIND)
@@ -31,9 +35,9 @@ export const CONTEXTVM_KIND = 25910;          // ContextVM tool call events
  */
 const ComponentElementSchema = z.object({
   type: z.literal("component"),
-  elementId: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, "Invalid elementId format").optional(),
-  alias: z.string().min(1),
-  argument: z.string().min(1),
+  elementId: ElementIdSchema.optional(),
+  alias: MinStringSchema,
+  argument: MinStringSchema,
 });
 
 /**
@@ -85,14 +89,15 @@ const SupportedElementType = z.union([
  * optional content (array of strings/elements), optional attributes,
  * and optional inline styles (CSS-in-JS object)
  */
+// Pre-define attribute schema
+const AttributesSchema = z.record(MinStringSchema, z.string());
+
 const ElementSchema = z.object({
   type: SupportedElementType,
-  elementId: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, "Invalid elementId format").optional(),
-  style: StylePropertiesSchema.optional(), // Inline styles as CSS-in-JS object
-  get content() {
-    return ElementContentSchema.optional();
-  },
-  attributes: z.record(z.string().min(1), z.string()).optional(),
+  elementId: ElementIdSchema.optional(),
+  style: StylePropertiesSchema, // Inline styles as CSS-in-JS object
+  content: z.lazy(() => ElementContentSchema.optional()),
+  attributes: AttributesSchema.optional(),
 });
 
 /**
@@ -116,11 +121,9 @@ const ElementContentSchema = z.array(
  */
 const IfElementSchema = z.object({
   type: z.literal("if"),
-  elementId: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, "Invalid elementId format").optional(),
-  condition: z.string().min(1),
-  get elements() {
-    return z.array(AnyElementSchema);
-  },
+  elementId: ElementIdSchema.optional(),
+  condition: MinStringSchema,
+  elements: z.lazy(() => z.array(AnyElementSchema)),
 });
 
 /**
@@ -131,12 +134,10 @@ const IfElementSchema = z.object({
  */
 const LoopElementSchema = z.object({
   type: z.literal("loop"),
-  elementId: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, "Invalid elementId format").optional(),
-  source: z.string().min(1),
-  variable: z.string().min(1),
-  get elements() {
-    return z.array(AnyElementSchema);
-  },
+  elementId: ElementIdSchema.optional(),
+  source: MinStringSchema,
+  variable: MinStringSchema,
+  elements: z.lazy(() => z.array(AnyElementSchema)),
 });
 
 /**
@@ -145,22 +146,23 @@ const LoopElementSchema = z.object({
  * - event: References an event template in the events map
  * - target: Optional elementId of an element to update upon successful submission
  */
+// Pre-define form element union to avoid recreation
+const FormElementUnion = z.lazy(() => z.union([
+  ElementSchema,
+  DivElementSchema,
+  ButtonElementSchema,
+  SpanElementSchema,
+  ComponentElementSchema,
+  IfElementSchema,
+  LoopElementSchema
+]));
+
 const FormElementSchema = z.object({
   type: z.literal("form"),
-  elementId: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, "Invalid elementId format").optional(),
-  event: z.string().min(1),
-  target: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, "Invalid elementId format").optional(),
-  get elements() {
-    return z.array(z.union([
-      ElementSchema,
-      DivElementSchema,
-      ButtonElementSchema,
-      SpanElementSchema,
-      ComponentElementSchema,
-      IfElementSchema,
-      LoopElementSchema
-    ]));
-  },
+  elementId: ElementIdSchema.optional(),
+  event: MinStringSchema,
+  target: ElementIdSchema.optional(),
+  elements: z.lazy(() => z.array(FormElementUnion)),
 });
 
 /**
@@ -170,12 +172,10 @@ const FormElementSchema = z.object({
  */
 const DivElementSchema = z.object({
   type: z.literal("div"),
-  elementId: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, "Invalid elementId format").optional(),
-  style: StylePropertiesSchema.optional(),
-  attributes: z.record(z.string().min(1), z.string()).optional(),
-  get elements() {
-    return z.array(AnyElementSchema).optional();
-  },
+  elementId: ElementIdSchema.optional(),
+  style: StylePropertiesSchema,
+  attributes: AttributesSchema.optional(),
+  elements: z.lazy(() => z.array(AnyElementSchema).optional()),
 });
 
 /**
@@ -185,12 +185,10 @@ const DivElementSchema = z.object({
  */
 const ButtonElementSchema = z.object({
   type: z.literal("button"),
-  elementId: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, "Invalid elementId format").optional(),
-  style: StylePropertiesSchema.optional(),
-  attributes: z.record(z.string().min(1), z.string()).optional(),
-  get elements() {
-    return z.array(AnyElementSchema).optional();
-  },
+  elementId: ElementIdSchema.optional(),
+  style: StylePropertiesSchema,
+  attributes: AttributesSchema.optional(),
+  elements: z.lazy(() => z.array(AnyElementSchema).optional()),
 });
 
 /**
@@ -200,12 +198,10 @@ const ButtonElementSchema = z.object({
  */
 const SpanElementSchema = z.object({
   type: z.literal("span"),
-  elementId: z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]*$/, "Invalid elementId format").optional(),
-  style: StylePropertiesSchema.optional(),
-  attributes: z.record(z.string().min(1), z.string()).optional(),
-  get elements() {
-    return z.array(AnyElementSchema).optional();
-  },
+  elementId: ElementIdSchema.optional(),
+  style: StylePropertiesSchema,
+  attributes: AttributesSchema.optional(),
+  elements: z.lazy(() => z.array(AnyElementSchema).optional()),
 });
 
 // Union of all element types for simpler type checking
@@ -239,23 +235,32 @@ const LegacyQueryPipeStepSchema = z.union([
   z.object({ operation: z.literal("default"), value: z.any() }),
 ]);
 
+// Pre-define array schemas
+const StringArraySchema = z.array(MinStringSchema);
+const IntArraySchema = z.array(z.int().nonnegative());
+const PositiveIntSchema = z.int().positive();
+const NonNegIntSchema = z.int().nonnegative();
+const IntOrStringSchema = z.union([NonNegIntSchema, z.string()]);
+const AuthorsSchema = z.union([StringArraySchema, MinStringSchema]);
+const TagArraySchema = z.array(z.array(z.string()));
+
 // Query schema - combines base Nostr filter with optional pipe transformations
 const QuerySchema = z.object({
   // Base Nostr filter fields
-  kinds: z.array(z.int().nonnegative()).optional(),
-  authors: z.union([z.array(z.string().min(1)), z.string().min(1)]).optional(),
-  limit: z.int().positive().optional(),
-  since: z.union([z.int().nonnegative(), z.string()]).optional(),
-  until: z.union([z.int().nonnegative(), z.string()]).optional(),
-  ids: z.array(z.string().min(1)).optional(),
+  kinds: IntArraySchema.optional(),
+  authors: AuthorsSchema.optional(),
+  limit: PositiveIntSchema.optional(),
+  since: IntOrStringSchema.optional(),
+  until: IntOrStringSchema.optional(),
+  ids: StringArraySchema.optional(),
   
   // Tag filters (NIP-01 standard)
-  "#e": z.array(z.string().min(1)).optional(),
-  "#p": z.array(z.string().min(1)).optional(),
-  "#d": z.array(z.string().min(1)).optional(),
-  "#t": z.array(z.string().min(1)).optional(),
-  "#a": z.array(z.string().min(1)).optional(),
-  "#r": z.array(z.string().min(1)).optional(),
+  "#e": StringArraySchema.optional(),
+  "#p": StringArraySchema.optional(),
+  "#d": StringArraySchema.optional(),
+  "#t": StringArraySchema.optional(),
+  "#a": StringArraySchema.optional(),
+  "#r": StringArraySchema.optional(),
   
   // NO MORE live flag - everything is live by default!
   // live: z.boolean().optional(), // REMOVED
@@ -272,10 +277,10 @@ const QuerySchema = z.object({
 
 // Event template schema - simplified!
 const EventTemplateSchema = z.object({
-  kind: z.int().nonnegative(), // Required for all events
+  kind: NonNegIntSchema, // Required for all events
   content: z.string().optional(),
   json: z.any().optional(), // Structured data that will be stringified as content
-  tags: z.array(z.array(z.string())).optional(),
+  tags: TagArraySchema.optional(),
   
   // Regular replaceable event fields
   d: z.string().optional(), // d tag for replaceable events

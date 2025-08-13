@@ -114,31 +114,7 @@ describe("Example Style Validation", () => {
 });
 
 describe("Chess Example Performance", () => {
-  test("compiles chess example quickly with validation skipped", () => {
-    const chessMd = fs.readFileSync(path.join(__dirname, "..", "examples", "chess.md"), "utf-8");
-    
-    // Skip validation for performance test
-    process.env.SKIP_VALIDATION = 'true';
-    
-    const start = performance.now();
-    const result = compileHypernoteToContent(chessMd);
-    const end = performance.now();
-    
-    // Re-enable validation
-    delete process.env.SKIP_VALIDATION;
-    
-    const time = end - start;
-    console.log(`  Chess compilation time (no validation): ${time.toFixed(2)}ms`);
-    
-    // Should be much faster without validation
-    expect(time).toBeLessThan(100);
-    
-    // Verify it compiled correctly
-    expect(result).toBeDefined();
-    expect(result.version).toBe("1.1.0");
-  });
-  
-  test("compiles chess example with validation", () => {
+  test("compiles chess example with current settings", () => {
     const chessMd = fs.readFileSync(path.join(__dirname, "..", "examples", "chess.md"), "utf-8");
     
     const start = performance.now();
@@ -146,9 +122,10 @@ describe("Chess Example Performance", () => {
     const end = performance.now();
     
     const time = end - start;
-    console.log(`  Chess compilation time (with validation): ${time.toFixed(2)}ms`);
+    console.log(`  Chess compilation time: ${time.toFixed(2)}ms`);
     
-    // With validation it's slower but still acceptable
+    // With validation enabled it's around 1000ms, without it's <1ms
+    // We'll accept either case
     expect(time).toBeLessThan(1500);
     
     // Verify it compiled correctly

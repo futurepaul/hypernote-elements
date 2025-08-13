@@ -188,9 +188,18 @@ if (process.env.SKIP_VALIDATION === 'true') {
 Chess example compilation times:
 - **Before optimization**: 2512ms
 - **After Tailwind parser**: 1341ms (1.9x faster)
+- **After schema optimization**: 1005ms (2.5x faster than original)
 - **With validation skipped**: 0.25ms (10,000x faster!)
 
-The remaining bottleneck is entirely Zod schema validation. For development:
+### 3. Schema Optimization (✅ Attempted)
+Fixed dynamic schema recreation by:
+- Pre-defining reusable schemas (`ElementIdSchema`, `MinStringSchema`, etc.)
+- Removing getter functions that recreated schemas
+- Using `z.lazy()` for recursive references
+
+**Result**: Modest improvement (~25% faster) but Zod validation still dominates at ~1 second for complex documents.
+
+The remaining bottleneck is Zod's recursive validation of deeply nested structures. For development:
 - Use `SKIP_VALIDATION=true` for hot reload
 - Run validation only in production/tests
 

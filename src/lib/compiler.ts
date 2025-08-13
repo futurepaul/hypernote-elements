@@ -7,6 +7,9 @@ import { processPipes } from './pipe-compiler';
 // Debug mode can be enabled via environment variable (check if process exists for browser compatibility)
 const DEBUG_MODE = typeof process !== 'undefined' && process.env?.HYPERNOTE_DEBUG === 'true';
 
+// Skip validation for performance (you can flip this to false for development speed)
+const ENABLE_VALIDATION = true; // Set to false to skip Zod validation
+
 function debugLog(message: string, data?: any) {
   if (DEBUG_MODE) {
     console.log(`[HYPERNOTE DEBUG] ${message}`);
@@ -222,9 +225,9 @@ export function compileHypernoteToContent(hnmd: string): Hypernote {
   debugLog('Processing pipes...');
   const processedResult = processPipes(result);
   
-  // Skip validation if requested (for performance)
-  if (process?.env?.SKIP_VALIDATION === 'true') {
-    debugLog('Skipping validation (SKIP_VALIDATION=true)');
+  // Skip validation if disabled (for performance)
+  if (!ENABLE_VALIDATION) {
+    debugLog('Skipping validation (ENABLE_VALIDATION=false)');
     return processedResult as Hypernote;
   }
   
