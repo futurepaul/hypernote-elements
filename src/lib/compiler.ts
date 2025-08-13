@@ -17,11 +17,20 @@ function debugLog(message: string, data?: any) {
   }
 }
 
+// Cache for Tailwind conversions to avoid reprocessing identical class strings
+const tailwindCache = new Map<string, Record<string, any> | null>();
+
 /**
- * Converts Tailwind classes to validated CSS-in-JS object
+ * Converts Tailwind classes to validated CSS-in-JS object with caching
  */
 function convertTailwindToStyle(tailwindClasses: string): Record<string, any> | null {
   if (!tailwindClasses.trim()) return null;
+  
+  // Check cache first
+  if (tailwindCache.has(tailwindClasses)) {
+    debugLog(`Using cached Tailwind conversion for: "${tailwindClasses}"`);
+    return tailwindCache.get(tailwindClasses)!;
+  }
   
   debugLog(`Converting Tailwind classes: "${tailwindClasses}"`);
   
@@ -36,13 +45,16 @@ function convertTailwindToStyle(tailwindClasses: string): Record<string, any> | 
       console.warn(`Invalid style properties from Tailwind: "${tailwindClasses}"`);
       console.warn('Tailwind output:', JSON.stringify(styleObject, null, 2));
       console.warn('Validation errors:', validation.error.issues);
+      tailwindCache.set(tailwindClasses, null);
       return null;
     }
     
     debugLog('Style validation passed');
+    tailwindCache.set(tailwindClasses, validation.data);
     return validation.data;
   } catch (error) {
     console.warn(`Failed to convert Tailwind classes: "${tailwindClasses}"`, error);
+    tailwindCache.set(tailwindClasses, null);
     return null;
   }
 }
@@ -61,6 +73,7 @@ function processElementStyles(element: any): any {
   if (element.attributes?.class) {
     debugLog(`Found class attribute: "${element.attributes.class}"`);
     const styleObject = convertTailwindToStyle(element.attributes.class);
+    
     if (styleObject) {
       element.style = styleObject;
       debugLog('Applied inline styles:', styleObject);

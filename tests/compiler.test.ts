@@ -137,6 +137,25 @@ test("should compile all examples without errors", () => {
   }
 });
 
+test("should compile chess example with board rendering", () => {
+  const example = loadExample("chess");
+  const result = compileHypernoteToContent(example.markdown);
+  
+  // Check that it has the expected structure
+  expect(result.version).toBe("1.1.0");
+  expect(result.queries).toBeDefined();
+  expect(result.queries?.["$board_state"]).toBeDefined();
+  expect(result.queries?.["$parsed_board"]).toBeDefined();
+  expect(result.events?.["@make_move"]).toBeDefined();
+  expect(result.events?.["@reset_board"]).toBeDefined();
+  
+  // Check for chess-specific tool call
+  const makeMoveEvent = result.events?.["@make_move"];
+  expect(makeMoveEvent.kind).toBe(25910);
+  expect(makeMoveEvent.json).toBeDefined();
+  expect(makeMoveEvent.json.params.name).toBe("chess_board_update");
+});
+
 test("should match expected JSON output for all examples", () => {
   for (const exampleName of AVAILABLE_EXAMPLES) {
     const example = loadExample(exampleName);

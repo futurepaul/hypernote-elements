@@ -542,25 +542,40 @@ function renderIf(element: HypernoteElement & { condition?: string }, ctx: Rende
   const isNegated = condition.startsWith('!');
   const cleanCondition = isNegated ? condition.slice(1).trim() : condition;
   
-  // Evaluate the condition
-  const value = resolveExpression(cleanCondition, ctx);
-  
-  // Determine truthiness
+  // Check for equality comparison
   let isTruthy = false;
-  if (value === undefined || value === null) {
-    isTruthy = false;
-  } else if (typeof value === 'boolean') {
-    isTruthy = value;
-  } else if (typeof value === 'string') {
-    isTruthy = value.length > 0;
-  } else if (typeof value === 'number') {
-    isTruthy = value !== 0;
-  } else if (Array.isArray(value)) {
-    isTruthy = value.length > 0;
-  } else if (typeof value === 'object') {
-    isTruthy = Object.keys(value).length > 0;
+  if (cleanCondition.includes(' == ')) {
+    // Handle equality comparison
+    const [leftExpr, rightExpr] = cleanCondition.split(' == ').map(s => s.trim());
+    const leftValue = resolveExpression(leftExpr, ctx);
+    const rightValue = resolveExpression(rightExpr, ctx);
+    
+    // Remove quotes from string literals for comparison
+    const cleanRight = rightExpr.startsWith('"') && rightExpr.endsWith('"') 
+      ? rightExpr.slice(1, -1) 
+      : rightValue;
+    
+    isTruthy = leftValue == cleanRight;
   } else {
-    isTruthy = !!value;
+    // Evaluate as truthy/falsy expression
+    const value = resolveExpression(cleanCondition, ctx);
+    
+    // Determine truthiness
+    if (value === undefined || value === null) {
+      isTruthy = false;
+    } else if (typeof value === 'boolean') {
+      isTruthy = value;
+    } else if (typeof value === 'string') {
+      isTruthy = value.length > 0;
+    } else if (typeof value === 'number') {
+      isTruthy = value !== 0;
+    } else if (Array.isArray(value)) {
+      isTruthy = value.length > 0;
+    } else if (typeof value === 'object') {
+      isTruthy = Object.keys(value).length > 0;
+    } else {
+      isTruthy = !!value;
+    }
   }
   
   // Apply negation if needed
@@ -584,9 +599,33 @@ function renderIf(element: HypernoteElement & { condition?: string }, ctx: Rende
 
 function renderLoop(element: HypernoteElement, ctx: RenderContext): React.ReactNode {
   const source = element.source || '';
-  const data = ctx.queryResults[source];
   const varName = element.variable || '$item';
-  const isLoading = ctx.loadingQueries?.has(source);
+  
+  // Check if source is a query result or a nested field
+  let data;
+  let isLoading = false;
+  
+  if (source.startsWith('$')) {
+    // Check if it's a loop variable first
+    if (ctx.loopVariables && ctx.loopVariables[source]) {
+      data = ctx.loopVariables[source];
+    } else if (source.includes('.')) {
+      // Nested field access like $board_state.board
+      data = resolveExpression(source, ctx);
+    } else {
+      // Direct query result
+      data = ctx.queryResults[source];
+      isLoading = ctx.loadingQueries?.has(source);
+    }
+  } else {
+    // Try to resolve as an expression
+    data = resolveExpression(source, ctx);
+  }
+  
+  // Ensure data is an array
+  if (data && !Array.isArray(data)) {
+    data = [];
+  }
   
   return (
     <div id={element.elementId} style={element.style}>
@@ -617,7 +656,7 @@ function renderLoop(element: HypernoteElement, ctx: RenderContext): React.ReactN
             loopVariables: { ...ctx.loopVariables, [varName]: item }
           };
           return (
-            <div key={item.id || i}>
+            <div key={item?.id || i}>
               {element.elements?.map((child, j) => 
                 <React.Fragment key={j}>{renderElement(child, loopCtx)}</React.Fragment>
               )}
