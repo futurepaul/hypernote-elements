@@ -3,12 +3,13 @@
  * Uses implicit dependency resolution via direct references
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { SimpleQueryExecutor } from '../lib/simple-query-executor';
 import { useAuthStore } from '../stores/authStore';
 import { useNostrStore } from '../stores/nostrStore';
 import type { NostrEvent } from '../lib/snstr/nip07';
 import { queryCache } from '../lib/queryCache';
+import { globalSubscriptionManager } from '../lib/subscriptionManager';
 
 interface UseQueryExecutionResult {
   queryResults: Record<string, any>;
@@ -49,21 +50,17 @@ export function useQueryExecution(
   // Key: queryName, Value: JSON stringified value that was triggered
   const firedTriggers = useRef<Map<string, string>>(new Map());
   
-  // Hash queries for change detection
-  const queriesJson = JSON.stringify(queries);
-  const [queriesHash, setQueriesHash] = useState<string>('');
+  // Stable serialization of queries for change detection
+  const queriesHash = useMemo(() => {
+    return JSON.stringify(queries);
+  }, [queries]);
   
-  useEffect(() => {
-    const hashQueries = async () => {
-      const encoder = new TextEncoder();
-      const data = encoder.encode(queriesJson);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-      setQueriesHash(hashHex);
-    };
-    hashQueries();
-  }, [queriesJson]);
+  // Stable serialization of relevant options for dependency tracking
+  const targetPubkey = options?.target?.pubkey;
+  const targetId = options?.target?.id;
+  const actionResultsHash = useMemo(() => {
+    return JSON.stringify(options?.actionResults || {});
+  }, [options?.actionResults]);
   
   // Check and execute triggers when query results change
   useEffect(() => {
@@ -108,7 +105,7 @@ export function useQueryExecution(
   }, [queryResults, options?.onTriggerAction]);
   
   useEffect(() => {
-    console.log('[useQueryExecution] Effect triggered - pubkey:', pubkey);
+    console.log('[useQueryExecution] Effect triggered');
     
     if (!snstrClient) {
       setLoading(false);
@@ -130,8 +127,7 @@ export function useQueryExecution(
     let cancelled = false;
     
     const executeQueries = async () => {
-      console.log('[useQueryExecution] Executing queries, hash:', queriesHash.substring(0, 16) + '...');
-      console.log('[useQueryExecution] Number of queries:', Object.keys(queries).length);
+      console.log(`[useQueryExecution] Executing ${Object.keys(queries).length} queries`);
       
       try {
         setLoading(true);
@@ -188,7 +184,7 @@ export function useQueryExecution(
         
         // Execute all queries
         const results = await executor.executeAll();
-        console.log('[useQueryExecution] Executor returned results Map:', results);
+        // console.log('[useQueryExecution] Executor returned results Map:', results);
         
         if (!cancelled) {
           // Convert Map to object
@@ -196,7 +192,7 @@ export function useQueryExecution(
           results.forEach((value, key) => {
             resultsObject[key] = value;
           });
-          console.log('[useQueryExecution] Setting query results:', resultsObject);
+          // console.log('[useQueryExecution] Setting query results:', resultsObject);
           setQueryResults(resultsObject);
           
           // Set up live subscriptions (all queries are live by default)
@@ -216,11 +212,25 @@ export function useQueryExecution(
               const value = resolvedFilter[key];
               if (value === 'user.pubkey') {
                 resolvedFilter[key] = pubkey || 'user.pubkey'; // Keep unresolved if no pubkey
+              } else if (value === 'target.pubkey') {
+                // Resolve target.pubkey if target context is available
+                resolvedFilter[key] = options?.target?.pubkey || 'target.pubkey';
+              } else if (value === 'target.id') {
+                // Resolve target.id if target context is available
+                resolvedFilter[key] = options?.target?.id || 'target.id';
               } else if (Array.isArray(value)) {
                 resolvedFilter[key] = value.map(v => {
                   // Resolve user.pubkey
                   if (v === 'user.pubkey') {
                     return pubkey || 'user.pubkey';
+                  }
+                  // Resolve target.pubkey
+                  if (v === 'target.pubkey') {
+                    return options?.target?.pubkey || 'target.pubkey';
+                  }
+                  // Resolve target.id
+                  if (v === 'target.id') {
+                    return options?.target?.id || 'target.id';
                   }
                   // Resolve action references
                   if (typeof v === 'string' && v.startsWith('@')) {
@@ -244,7 +254,9 @@ export function useQueryExecution(
             // Safety check: Don't create live subscription with unresolved references
             const hasUnresolvedRefs = (obj: any): boolean => {
               if (typeof obj === 'string') {
-                return obj.startsWith('@') || obj.startsWith('$') || obj === 'user.pubkey';
+                // Check for any unresolved references
+                return obj.startsWith('@') || obj.startsWith('$') || 
+                       obj === 'user.pubkey' || obj === 'target.pubkey' || obj === 'target.id';
               }
               if (Array.isArray(obj)) {
                 return obj.some(item => hasUnresolvedRefs(item));
@@ -262,8 +274,9 @@ export function useQueryExecution(
             
             console.log(`[LIVE] Starting subscription for ${queryName}`);
             
-            const cleanup = snstrClient.subscribeLive(
-              [resolvedFilter],
+            // Use subscription manager to deduplicate
+            const cleanup = globalSubscriptionManager.addSubscription(
+              resolvedFilter,
               async (event: NostrEvent) => {
                 console.log(`[LIVE] New event for ${queryName}:`, event.id);
                 
@@ -291,12 +304,18 @@ export function useQueryExecution(
                   });
                 }
               },
-              () => {
-                console.log(`[LIVE] EOSE for ${queryName}`);
-              }
+              // Factory function to create the actual subscription
+              (filter, callback) => snstrClient.subscribeLive(
+                [filter],
+                callback,
+                () => {
+                  console.log(`[LIVE] EOSE for ${queryName}`);
+                }
+              )
             );
             
             liveSubscriptions.current.set(queryName, cleanup);
+            console.log(`[SubscriptionManager] Active subscriptions: ${globalSubscriptionManager.getActiveCount()}`);
           });
         }
       } catch (err) {
@@ -321,7 +340,7 @@ export function useQueryExecution(
       });
       liveSubscriptions.current.clear();
     };
-  }, [queriesHash, snstrClient, pubkey, options?.target, options?.actionResults]);
+  }, [queriesHash, snstrClient, pubkey, targetPubkey, targetId, actionResultsHash, options?.onTriggerAction]);
   
   // Clear fired triggers when queries change (but not when action results change)
   useEffect(() => {

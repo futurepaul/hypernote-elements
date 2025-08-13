@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useDebounce } from 'use-debounce';
 import { RelayHandler } from './lib/relayHandler';
 import { safeCompileHypernote } from './lib/safe-compiler';
@@ -86,6 +86,12 @@ export function RenderHypernoteContent({ content }: { content: Hypernote }) {
   const resolverRef = useRef<ComponentResolver | undefined>(undefined);
   const [componentsLoaded, setComponentsLoaded] = useState(false);
 
+  // Create imports hash for stable dependency tracking
+  const importsHash = useMemo(() => {
+    if (!content.imports) return '';
+    return JSON.stringify(content.imports);
+  }, [content.imports]);
+
   // Prefetch all imported components
   useEffect(() => {
     const loadComponents = async () => {
@@ -96,12 +102,19 @@ export function RenderHypernoteContent({ content }: { content: Hypernote }) {
           return;
         }
 
-        console.log('[Renderer] Loading imported components:', content.imports);
-        const resolver = new ComponentResolver(snstrClient);
+        // Reuse existing resolver if possible
+        let resolver = resolverRef.current;
+        if (!resolver) {
+          console.log('[Renderer] Creating new ComponentResolver');
+          resolver = new ComponentResolver(snstrClient);
+          resolverRef.current = resolver;
+        } else {
+          console.log('[Renderer] Reusing existing ComponentResolver');
+        }
 
         try {
+          console.log('[Renderer] Loading imported components');
           await resolver.prefetchComponents(content.imports);
-          resolverRef.current = resolver;
           setComponentsLoaded(true);
         } catch (error) {
           console.error('[Renderer] Failed to load components:', error);
@@ -112,7 +125,7 @@ export function RenderHypernoteContent({ content }: { content: Hypernote }) {
       }
     };
     loadComponents();
-  }, [content.imports, snstrClient]);
+  }, [importsHash, snstrClient]);
 
   // Set up form data state
   const [formData, setFormData] = useState<Record<string, string>>({});
@@ -144,28 +157,37 @@ export function RenderHypernoteContent({ content }: { content: Hypernote }) {
 
   // Memoize queries based on their hash to prevent unnecessary re-fetches
   const memoizedQueries = useMemo(() => {
-    console.log('[Renderer] Using memoized queries with hash:', queriesHash.substring(0, 16) + '...');
+    console.log('[Renderer] Render cycle triggered');
     return content.queries || {};
   }, [queriesHash]);
 
   // Use a ref to hold the action executor so queries can trigger it
   const executeActionRef = useRef<(actionName: string) => Promise<void> | void>(() => {});
 
-  // Execute all queries with dependency resolution
-  const { queryResults, extractedVariables, loading: queriesLoading, error: queryError } = useQueryExecution(memoizedQueries, {
-    actionResults: publishedEventIds,
-    onTriggerAction: (actionName) => {
-      console.log(`[Renderer] Triggering action from query: "${actionName}"`);
-      if (executeActionRef.current) {
-        executeActionRef.current(actionName);
-      }
+  // Memoize the onTriggerAction callback to prevent re-renders
+  const onTriggerAction = useCallback((actionName: string) => {
+    console.log(`[Renderer] Triggering action from query: "${actionName}"`);
+    if (executeActionRef.current) {
+      executeActionRef.current(actionName);
     }
-  });
+  }, []); // Empty deps since we use a ref
+
+  // Memoize the query execution options to prevent re-executions
+  const queryExecutionOptions = useMemo(() => ({
+    actionResults: publishedEventIds,
+    onTriggerAction
+  }), [publishedEventIds, onTriggerAction]);
+
+  // Execute all queries with dependency resolution
+  const { queryResults, extractedVariables, loading: queriesLoading, error: queryError } = useQueryExecution(
+    memoizedQueries, 
+    queryExecutionOptions
+  );
 
   // Debug: Log when queryResults changes
-  useEffect(() => {
-    console.log('[Renderer] queryResults changed:', Object.keys(queryResults).map(k => `${k}: ${queryResults[k]?.length} items`));
-  }, [queryResults]);
+  // useEffect(() => {
+  //   console.log('[Renderer] queryResults changed:', Object.keys(queryResults).map(k => `${k}: ${queryResults[k]?.length} items`));
+  // }, [queryResults]);
 
   // Use the clean action execution hook with query results
   const { executeAction } = useActionExecution({
@@ -390,7 +412,8 @@ function resolveExpression(expr: string, ctx: RenderContext): any {
     }
     
     const result = path.reduce((obj, prop) => obj?.[prop], baseValue);
-    return result !== undefined ? result : '';
+    // Return null/undefined as-is instead of empty string to indicate missing value
+    return result;
   }
   
   // Special handling for time expressions
@@ -405,6 +428,7 @@ function resolveExpression(expr: string, ctx: RenderContext): any {
   }
   
   // Return the value if found, otherwise return original expression
+  // But if value is explicitly null (like user.pubkey when not logged in), return null
   return value !== undefined ? value : expr;
 }
 
@@ -746,8 +770,8 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
       ? processString(argument, ctx)  // Has braces, use processString
       : String(resolveExpression(argument, ctx));  // No braces, resolve directly
     
-    console.log(`[Component] Resolving argument for ${alias}: "${argument}" -> "${resolved}"`);
-    console.log(`[Component] Component def kind: ${componentDef.kind}`);
+    // console.log(`[Component] Resolving argument for ${alias}: "${argument}" -> "${resolved}"`);
+    // console.log(`[Component] Component def kind: ${componentDef.kind}`);
     return resolved;
   }, [argument, ctx.loopVariables, ctx.queryResults, ctx.extractedVariables, ctx.userPubkey, alias, componentDef.kind]);
   
@@ -765,11 +789,16 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
         return;
       }
       
-      // Skip if the resolved argument looks invalid (like "undefined" string or empty)
-      if (resolvedArgument === 'undefined' || resolvedArgument === 'null' || resolvedArgument === '') {
-        console.log(`[Component] Skipping load for ${alias} - invalid argument: "${resolvedArgument}"`);
-        setTargetError('Invalid argument');
+      // Skip if the resolved argument looks invalid
+      // Check for actual null/undefined values or string representations
+      if (resolvedArgument === 'undefined' || resolvedArgument === 'null' || 
+          resolvedArgument === '' || resolvedArgument === null || 
+          resolvedArgument === undefined || resolvedArgument === 'user.pubkey') {
+        console.log(`[Component] Waiting for valid argument for ${alias} - current: "${resolvedArgument}"`);
+        setTargetError('Waiting for data...');
         setTargetLoading(false);
+        // Clear any previous target context when waiting
+        setTargetContext(null);
         return;
       }
       
@@ -810,6 +839,21 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
   
   // Show error state
   if (targetError) {
+    // Special handling for "waiting for data" state
+    if (targetError === 'Waiting for data...') {
+      return (
+        <div style={{ 
+          color: '#6b7280', 
+          padding: '0.5rem', 
+          backgroundColor: '#f3f4f6', 
+          borderRadius: '0.25rem',
+          ...element.style 
+        }}>
+          <div style={{ fontSize: '0.875rem' }}>Waiting for authentication...</div>
+        </div>
+      );
+    }
+    
     return (
       <div style={{ 
         color: '#ef4444', 
@@ -878,18 +922,21 @@ function ComponentRenderer({
   elementStyle?: any;
   elementId?: string;
 }) {
+  // Memoize query options to prevent re-executions
+  const queryOptions = useMemo(() => ({
+    target: context.target,
+    parentExtracted: context.extractedVariables
+  }), [context.target, context.extractedVariables]);
+
   // Execute queries - the hook will handle validation of target context
   const { queryResults, extractedVariables, allLoading } = useQueryExecution(
     componentDef.queries || {},
-    {
-      target: context.target,
-      parentExtracted: context.extractedVariables
-    }
+    queryOptions
   );
   
   // Debug log query results
-  console.log(`[ComponentRenderer] Query results for component:`, queryResults);
-  console.log(`[ComponentRenderer] Loading state:`, allLoading);
+  // console.log(`[ComponentRenderer] Query results for component:`, queryResults);
+  // console.log(`[ComponentRenderer] Loading state:`, allLoading);
   
   // Merge the query results into context
   const componentCtx: RenderContext = {

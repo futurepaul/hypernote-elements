@@ -27,19 +27,25 @@ export class ComponentResolver {
   async prefetchComponents(imports: Record<string, string> | undefined): Promise<void> {
     if (!imports) return;
     
-    const fetches = Object.entries(imports).map(([alias, reference]) => 
-      this.fetchComponent(reference)
+    const fetches = Object.entries(imports).map(([alias, reference]) => {
+      // Check if already cached
+      const key = alias.startsWith('#') ? alias.slice(1) : alias;
+      if (this.cache.has(key)) {
+        console.log(`[ComponentResolver] Component ${key} already cached, skipping fetch`);
+        return Promise.resolve();
+      }
+      
+      return this.fetchComponent(reference)
         .then(component => {
           // Store without # prefix
-          const key = alias.startsWith('#') ? alias.slice(1) : alias;
           this.cache.set(key, component);
           console.log(`[ComponentResolver] Cached component ${key}`);
         })
         .catch(error => {
           console.error(`[ComponentResolver] Failed to fetch component ${alias}:`, error);
           // Don't throw - allow other components to load
-        })
-    );
+        });
+    });
     
     await Promise.all(fetches);
   }

@@ -228,13 +228,51 @@ export class RelayHandler {
     const subscriptionId = Math.random().toString(36).substring(2, 15);
     const minRelays = options.requireMinRelays || 1;
     
+    // Validate filters before sending to relays
+    const isValidFilter = (filter: Filter): boolean => {
+      // Check if any filter values contain unresolved references
+      for (const [key, value] of Object.entries(filter)) {
+        if (key === 'authors' || key === 'ids') {
+          if (Array.isArray(value)) {
+            for (const item of value) {
+              if (typeof item === 'string') {
+                // Check for unresolved references
+                if (item === 'user.pubkey' || item === 'target.pubkey' || 
+                    item === 'target.id' || item.startsWith('$') || 
+                    item.startsWith('@')) {
+                  this.logger(`⚠️ Invalid filter value detected: ${key}=${item}`);
+                  return false;
+                }
+                // Check for valid hex format (for pubkeys and event ids)
+                if ((key === 'authors' && !/^[0-9a-f]{64}$/i.test(item)) ||
+                    (key === 'ids' && !/^[0-9a-f]{64}$/i.test(item))) {
+                  this.logger(`⚠️ Invalid hex format in filter: ${key}=${item}`);
+                  return false;
+                }
+              }
+            }
+          }
+        }
+      }
+      return true;
+    };
+    
+    // Filter out invalid filters
+    const validFilters = filters.filter(isValidFilter);
+    
+    if (validFilters.length === 0) {
+      this.logger('⚠️ No valid filters to subscribe to, skipping subscription');
+      // Return a no-op cleanup function
+      return () => {};
+    }
+    
     const connectedRelays = this.getConnectedRelays();
     
     if (connectedRelays.length < minRelays) {
       throw new Error(`Need at least ${minRelays} connected relays, have ${connectedRelays.length}`);
     }
     
-    this.logger(`Starting LIVE subscription on ${connectedRelays.length} relays with filters: ${JSON.stringify(filters)}`);
+    this.logger(`Starting LIVE subscription on ${connectedRelays.length} relays with filters: ${JSON.stringify(validFilters)}`);
     
     let eoseCount = 0;
     const targetEoseCount = connectedRelays.length;
@@ -242,7 +280,7 @@ export class RelayHandler {
     
     const sub = this.pool.subscribeMany(
       connectedRelays,
-      filters,
+      validFilters,
       {
         onevent: (event) => {
           if (this.validateEvent(event)) {
@@ -293,13 +331,51 @@ export class RelayHandler {
     const timeout = options.timeout || this.subscriptionTimeout;
     const minRelays = options.requireMinRelays || 1;
     
+    // Validate filters before sending to relays
+    const isValidFilter = (filter: Filter): boolean => {
+      // Check if any filter values contain unresolved references
+      for (const [key, value] of Object.entries(filter)) {
+        if (key === 'authors' || key === 'ids') {
+          if (Array.isArray(value)) {
+            for (const item of value) {
+              if (typeof item === 'string') {
+                // Check for unresolved references
+                if (item === 'user.pubkey' || item === 'target.pubkey' || 
+                    item === 'target.id' || item.startsWith('$') || 
+                    item.startsWith('@')) {
+                  this.logger(`⚠️ Invalid filter value detected: ${key}=${item}`);
+                  return false;
+                }
+                // Check for valid hex format (for pubkeys and event ids)
+                if ((key === 'authors' && !/^[0-9a-f]{64}$/i.test(item)) ||
+                    (key === 'ids' && !/^[0-9a-f]{64}$/i.test(item))) {
+                  this.logger(`⚠️ Invalid hex format in filter: ${key}=${item}`);
+                  return false;
+                }
+              }
+            }
+          }
+        }
+      }
+      return true;
+    };
+    
+    // Filter out invalid filters
+    const validFilters = filters.filter(isValidFilter);
+    
+    if (validFilters.length === 0) {
+      this.logger('⚠️ No valid filters to subscribe to, returning empty results');
+      // Return empty results
+      return onEvent ? subscriptionId : [];
+    }
+    
     const connectedRelays = this.getConnectedRelays();
     
     if (connectedRelays.length < minRelays) {
       throw new Error(`Need at least ${minRelays} connected relays, have ${connectedRelays.length}`);
     }
     
-    this.logger(`Subscribing to events on ${connectedRelays.length} relays with filters: ${JSON.stringify(filters)}`);
+    this.logger(`Subscribing to events on ${connectedRelays.length} relays with filters: ${JSON.stringify(validFilters)}`);
     
     try {
       // If no callback is provided, collect events and return them
@@ -316,7 +392,7 @@ export class RelayHandler {
 
           const sub = this.pool.subscribeMany(
             connectedRelays,
-            filters,
+            validFilters,
             {
               onevent: (event) => {
                 if (this.validateEvent(event)) {
@@ -348,7 +424,7 @@ export class RelayHandler {
       // Callback-based subscription
       const unsub = this.pool.subscribeMany(
         connectedRelays,
-        filters,
+        validFilters,
         {
           onevent: (event) => {
             if (this.validateEvent(event)) {
