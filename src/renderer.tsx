@@ -6,6 +6,7 @@ import { useNostrStore } from './stores/nostrStore';
 import { useAuthStore } from './stores/authStore';
 import { useNostrSubscription } from './lib/snstr/hooks';
 import { useQueryExecution } from './hooks/useQueryExecution';
+import { useHypernoteExecutor } from './hooks/useHypernoteExecutor';
 import { useActionExecution } from './hooks/useActionExecution';
 import type { Hypernote, AnyElement } from './lib/schema';
 import { toast } from 'sonner';
@@ -178,11 +179,21 @@ export function RenderHypernoteContent({ content }: { content: Hypernote }) {
     onTriggerAction
   }), [publishedEventIds, onTriggerAction]);
 
+  // Toggle between old and new implementation
+  const USE_NEW_EXECUTOR = true; // Set to true to test new implementation
+  
   // Execute all queries with dependency resolution
-  const { queryResults, extractedVariables, loading: queriesLoading, error: queryError } = useQueryExecution(
-    memoizedQueries, 
+  const oldHook = useQueryExecution(
+    USE_NEW_EXECUTOR ? {} : memoizedQueries, 
     queryExecutionOptions
   );
+  
+  const newHook = useHypernoteExecutor(
+    USE_NEW_EXECUTOR ? content : { queries: {} },
+    queryExecutionOptions
+  );
+  
+  const { queryResults, extractedVariables, loading: queriesLoading, error: queryError } = USE_NEW_EXECUTOR ? newHook : oldHook;
 
   // Debug: Log when queryResults changes
   // useEffect(() => {
@@ -190,7 +201,7 @@ export function RenderHypernoteContent({ content }: { content: Hypernote }) {
   // }, [queryResults]);
 
   // Use the clean action execution hook with query results
-  const { executeAction } = useActionExecution({
+  const oldActionHook = useActionExecution({
     events: content.events,
     queryResults: queryResults || {},
     formData,
@@ -201,6 +212,19 @@ export function RenderHypernoteContent({ content }: { content: Hypernote }) {
       }));
     }
   });
+  
+  // For new executor, action execution is built-in
+  const executeAction = USE_NEW_EXECUTOR 
+    ? async (actionName: string) => {
+        const eventId = await newHook.executeAction(actionName, formData);
+        if (eventId) {
+          setPublishedEventIds(prev => ({
+            ...prev,
+            [actionName]: eventId
+          }));
+        }
+      }
+    : oldActionHook.executeAction;
 
   // Store the executeAction in ref so queries can use it
   executeActionRef.current = executeAction;
@@ -948,10 +972,21 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
     parentExtracted: ctx.extractedVariables
   }), [targetContext, ctx.extractedVariables]);
   
-  const { queryResults, extractedVariables, loading: queriesLoading } = useQueryExecution(
-    componentDef.queries || {},
+  // Use same executor flag as parent
+  const USE_NEW_EXECUTOR = true; // Match parent setting
+  
+  const oldComponentHook = useQueryExecution(
+    USE_NEW_EXECUTOR ? {} : componentDef.queries || {},
     queryOptions
   );
+  
+  const newComponentHook = useHypernoteExecutor(
+    USE_NEW_EXECUTOR ? componentDef : { queries: {} },
+    queryOptions
+  );
+  
+  const { queryResults, extractedVariables, loading: queriesLoading } = 
+    USE_NEW_EXECUTOR ? newComponentHook : oldComponentHook;
   
   // Update context with query results
   const finalCtx: RenderContext = {

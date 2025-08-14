@@ -20,6 +20,7 @@ export class SimpleQueryExecutor {
   private context: QueryContext;
   private fetchEvents: (filter: any) => Promise<NostrEvent[]>;
   private resolvedFilters: Map<string, any> = new Map();
+  private extractedVariables: Record<string, any> = {};
   
   constructor(
     queries: Record<string, any>,
@@ -188,6 +189,10 @@ export class SimpleQueryExecutor {
       return Object.values(obj).some(value => this.hasUnresolvedReferences(value));
     }
     return false;
+  }
+  
+  getExtractedVariables(): Record<string, any> {
+    return this.extractedVariables;
   }
   
   private resolveFilterVariables(filter: any): any {
