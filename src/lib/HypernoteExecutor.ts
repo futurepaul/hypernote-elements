@@ -41,6 +41,7 @@ export class HypernoteExecutor {
   private subscriptions: Map<string, Cleanup> = new Map();
   private resolvedFilters: Map<string, any> = new Map();
   private currentResults: Map<string, any> = new Map();
+  private signEvent?: (event: any) => Promise<NostrEvent>;
   
   // Callback for updates
   public onUpdate?: UpdateCallback;
@@ -49,13 +50,15 @@ export class HypernoteExecutor {
     hypernote: Partial<Hypernote>,
     context: ExecutorContext,
     snstrClient: SNSTRClient,
-    queryCache: typeof QueryCacheInstance
+    queryCache: typeof QueryCacheInstance,
+    signEvent?: (event: any) => Promise<NostrEvent>
   ) {
     this.queries = hypernote.queries || {};
     this.actions = hypernote.events || {};
     this.context = context;
     this.snstrClient = snstrClient;
     this.queryCache = queryCache;
+    this.signEvent = signEvent;
   }
   
   /**
@@ -229,12 +232,22 @@ export class HypernoteExecutor {
     // Resolve variables in the action
     const resolvedAction = this.resolveActionVariables(action, actionContext);
     
+    // Build the unsigned event
+    const unsignedEvent = {
+      kind: resolvedAction.kind,
+      content: resolvedAction.content,
+      tags: resolvedAction.tags || [],
+      created_at: Math.floor(Date.now() / 1000)
+    };
+    
+    // Sign the event if signing function is available
+    const eventToPublish = this.signEvent 
+      ? await this.signEvent(unsignedEvent)
+      : { ...unsignedEvent, pubkey: '', id: '', sig: '' } as NostrEvent;
+    
     // Publish the event
-    const eventId = await this.snstrClient.publishEvent(
-      resolvedAction.kind,
-      resolvedAction.content,
-      resolvedAction.tags || []
-    );
+    const publishResult = await this.snstrClient.publishEvent(eventToPublish);
+    const eventId = publishResult.eventId;
     
     console.log(`[HypernoteExecutor] Published event ${eventId} for action ${actionName}`);
     

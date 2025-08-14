@@ -29,7 +29,7 @@ export function useHypernoteExecutor(
   
   const executorRef = useRef<HypernoteExecutor>();
   const { snstrClient } = useNostrStore();
-  const { pubkey } = useAuthStore();
+  const { pubkey, signEvent } = useAuthStore();
   
   // Hash the queries to detect changes
   const queriesHash = useMemo(() => {
@@ -77,7 +77,8 @@ export function useHypernoteExecutor(
       hypernote,
       context,
       snstrClient,
-      queryCache
+      queryCache,
+      signEvent
     );
     executorRef.current = executor;
     
