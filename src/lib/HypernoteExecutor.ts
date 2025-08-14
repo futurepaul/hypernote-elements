@@ -245,9 +245,16 @@ export class HypernoteExecutor {
       ? await this.signEvent(unsignedEvent)
       : { ...unsignedEvent, pubkey: '', id: '', sig: '' } as NostrEvent;
     
+    // The signed event should have an id
+    const eventId = eventToPublish.id;
+    
+    if (!eventId) {
+      console.error(`[HypernoteExecutor] Signed event has no ID:`, eventToPublish);
+      return null;
+    }
+    
     // Publish the event
     const publishResult = await this.snstrClient.publishEvent(eventToPublish);
-    const eventId = publishResult.eventId;
     
     console.log(`[HypernoteExecutor] Published event ${eventId} for action ${actionName}`);
     
