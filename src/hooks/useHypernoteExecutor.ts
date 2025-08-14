@@ -31,11 +31,14 @@ export function useHypernoteExecutor(
   const { snstrClient } = useNostrStore();
   const { pubkey, signEvent } = useAuthStore();
   
-  // Hash the queries to detect changes
-  const queriesHash = useMemo(() => {
-    if (!hypernote.queries) return '';
-    return JSON.stringify(hypernote.queries);
-  }, [hypernote.queries]);
+  // Hash the queries AND events to detect changes
+  const hypernoteHash = useMemo(() => {
+    const hashObj = {
+      queries: hypernote.queries || {},
+      events: hypernote.events || {}
+    };
+    return JSON.stringify(hashObj);
+  }, [hypernote.queries, hypernote.events]);
   
   useEffect(() => {
     // Skip if no queries or no client
@@ -119,7 +122,7 @@ export function useHypernoteExecutor(
         executorRef.current.cleanup();
       }
     };
-  }, [queriesHash, snstrClient, queryCache, pubkey, options?.target]);
+  }, [hypernoteHash, snstrClient, queryCache, pubkey, options?.target]);
   
   // Action execution function
   const executeAction = async (actionName: string, formData: Record<string, any>) => {

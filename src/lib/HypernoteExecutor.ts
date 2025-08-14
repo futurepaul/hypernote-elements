@@ -3,14 +3,15 @@ import { SimpleQueryExecutor } from './simple-query-executor';
 import { applyPipes } from './pipes';
 import { SNSTRClient } from './snstr/client';
 import { queryCache as QueryCacheInstance } from './queryCache';
+import { UnifiedResolver, type ResolutionContext } from './UnifiedResolver';
 import type { Hypernote } from './schema';
 
-// Context for resolving variables
+// Context for resolving variables (matches ResolutionContext)
 export interface ExecutorContext {
   user: { pubkey: string | null };
   target?: any;
   queryResults: Map<string, any>;
-  actionResults: Map<string, string>;
+  actionResults: Map<string, string> | Record<string, string>;  // Support both formats
   loopVariables?: Record<string, any>;
   formData?: Record<string, any>;
 }
@@ -35,12 +36,11 @@ type UpdateCallback = (data: Partial<ResolvedData>) => void;
 export class HypernoteExecutor {
   private queries: Record<string, any>;
   private actions: Record<string, any>;
-  private context: ExecutorContext;
+  private resolver: UnifiedResolver;
   private snstrClient: SNSTRClient;
   private queryCache: typeof QueryCacheInstance;
   private subscriptions: Map<string, Cleanup> = new Map();
   private resolvedFilters: Map<string, any> = new Map();
-  private currentResults: Map<string, any> = new Map();
   private signEvent?: (event: any) => Promise<NostrEvent>;
   
   // Callback for updates
@@ -55,7 +55,19 @@ export class HypernoteExecutor {
   ) {
     this.queries = hypernote.queries || {};
     this.actions = hypernote.events || {};
-    this.context = context;
+    
+    // Create unified resolver with initial context
+    const resolutionContext: ResolutionContext = {
+      queryResults: context.queryResults || new Map(),
+      actionResults: context.actionResults || new Map(),
+      formData: context.formData || {},
+      loopVariables: context.loopVariables || {},
+      user: context.user,
+      target: context.target,
+      time: { now: Date.now() }
+    };
+    this.resolver = new UnifiedResolver(resolutionContext);
+    
     this.snstrClient = snstrClient;
     this.queryCache = queryCache;
     this.signEvent = signEvent;
@@ -77,10 +89,22 @@ export class HypernoteExecutor {
    * Phase 2: Execute queries with dependency resolution
    */
   async executeQueries(): Promise<ResolvedData> {
+    // Get current context from resolver
+    const resolverContext = this.resolver.getContext();
+    
+    // Convert to SimpleQueryExecutor context format
+    const executorContext = {
+      user: resolverContext.user,
+      target: resolverContext.target,
+      time: resolverContext.time,
+      queryResults: resolverContext.queryResults,
+      actionResults: resolverContext.actionResults
+    };
+    
     // Use SimpleQueryExecutor for dependency resolution
     const executor = new SimpleQueryExecutor(
       this.queries,
-      this.context,
+      executorContext,
       (filter) => this.fetchWithCache(filter)
     );
     
@@ -89,7 +113,9 @@ export class HypernoteExecutor {
     
     // Store resolved filters for live subscriptions
     this.resolvedFilters = resolvedFilters;
-    this.currentResults = results;
+    
+    // Update resolver context with new query results
+    this.resolver.updateContext({ queryResults: results });
     
     // Convert Map to object for React
     const queryResults: Record<string, any> = {};
@@ -149,7 +175,11 @@ export class HypernoteExecutor {
     event: NostrEvent,
     pipe?: any[]
   ): Promise<void> {
-    const currentData = this.currentResults.get(queryName);
+    // Get current context from resolver
+    const context = this.resolver.getContext();
+    const currentData = context.queryResults.get(queryName);
+    
+    let updatedData: any;
     
     if (pipe && pipe.length > 0) {
       // FIXED: Handle live updates with pipes!
@@ -161,24 +191,9 @@ export class HypernoteExecutor {
       const allEvents = await this.fetchWithCache(resolvedFilter);
       
       // Apply pipes to get transformed result
-      const processed = applyPipes(allEvents, pipe);
-      
-      // Update stored results
-      this.currentResults.set(queryName, processed);
-      
-      // Notify React
-      if (this.onUpdate) {
-        const queryResults: Record<string, any> = {};
-        this.currentResults.forEach((value, key) => {
-          queryResults[key] = value;
-        });
-        
-        this.onUpdate({ queryResults });
-      }
+      updatedData = applyPipes(allEvents, pipe);
     } else {
       // Simple case: no pipes, just append/prepend the event
-      let updatedData: any;
-      
       if (Array.isArray(currentData)) {
         // Check for duplicates
         if (currentData.some(e => e.id === event.id)) return;
@@ -189,19 +204,22 @@ export class HypernoteExecutor {
         // Single event query
         updatedData = event;
       }
-      
-      // Update stored results
-      this.currentResults.set(queryName, updatedData);
-      
-      // Notify React
-      if (this.onUpdate) {
-        const queryResults: Record<string, any> = {};
-        this.currentResults.forEach((value, key) => {
-          queryResults[key] = value;
-        });
-        
-        this.onUpdate({ queryResults });
-      }
+    }
+    
+    // Update resolver context with new query result
+    const queryResults = new Map([[queryName, updatedData]]);
+    this.resolver.updateContext({ queryResults });
+    
+    // Get all query results for React update
+    const allQueryResults: Record<string, any> = {};
+    const updatedContext = this.resolver.getContext();
+    updatedContext.queryResults.forEach((value, key) => {
+      allQueryResults[key] = value;
+    });
+    
+    // Notify React
+    if (this.onUpdate) {
+      this.onUpdate({ queryResults: allQueryResults });
     }
     
     // Check if this query triggers any actions
@@ -216,21 +234,22 @@ export class HypernoteExecutor {
    * Execute an action (publish an event)
    */
   async executeAction(actionName: string, formData: Record<string, any>): Promise<string | null> {
-    const action = this.actions[actionName];
+    const fullActionName = actionName.startsWith('@') ? actionName : `@${actionName}`;
+    const action = this.actions[fullActionName];
+    
     if (!action) {
-      console.error(`Action ${actionName} not found`);
+      console.error(`Action ${fullActionName} not found in`, this.actions);
       return null;
     }
     
-    // Update context with form data
-    const actionContext = {
-      ...this.context,
+    // Update resolver context with form data
+    this.resolver.updateContext({ 
       formData,
-      queryResults: this.currentResults
-    };
+      time: { now: Date.now() }
+    });
     
-    // Resolve variables in the action
-    const resolvedAction = this.resolveActionVariables(action, actionContext);
+    // Resolve the entire action using unified resolver
+    const resolvedAction = this.resolver.resolve(action);
     
     // Build the unsigned event
     const unsignedEvent = {
@@ -256,105 +275,17 @@ export class HypernoteExecutor {
     // Publish the event
     const publishResult = await this.snstrClient.publishEvent(eventToPublish);
     
-    console.log(`[HypernoteExecutor] Published event ${eventId} for action ${actionName}`);
+    console.log(`[HypernoteExecutor] Published event ${eventId} for action ${fullActionName}`);
     
-    // Store the event ID for queries that depend on it
-    this.context.actionResults.set(actionName, eventId);
+    // Store the event ID in resolver context for queries that depend on it
+    const actionResults = new Map([[fullActionName, eventId]]);
+    this.resolver.updateContext({ actionResults });
     
     // No need to invalidate queries - they're live and will auto-update!
     
     return eventId;
   }
   
-  /**
-   * Resolve variables in an action
-   */
-  private resolveActionVariables(action: any, context: ExecutorContext): any {
-    // This is a simplified version - full implementation would handle all variable types
-    const resolved = { ...action };
-    
-    // Resolve content
-    if (typeof resolved.content === 'string') {
-      resolved.content = this.resolveString(resolved.content, context);
-    } else if (resolved.json) {
-      // Handle JSON content
-      resolved.content = JSON.stringify(this.resolveObject(resolved.json, context));
-    }
-    
-    // Resolve tags
-    if (resolved.tags) {
-      resolved.tags = resolved.tags.map((tag: any[]) => 
-        tag.map(t => this.resolveString(t, context))
-      );
-    }
-    
-    return resolved;
-  }
-  
-  /**
-   * Resolve a string with variable substitutions
-   */
-  private resolveString(str: string, context: ExecutorContext): string {
-    // Handle {$queryName} substitutions
-    return str.replace(/\{([^}]+)\}/g, (match, expr) => {
-      // Handle "or" operator for default values
-      if (expr.includes(' or ')) {
-        const [varPart, defaultPart] = expr.split(' or ').map(s => s.trim());
-        
-        // Try to resolve the variable part
-        if (varPart.startsWith('$')) {
-          const queryName = varPart;
-          const result = context.queryResults.get(queryName);
-          if (result !== undefined && result !== null && result !== '') {
-            return String(result);
-          }
-        } else if (varPart === 'user.pubkey') {
-          if (context.user.pubkey) {
-            return context.user.pubkey;
-          }
-        }
-        
-        // Use the default value
-        return defaultPart;
-      }
-      
-      // Handle different expression types
-      if (expr.startsWith('$')) {
-        // Query result reference
-        const queryName = expr;
-        const result = context.queryResults.get(queryName);
-        return result !== undefined ? String(result) : match;
-      } else if (expr.startsWith('form.')) {
-        // Form field reference
-        const fieldName = expr.substring(5);
-        return context.formData?.[fieldName] || '';
-      } else if (expr === 'user.pubkey') {
-        return context.user.pubkey || '';
-      } else if (expr === 'time.now') {
-        return String(Date.now());
-      }
-      
-      return match;
-    });
-  }
-  
-  /**
-   * Resolve an object with variable substitutions
-   */
-  private resolveObject(obj: any, context: ExecutorContext): any {
-    if (typeof obj === 'string') {
-      return this.resolveString(obj, context);
-    } else if (Array.isArray(obj)) {
-      return obj.map(item => this.resolveObject(item, context));
-    } else if (obj && typeof obj === 'object') {
-      const resolved: any = {};
-      for (const [key, value] of Object.entries(obj)) {
-        resolved[key] = this.resolveObject(value, context);
-      }
-      return resolved;
-    }
-    return obj;
-  }
   
   /**
    * Fetch events with caching
@@ -378,8 +309,9 @@ export class HypernoteExecutor {
    * Get current query results
    */
   getCurrentResults(): Record<string, any> {
+    const context = this.resolver.getContext();
     const results: Record<string, any> = {};
-    this.currentResults.forEach((value, key) => {
+    context.queryResults.forEach((value, key) => {
       results[key] = value;
     });
     return results;
