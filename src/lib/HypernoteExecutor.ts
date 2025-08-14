@@ -297,6 +297,27 @@ export class HypernoteExecutor {
   private resolveString(str: string, context: ExecutorContext): string {
     // Handle {$queryName} substitutions
     return str.replace(/\{([^}]+)\}/g, (match, expr) => {
+      // Handle "or" operator for default values
+      if (expr.includes(' or ')) {
+        const [varPart, defaultPart] = expr.split(' or ').map(s => s.trim());
+        
+        // Try to resolve the variable part
+        if (varPart.startsWith('$')) {
+          const queryName = varPart;
+          const result = context.queryResults.get(queryName);
+          if (result !== undefined && result !== null && result !== '') {
+            return String(result);
+          }
+        } else if (varPart === 'user.pubkey') {
+          if (context.user.pubkey) {
+            return context.user.pubkey;
+          }
+        }
+        
+        // Use the default value
+        return defaultPart;
+      }
+      
       // Handle different expression types
       if (expr.startsWith('$')) {
         // Query result reference
