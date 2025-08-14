@@ -185,13 +185,18 @@ export class HypernoteExecutor {
       // FIXED: Handle live updates with pipes!
       // Re-fetch all events and re-apply pipes
       const resolvedFilter = this.resolvedFilters.get(queryName);
-      if (!resolvedFilter) return;
+      if (!resolvedFilter) {
+        console.log(`[HypernoteExecutor] No resolved filter for ${queryName}, skipping update`);
+        return;
+      }
       
       // Get all events (including the new one)
       const allEvents = await this.fetchWithCache(resolvedFilter);
+      console.log(`[HypernoteExecutor] Re-fetched ${allEvents.length} events for ${queryName}`);
       
       // Apply pipes to get transformed result
       updatedData = applyPipes(allEvents, pipe);
+      console.log(`[HypernoteExecutor] After pipes, ${queryName} =`, updatedData);
     } else {
       // Simple case: no pipes, just append/prepend the event
       if (Array.isArray(currentData)) {
@@ -219,7 +224,10 @@ export class HypernoteExecutor {
     
     // Notify React
     if (this.onUpdate) {
+      console.log(`[HypernoteExecutor] Notifying React with updated results for ${queryName}:`, allQueryResults[queryName]);
       this.onUpdate({ queryResults: allQueryResults });
+    } else {
+      console.log(`[HypernoteExecutor] No onUpdate callback set!`);
     }
     
     // Check if this query triggers any actions

@@ -87,7 +87,12 @@ export function useHypernoteExecutor(
     
     // Set up update callback
     executor.onUpdate = (newData) => {
-      setData(prev => ({ ...prev, ...newData }));
+      console.log('[useHypernoteExecutor] Received update from executor:', newData);
+      setData(prev => {
+        const updated = { ...prev, ...newData };
+        console.log('[useHypernoteExecutor] Updated state:', updated);
+        return updated;
+      });
     };
     
     // Execute queries
