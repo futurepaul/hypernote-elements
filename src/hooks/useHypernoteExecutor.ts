@@ -8,7 +8,7 @@ import type { Hypernote } from '../lib/schema';
 interface UseHypernoteExecutorOptions {
   target?: any;
   parentExtracted?: Record<string, any>;
-  actionResults?: Map<string, string>;
+  actionResults?: Map<string, string> | Record<string, string>;
 }
 
 /**
@@ -54,7 +54,15 @@ export function useHypernoteExecutor(
       user: { pubkey },
       target: options?.target,
       queryResults: new Map(),
-      actionResults: options?.actionResults || new Map()
+      actionResults: (() => {
+        // Convert actionResults to Map if it's a plain object
+        if (options?.actionResults instanceof Map) {
+          return options.actionResults;
+        } else if (options?.actionResults) {
+          return new Map(Object.entries(options.actionResults));
+        }
+        return new Map();
+      })()
     };
     
     // Add parent extracted variables if provided
