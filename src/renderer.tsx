@@ -6,8 +6,6 @@ import { useNostrStore } from './stores/nostrStore';
 import { useAuthStore } from './stores/authStore';
 import { useNostrSubscription } from './lib/snstr/hooks';
 import { useQueryExecution } from './hooks/useQueryExecution';
-import { useQueryExecutionWithPlanner } from './hooks/useQueryExecutionWithPlanner';
-import { QueryPlannerProvider } from './hooks/useQueryPlanner';
 import { useActionExecution } from './hooks/useActionExecution';
 import type { Hypernote, AnyElement } from './lib/schema';
 import { toast } from 'sonner';
@@ -928,52 +926,15 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
     loadingQueries: new Set()
   };
   
-  // Recursively render component's elements
-  return (
-    <ComponentRenderer 
-      componentDef={componentDef}
-      context={componentCtx}
-      elementStyle={element.style}
-      elementId={element.elementId}
-    />
-  );
-}
-
-// Pure component renderer - renders embedded hypernote components
-function renderComponent(element: HypernoteElement & { alias?: string; argument?: string }, ctx: RenderContext): React.ReactNode {
-  return <ComponentWrapper element={element} ctx={ctx} />;
-}
-
-// Component renderer - renders the actual component content with its own context
-function ComponentRenderer({ 
-  componentDef, 
-  context, 
-  elementStyle, 
-  elementId 
-}: { 
-  componentDef: Hypernote; 
-  context: RenderContext; 
-  elementStyle?: any;
-  elementId?: string;
-}) {
-  // Check if we need to execute queries at all
-  const hasPrePopulatedData = context.queryResults && Object.keys(context.queryResults).length > 0;
+  // Check if we need to execute queries
+  const hasPrePopulatedData = preResolvedQueries && Object.keys(preResolvedQueries).length > 0;
   const hasQueries = componentDef.queries && Object.keys(componentDef.queries).length > 0;
   
-  // For ANY component with pre-populated data, skip all query logic
-  // This prevents infinite re-render loops when parent components update
-  if (hasPrePopulatedData) {
-    // Directly use the pre-populated data without any hooks or effects
-    const componentCtx: RenderContext = {
-      ...context,
-      queryResults: context.queryResults,
-      extractedVariables: context.extractedVariables,
-      loadingQueries: new Set()
-    };
-    
-    // Render the component's elements
+  // Skip query execution if we have pre-populated data (prevents infinite loops)
+  if (hasPrePopulatedData || !hasQueries) {
+    // Directly render with pre-populated or no data
     return (
-      <div id={elementId} style={elementStyle}>
+      <div id={element.elementId} style={element.style}>
         {componentDef.elements?.map((el, i) => (
           <React.Fragment key={i}>
             {renderElement(el as HypernoteElement, componentCtx)}
@@ -983,44 +944,40 @@ function ComponentRenderer({
     );
   }
   
-  // Only run query execution for components that actually need it
+  // Only execute queries if needed
   const queryOptions = useMemo(() => ({
-    target: context.target,
-    parentExtracted: context.extractedVariables
-  }), [context.target, context.extractedVariables]);
-
-  const { queryResults, extractedVariables, allLoading } = useQueryExecutionWithPlanner(
+    target: targetContext,
+    parentExtracted: ctx.extractedVariables
+  }), [targetContext, ctx.extractedVariables]);
+  
+  const { queryResults, extractedVariables, loading: queriesLoading } = useQueryExecution(
     componentDef.queries || {},
     queryOptions
   );
   
-  // Debug log query results
-  // console.log(`[ComponentRenderer] Query results for component:`, queryResults);
-  // console.log(`[ComponentRenderer] Loading state:`, allLoading);
-  
-  // Merge the query results with any pre-resolved data from parent
-  const mergedQueryResults = {
-    ...context.queryResults,  // Pre-resolved data from parent
-    ...queryResults            // New query results
-  };
-  
-  const componentCtx: RenderContext = {
-    ...context,
-    queryResults: mergedQueryResults,
+  // Update context with query results
+  const finalCtx: RenderContext = {
+    ...componentCtx,
+    queryResults: { ...preResolvedQueries, ...queryResults },
     extractedVariables,
-    loadingQueries: allLoading ? new Set(Object.keys(componentDef.queries || {})) : new Set()
+    loadingQueries: queriesLoading ? new Set(Object.keys(componentDef.queries || {})) : new Set()
   };
   
-  // Render the component's elements
+  // Render component with query results
   return (
-    <div id={elementId} style={elementStyle}>
+    <div id={element.elementId} style={element.style}>
       {componentDef.elements?.map((el, i) => (
         <React.Fragment key={i}>
-          {renderElement(el as HypernoteElement, componentCtx)}
+          {renderElement(el as HypernoteElement, finalCtx)}
         </React.Fragment>
       ))}
     </div>
   );
+}
+
+// Pure component renderer - renders embedded hypernote components
+function renderComponent(element: HypernoteElement & { alias?: string; argument?: string }, ctx: RenderContext): React.ReactNode {
+  return <ComponentWrapper element={element} ctx={ctx} />;
 }
 
 // Pure JSON renderer
