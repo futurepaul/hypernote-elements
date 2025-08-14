@@ -190,9 +190,12 @@ export class HypernoteExecutor {
         return;
       }
       
-      // Get all events (including the new one)
-      const allEvents = await this.fetchWithCache(resolvedFilter);
-      console.log(`[HypernoteExecutor] Re-fetched ${allEvents.length} events for ${queryName}`);
+      // Get all events (including the new one) - skip cache for live updates!
+      const allEvents = await this.snstrClient.fetchEvents([resolvedFilter]);
+      console.log(`[HypernoteExecutor] Re-fetched ${allEvents.length} events for ${queryName} (bypassed cache)`);
+      
+      // Invalidate cache for this filter so future queries get fresh data
+      this.queryCache.invalidate(resolvedFilter);
       
       // Apply pipes to get transformed result
       updatedData = applyPipes(allEvents, pipe);
