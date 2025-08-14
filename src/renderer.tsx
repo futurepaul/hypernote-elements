@@ -277,29 +277,27 @@ export function RenderHypernoteContent({ content }: { content: Hypernote }) {
     </div>
   ) : null;
 
-  // Wrap in QueryPlannerProvider to enable batching
+  // Render the content
   return (
-    <QueryPlannerProvider queries={content.queries} enabled={true}>
-      <>
-        <style>{`
-          @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-          }
-        `}</style>
-        {errorBanner}
-        <div 
-          className={`hypernote-content ${themeClass}`.trim()} 
-          style={rootStyles as React.CSSProperties}
-        >
-          {content.elements.map((element, index) => (
-            <React.Fragment key={index}>
-              {renderElement(element, context)}
-            </React.Fragment>
-          ))}
-        </div>
-      </>
-    </QueryPlannerProvider>
+    <>
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+      `}</style>
+      {errorBanner}
+      <div 
+        className={`hypernote-content ${themeClass}`.trim()} 
+        style={rootStyles as React.CSSProperties}
+      >
+        {content.elements.map((element, index) => (
+          <React.Fragment key={index}>
+            {renderElement(element, context)}
+          </React.Fragment>
+        ))}
+      </div>
+    </>
   );
 }
 
