@@ -147,13 +147,13 @@ export class HypernoteExecutor {
       
       const { pipe } = queryConfig;
       
-      console.log(`[HypernoteExecutor] Setting up live subscription for ${queryName}`);
+      console.log(`[HypernoteExecutor] Setting up live subscription for ${queryName} with filter:`, resolvedFilter);
       
       // Subscribe to live events
       const cleanup = this.snstrClient.subscribeLive(
         [resolvedFilter],
         async (event: NostrEvent) => {
-          console.log(`[HypernoteExecutor] New live event for ${queryName}:`, event.id);
+          console.log(`[HypernoteExecutor] New live event for ${queryName}:`, event.id, event.kind);
           
           // Handle the live update
           await this.handleLiveUpdate(queryName, event, pipe);
@@ -251,10 +251,16 @@ export class HypernoteExecutor {
     // Resolve the entire action using unified resolver
     const resolvedAction = this.resolver.resolve(action);
     
+    // Handle json field - convert to content string
+    let content = resolvedAction.content;
+    if (!content && resolvedAction.json) {
+      content = JSON.stringify(resolvedAction.json);
+    }
+    
     // Build the unsigned event
     const unsignedEvent = {
       kind: resolvedAction.kind,
-      content: resolvedAction.content,
+      content: content || '',
       tags: resolvedAction.tags || [],
       created_at: Math.floor(Date.now() / 1000)
     };
