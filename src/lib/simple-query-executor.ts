@@ -64,16 +64,17 @@ export class SimpleQueryExecutor {
     // Resolve variables in the filter
     const resolvedFilter = this.resolveFilterVariables(filter);
     
-    // Store the resolved filter for live subscriptions
-    this.resolvedFilters.set(queryName, resolvedFilter);
-    
     // Safety check: Don't send queries with unresolved @ or $ values
     const hasUnresolvedRefs = this.hasUnresolvedReferences(resolvedFilter);
     if (hasUnresolvedRefs) {
       console.log(`[SimpleQueryExecutor] Skipping query ${queryName} - has unresolved references:`, resolvedFilter);
       console.log(`[SimpleQueryExecutor] Target context:`, this.context.target);
+      // Don't store filters with unresolved references for live subscriptions
       return [];
     }
+    
+    // Only store the resolved filter if it's actually resolvable
+    this.resolvedFilters.set(queryName, resolvedFilter);
     
     // Fetch events
     console.log(`[SimpleQueryExecutor] Fetching events for ${queryName} with filter:`, resolvedFilter);
