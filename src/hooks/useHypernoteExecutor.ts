@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import { HypernoteExecutor, type ResolvedData, type ExecutorContext } from '../lib/HypernoteExecutor';
 import { useNostrStore } from '../stores/nostrStore';
 import { useAuthStore } from '../stores/authStore';
+import { queryCache } from '../lib/queryCache';
 import type { Hypernote } from '../lib/schema';
 
 interface UseHypernoteExecutorOptions {
@@ -27,7 +28,7 @@ export function useHypernoteExecutor(
   const [error, setError] = useState<string | null>(null);
   
   const executorRef = useRef<HypernoteExecutor>();
-  const { snstrClient, queryCache } = useNostrStore();
+  const { snstrClient } = useNostrStore();
   const { pubkey } = useAuthStore();
   
   // Hash the queries to detect changes
@@ -43,7 +44,7 @@ export function useHypernoteExecutor(
       return;
     }
     
-    if (!snstrClient || !queryCache) {
+    if (!snstrClient) {
       setLoading(false);
       return;
     }

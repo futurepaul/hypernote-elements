@@ -1,8 +1,8 @@
-import { NostrEvent } from './snstr/nip07';
+import type { NostrEvent } from './snstr/nip07';
 import { SimpleQueryExecutor } from './simple-query-executor';
 import { applyPipes } from './pipes';
-import { SnstrClient } from './snstr/client';
-import { QueryCache } from './queryCache';
+import { SNSTRClient } from './snstr/client';
+import { queryCache as QueryCacheInstance } from './queryCache';
 import type { Hypernote } from './schema';
 
 // Context for resolving variables
@@ -36,8 +36,8 @@ export class HypernoteExecutor {
   private queries: Record<string, any>;
   private actions: Record<string, any>;
   private context: ExecutorContext;
-  private snstrClient: SnstrClient;
-  private queryCache: QueryCache;
+  private snstrClient: SNSTRClient;
+  private queryCache: typeof QueryCacheInstance;
   private subscriptions: Map<string, Cleanup> = new Map();
   private resolvedFilters: Map<string, any> = new Map();
   private currentResults: Map<string, any> = new Map();
@@ -48,8 +48,8 @@ export class HypernoteExecutor {
   constructor(
     hypernote: Partial<Hypernote>,
     context: ExecutorContext,
-    snstrClient: SnstrClient,
-    queryCache: QueryCache
+    snstrClient: SNSTRClient,
+    queryCache: typeof QueryCacheInstance
   ) {
     this.queries = hypernote.queries || {};
     this.actions = hypernote.events || {};
