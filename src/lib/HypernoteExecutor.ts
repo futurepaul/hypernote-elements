@@ -41,6 +41,7 @@ export class HypernoteExecutor {
   private queryCache: typeof QueryCacheInstance;
   private subscriptions: Map<string, Cleanup> = new Map();
   private resolvedFilters: Map<string, any> = new Map();
+  private queryResultHashes: Map<string, string> = new Map();
   private signEvent?: (event: any) => Promise<NostrEvent>;
   
   // Callback for updates
@@ -114,6 +115,21 @@ export class HypernoteExecutor {
     // Store resolved filters for live subscriptions
     this.resolvedFilters = resolvedFilters;
     
+    // Check which queries have actually changed
+    const changedQueries = new Map<string, any>();
+    results.forEach((value, key) => {
+      const newHash = JSON.stringify(value);
+      const oldHash = this.queryResultHashes.get(key);
+      
+      if (newHash !== oldHash) {
+        console.log(`[HypernoteExecutor] Query ${key} result changed`);
+        changedQueries.set(key, value);
+        this.queryResultHashes.set(key, newHash);
+      } else {
+        console.log(`[HypernoteExecutor] Query ${key} result unchanged, skipping triggers`);
+      }
+    });
+    
     // Update resolver context with new query results
     this.resolver.updateContext({ queryResults: results });
     
@@ -125,6 +141,22 @@ export class HypernoteExecutor {
     
     // Set up live subscriptions for all queries
     this.setupLiveSubscriptions();
+    
+    // Handle triggers for queries that changed AND have valid results
+    for (const [queryName, result] of changedQueries) {
+      const queryConfig = this.queries[queryName];
+      
+      // Skip triggers if the result is empty/unresolved
+      if (!result || (Array.isArray(result) && result.length === 0)) {
+        console.log(`[HypernoteExecutor] Query ${queryName} has no valid result, skipping trigger`);
+        continue;
+      }
+      
+      if (queryConfig.triggers) {
+        console.log(`[HypernoteExecutor] Query ${queryName} changed and has trigger: ${queryConfig.triggers}`);
+        await this.executeAction(queryConfig.triggers, {});
+      }
+    }
     
     return {
       queryResults,
@@ -214,6 +246,18 @@ export class HypernoteExecutor {
       }
     }
     
+    // Check if the result actually changed
+    const newHash = JSON.stringify(updatedData);
+    const oldHash = this.queryResultHashes.get(queryName);
+    const hasChanged = newHash !== oldHash;
+    
+    if (hasChanged) {
+      console.log(`[HypernoteExecutor] Live update changed ${queryName} result`);
+      this.queryResultHashes.set(queryName, newHash);
+    } else {
+      console.log(`[HypernoteExecutor] Live update didn't change ${queryName} result, skipping`);
+    }
+    
     // Update resolver context with new query result
     const queryResults = new Map([[queryName, updatedData]]);
     this.resolver.updateContext({ queryResults });
@@ -233,11 +277,13 @@ export class HypernoteExecutor {
       console.log(`[HypernoteExecutor] No onUpdate callback set!`);
     }
     
-    // Check if this query triggers any actions
-    const queryConfig = this.queries[queryName];
-    if (queryConfig.triggers) {
-      // Execute triggered action
-      await this.executeAction(queryConfig.triggers, {});
+    // Only trigger actions if the result actually changed AND is valid
+    if (hasChanged && updatedData && !(Array.isArray(updatedData) && updatedData.length === 0)) {
+      const queryConfig = this.queries[queryName];
+      if (queryConfig.triggers) {
+        console.log(`[HypernoteExecutor] Query ${queryName} changed via live update, executing trigger: ${queryConfig.triggers}`);
+        await this.executeAction(queryConfig.triggers, {});
+      }
     }
   }
   
@@ -298,7 +344,12 @@ export class HypernoteExecutor {
     const actionResults = new Map([[fullActionName, eventId]]);
     this.resolver.updateContext({ actionResults });
     
-    // No need to invalidate queries - they're live and will auto-update!
+    // Clear the cache and re-execute all queries since we have new resolved values
+    this.queryCache.clear();
+    console.log(`[HypernoteExecutor] Action ${fullActionName} completed, re-executing queries`);
+    
+    // Re-execute all queries (some may now be resolvable with the new action result)
+    await this.executeQueries();
     
     return eventId;
   }
