@@ -448,9 +448,14 @@ function renderElement(element: HypernoteElement, ctx: RenderContext): React.Rea
     return React.createElement(
       element.type,
       props,
-      element.elements?.map((child, i) => 
-        <React.Fragment key={i}>{renderElement(child, ctx)}</React.Fragment>
-      )
+      <>
+        {/* Render content if present */}
+        {element.content && renderContent(element.content, ctx)}
+        {/* Then render child elements */}
+        {element.elements?.map((child, i) => 
+          <React.Fragment key={i}>{renderElement(child, ctx)}</React.Fragment>
+        )}
+      </>
     );
   }
 

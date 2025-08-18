@@ -5,555 +5,134 @@
     {
       "type": "h1",
       "content": [
-        "♟️ Chess Game"
+        "♟️ Chess"
       ]
-    },
-    {
-      "type": "if",
-      "elements": [
-        {
-          "type": "h2",
-          "content": [
-            "Current Turn: {$board_state.turn}"
-          ]
-        },
-        {
-          "type": "div",
-          "elements": [
-            {
-              "type": "h3",
-              "content": [
-                "Last Move: {$board_state.lastMove or \"Game Start\"}"
-              ]
-            }
-          ],
-          "style": {
-            "marginBottom": "1rem"
-          }
-        },
-        {
-          "type": "div",
-          "elements": [
-            {
-              "type": "loop",
-              "elements": [
-                {
-                  "type": "div",
-                  "elements": [
-                    {
-                      "type": "loop",
-                      "elements": [
-                        {
-                          "type": "div",
-                          "elements": [
-                            {
-                              "type": "if",
-                              "elements": [
-                                {
-                                  "type": "div",
-                                  "elements": [
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♔"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"K\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♕"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"Q\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♖"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"R\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♗"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"B\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♘"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"N\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♙"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"P\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♚"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"k\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♛"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"q\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♜"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"r\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♝"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"b\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♞"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"n\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♟"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"p\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [],
-                                      "condition": "$square.piece == \" \""
-                                    }
-                                  ],
-                                  "style": {
-                                    "width": "4rem",
-                                    "height": "4rem",
-                                    "display": "flex",
-                                    "alignItems": "center",
-                                    "justifyContent": "center",
-                                    "fontSize": "2.25rem",
-                                    "fontWeight": 700,
-                                    "borderWidth": "1px",
-                                    "borderColor": "rgb(120,53,15)",
-                                    "backgroundColor": "rgb(180,83,9)"
-                                  }
-                                }
-                              ],
-                              "condition": "$square.color == \"dark\""
-                            },
-                            {
-                              "type": "if",
-                              "elements": [
-                                {
-                                  "type": "div",
-                                  "elements": [
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♔"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"K\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♕"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"Q\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♖"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"R\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♗"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"B\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♘"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"N\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♙"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"P\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♚"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"k\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♛"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"q\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♜"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"r\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♝"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"b\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♞"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"n\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [
-                                        {
-                                          "type": "p",
-                                          "content": [
-                                            "♟"
-                                          ]
-                                        }
-                                      ],
-                                      "condition": "$square.piece == \"p\""
-                                    },
-                                    {
-                                      "type": "if",
-                                      "elements": [],
-                                      "condition": "$square.piece == \" \""
-                                    }
-                                  ],
-                                  "style": {
-                                    "width": "4rem",
-                                    "height": "4rem",
-                                    "display": "flex",
-                                    "alignItems": "center",
-                                    "justifyContent": "center",
-                                    "fontSize": "2.25rem",
-                                    "fontWeight": 700,
-                                    "borderWidth": "1px",
-                                    "borderColor": "rgb(120,53,15)",
-                                    "backgroundColor": "rgb(253,230,138)"
-                                  }
-                                }
-                              ],
-                              "condition": "$square.color == \"light\""
-                            }
-                          ],
-                          "style": {
-                            "display": "flex",
-                            "flexDirection": "row"
-                          }
-                        }
-                      ],
-                      "source": "$row",
-                      "variable": "$square"
-                    }
-                  ],
-                  "style": {
-                    "display": "flex"
-                  }
-                }
-              ],
-              "source": "$board_state.rows",
-              "variable": "$row"
-            }
-          ],
-          "style": {
-            "backgroundColor": "rgb(254,243,199)",
-            "padding": "1rem",
-            "borderRadius": "0.25rem",
-            "borderWidth": "4px",
-            "borderColor": "rgb(120,53,15)"
-          }
-        }
-      ],
-      "condition": "$board_state.rows"
-    },
-    {
-      "type": "if",
-      "elements": [
-        {
-          "type": "div",
-          "elements": [
-            {
-              "type": "h3",
-              "content": [
-                "No game in progress"
-              ]
-            },
-            {
-              "type": "p",
-              "content": [
-                "Click \"New Game\" to start playing!",
-                " "
-              ]
-            }
-          ],
-          "style": {
-            "padding": "2rem",
-            "textAlign": "center",
-            "backgroundColor": "rgb(243,244,246)",
-            "borderRadius": "0.25rem"
-          }
-        }
-      ],
-      "condition": "!$board_state.rows"
     },
     {
       "type": "div",
       "elements": [
         {
-          "type": "h3",
+          "type": "p",
           "content": [
-            "Make a Move"
+            {
+              "type": "strong",
+              "content": [
+                "Debug FEN"
+              ]
+            },
+            ": ",
+            "{$chess_fen}",
+            " "
           ]
-        },
+        }
+      ],
+      "style": {
+        "marginTop": "1rem",
+        "fontSize": "0.875rem",
+        "color": "rgb(75,85,99)"
+      }
+    },
+    {
+      "type": "component",
+      "alias": "chess_board",
+      "argument": ""
+    },
+    {
+      "type": "form",
+      "elements": [
         {
-          "type": "form",
+          "type": "div",
           "elements": [
             {
-              "type": "div",
-              "elements": [
-                {
-                  "type": "input",
-                  "content": [],
-                  "attributes": {
-                    "name": "move",
-                    "placeholder": "Enter move (e.g., e4, Nf3, O-O)"
-                  },
-                  "style": {
-                    "padding": "0.5rem",
-                    "borderWidth": "1px",
-                    "borderRadius": "0.25rem"
-                  }
-                },
-                {
-                  "type": "button",
-                  "elements": [
-                    {
-                      "type": "p",
-                      "content": [
-                        "Move"
-                      ]
-                    }
-                  ],
-                  "style": {
-                    "backgroundColor": "rgb(59,130,246)",
-                    "color": "rgb(255,255,255)",
-                    "paddingLeft": "1.5rem",
-                    "paddingRight": "1.5rem",
-                    "paddingTop": "0.5rem",
-                    "paddingBottom": "0.5rem",
-                    "borderRadius": "0.25rem",
-                    "fontWeight": 700
-                  }
-                }
-              ],
+              "type": "input",
+              "content": [],
+              "attributes": {
+                "name": "move",
+                "placeholder": "Enter move (e.g., e4, Nf3, O-O)"
+              },
               "style": {
-                "display": "flex"
+                "padding": "0.5rem",
+                "borderWidth": "1px",
+                "borderRadius": "0.25rem"
               }
-            }
-          ],
-          "event": "@make_move"
-        },
-        {
-          "type": "form",
-          "elements": [
+            },
             {
               "type": "button",
               "elements": [
                 {
                   "type": "p",
                   "content": [
-                    "New Game"
+                    "Make Move"
                   ]
                 }
               ],
               "style": {
-                "backgroundColor": "rgb(239,68,68)",
+                "backgroundColor": "rgb(59,130,246)",
                 "color": "rgb(255,255,255)",
-                "paddingLeft": "1rem",
-                "paddingRight": "1rem",
+                "paddingLeft": "1.5rem",
+                "paddingRight": "1.5rem",
                 "paddingTop": "0.5rem",
                 "paddingBottom": "0.5rem",
-                "borderRadius": "0.25rem"
+                "borderRadius": "0.25rem",
+                "fontWeight": 700
               }
             }
           ],
-          "event": "@reset_board"
+          "style": {
+            "display": "flex",
+            "gap": "0.5rem"
+          }
         }
       ],
-      "style": {
-        "marginTop": "1.5rem"
-      }
+      "event": "@make_move"
+    },
+    {
+      "type": "form",
+      "elements": [
+        {
+          "type": "button",
+          "elements": [
+            {
+              "type": "p",
+              "content": [
+                "New Game"
+              ]
+            }
+          ],
+          "style": {
+            "backgroundColor": "rgb(34,197,94)",
+            "color": "rgb(255,255,255)",
+            "paddingLeft": "1rem",
+            "paddingRight": "1rem",
+            "paddingTop": "0.5rem",
+            "paddingBottom": "0.5rem",
+            "borderRadius": "0.25rem",
+            "marginTop": "0.5rem"
+          }
+        }
+      ],
+      "event": "@new_game"
+    },
+    {
+      "type": "h2",
+      "content": [
+        "How to Play"
+      ]
     },
     {
       "type": "div",
       "elements": [
         {
-          "type": "h3",
-          "content": [
-            "How to Play"
-          ]
-        },
-        {
           "type": "p",
           "content": [
-            "- Enter moves in standard algebraic notation",
-            " ",
-            "- Pawns: ",
+            "- ",
+            {
+              "type": "strong",
+              "content": [
+                "Pawns"
+              ]
+            },
+            ": ",
             {
               "type": "code",
               "content": [
@@ -575,7 +154,14 @@
               ]
             },
             " ",
-            "- Pieces: ",
+            "- ",
+            {
+              "type": "strong",
+              "content": [
+                "Pieces"
+              ]
+            },
+            ": ",
             {
               "type": "code",
               "content": [
@@ -596,8 +182,15 @@
                 "Qd8"
               ]
             },
-            " ",
-            "- Castling: ",
+            "  ",
+            "- ",
+            {
+              "type": "strong",
+              "content": [
+                "Castling"
+              ]
+            },
+            ": ",
             {
               "type": "code",
               "content": [
@@ -613,78 +206,53 @@
             },
             " (queenside)",
             " ",
-            "- Add ",
+            "- ",
+            {
+              "type": "strong",
+              "content": [
+                "Check/Checkmate"
+              ]
+            },
+            ": Add ",
             {
               "type": "code",
               "content": [
                 "+"
               ]
             },
-            " for check, ",
+            " or ",
             {
               "type": "code",
               "content": [
                 "#"
               ]
             },
-            " for checkmate",
             " "
           ]
         }
       ],
       "style": {
-        "marginTop": "1.5rem",
+        "marginTop": "1rem",
         "padding": "1rem",
         "backgroundColor": "rgb(243,244,246)",
         "borderRadius": "0.25rem"
       }
-    },
-    {
-      "type": "h2",
-      "content": [
-        "Debug Info"
-      ]
-    },
-    {
-      "type": "h3",
-      "content": [
-        "Raw board_state:"
-      ]
-    },
-    {
-      "type": "json",
-      "content": [],
-      "attributes": {
-        "variable": "$board_state"
-      }
-    },
-    {
-      "type": "h3",
-      "content": [
-        "Turn: {$board_state.turn or \"undefined\"}"
-      ]
-    },
-    {
-      "type": "h3",
-      "content": [
-        "Board exists: {$board_state.board or \"no board\"}"
-      ]
     }
   ],
   "type": "hypernote",
-  "title": "Chess Game",
-  "description": "Interactive chess game using ContextVM for move processing",
-  "name": "chess-game",
+  "title": "Chess",
+  "description": "Play chess with hypermedia UI from MCP server",
+  "name": "chess",
   "queries": {
-    "$board_state": {
+    "$chess_fen": {
       "kinds": [
         30078
       ],
       "authors": [
-        "user.pubkey"
+        "2e6ad883d5a134a6fb3f0de9063ab170deeb805592bba90ac7351cf3920bbbd0"
       ],
       "#d": [
-        "chess_board"
+        "chess-fen"
       ],
       "limit": 1,
       "pipe": [
@@ -696,87 +264,27 @@
           "field": "content"
         },
         {
-          "op": "json"
+          "op": "default",
+          "value": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
         }
       ]
     },
-    "$move_result": {
+    "#chess_board": {
       "kinds": [
-        25910
-      ],
-      "#e": [
-        "@make_move"
+        32616
       ],
       "authors": [
-        "19f5b5cd2fce663a3b4916b42c378c0280cce2bffd0af384380e91356fcff1d6"
+        "2e6ad883d5a134a6fb3f0de9063ab170deeb805592bba90ac7351cf3920bbbd0"
       ],
+      "#d": [
+        "chess-board"
+      ],
+      "limit": 1,
       "pipe": [
         {
           "op": "first"
-        },
-        {
-          "op": "get",
-          "field": "content"
-        },
-        {
-          "op": "json"
-        },
-        {
-          "op": "get",
-          "field": "result"
-        },
-        {
-          "op": "get",
-          "field": "content"
-        },
-        {
-          "op": "first"
-        },
-        {
-          "op": "get",
-          "field": "text"
         }
-      ],
-      "triggers": "@save_board"
-    },
-    "$reset_result": {
-      "kinds": [
-        25910
-      ],
-      "#e": [
-        "@reset_board"
-      ],
-      "authors": [
-        "19f5b5cd2fce663a3b4916b42c378c0280cce2bffd0af384380e91356fcff1d6"
-      ],
-      "pipe": [
-        {
-          "op": "first"
-        },
-        {
-          "op": "get",
-          "field": "content"
-        },
-        {
-          "op": "json"
-        },
-        {
-          "op": "get",
-          "field": "result"
-        },
-        {
-          "op": "get",
-          "field": "content"
-        },
-        {
-          "op": "first"
-        },
-        {
-          "op": "get",
-          "field": "text"
-        }
-      ],
-      "triggers": "@save_reset"
+      ]
     }
   },
   "events": {
@@ -787,9 +295,8 @@
         "id": "{time.now}",
         "method": "tools/call",
         "params": {
-          "name": "chess_board_update",
+          "name": "make_move",
           "arguments": {
-            "board": "{$board_state.fen or 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'}",
             "move": "{form.move}"
           }
         }
@@ -797,48 +304,25 @@
       "tags": [
         [
           "p",
-          "19f5b5cd2fce663a3b4916b42c378c0280cce2bffd0af384380e91356fcff1d6"
+          "2e6ad883d5a134a6fb3f0de9063ab170deeb805592bba90ac7351cf3920bbbd0"
         ]
       ]
     },
-    "@save_board": {
-      "kind": 30078,
-      "content": "{$move_result}",
-      "tags": [
-        [
-          "d",
-          "chess_board"
-        ]
-      ]
-    },
-    "@reset_board": {
+    "@new_game": {
       "kind": 25910,
       "json": {
         "jsonrpc": "2.0",
         "id": "{time.now}",
         "method": "tools/call",
         "params": {
-          "name": "chess_board_update",
-          "arguments": {
-            "board": "",
-            "move": "reset"
-          }
+          "name": "new_game",
+          "arguments": {}
         }
       },
       "tags": [
         [
           "p",
-          "19f5b5cd2fce663a3b4916b42c378c0280cce2bffd0af384380e91356fcff1d6"
-        ]
-      ]
-    },
-    "@save_reset": {
-      "kind": 30078,
-      "content": "{$reset_result}",
-      "tags": [
-        [
-          "d",
-          "chess_board"
+          "2e6ad883d5a134a6fb3f0de9063ab170deeb805592bba90ac7351cf3920bbbd0"
         ]
       ]
     }

@@ -12,7 +12,9 @@
     "seed": "bun run src/utils/seed.ts",
     "test:seed": "bun run src/utils/seed.ts && bun test tests/seed.test.ts",
     "query": "bun run src/utils/query-test.ts",
-    "update-examples": "bun scripts/update-example-json.ts"
+    "update-examples": "bun scripts/update-example-json.ts",
+    "mcp-counter": "bun run mcp-counter-server.ts",
+    "mcp-chess": "bun run mcp-chess-server.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.0",
