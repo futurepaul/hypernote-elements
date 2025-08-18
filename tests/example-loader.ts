@@ -9,7 +9,6 @@ import textFormattingMd from "../examples/text-formatting.md";
 import imageVariablesMd from "../examples/image-variables.md";
 import hypernotesMd from "../examples/hypernotes.md";
 import counterMd from "../examples/counter.md";
-import counterHypermediaMd from "../examples/counter-hypermedia.md";
 import chessMd from "../examples/chess.md";
 
 // Import all JSON examples directly using Bun's built-in JSON loader
@@ -21,7 +20,6 @@ import textFormattingJson from "../examples/text-formatting.json";
 import imageVariablesJson from "../examples/image-variables.json";
 import hypernotesJson from "../examples/hypernotes.json";
 import counterJson from "../examples/counter.json";
-import counterHypermediaJson from "../examples/counter-hypermedia.json";
 import chessJson from "../examples/chess.json";
 
 // Map of example names to their imported content
@@ -34,7 +32,6 @@ const EXAMPLE_MAP = {
   "text-formatting": { markdown: textFormattingMd, json: textFormattingJson },
   "hypernotes": { markdown: hypernotesMd, json: hypernotesJson },
   "counter": { markdown: counterMd, json: counterJson },
-  "counter-hypermedia": { markdown: counterHypermediaMd, json: counterHypermediaJson },
   "chess": { markdown: chessMd, json: chessJson },
 } as const;
 
@@ -80,7 +77,6 @@ export const AVAILABLE_EXAMPLES = [
   "text-formatting",
   "hypernotes",
   "counter",
-  "counter-hypermedia",
   "chess",
 ] as const;
 
