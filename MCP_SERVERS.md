@@ -8,7 +8,7 @@ A simple counter that publishes both raw data and UI elements.
 
 ### Run the server:
 ```bash
-SERVER_PRIVATE_KEY=<your-hex-private-key> bun run mcp-counter
+COUNTER_SERVER_KEY=<your-hex-private-key> bun run mcp-counter
 ```
 
 ### Outputs:
