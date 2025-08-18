@@ -1,310 +1,373 @@
-# Merged Executors Plan
+# Unified Executor Plan - Simplified
 
-## Current Situation: The Two-Executor Problem
+## Current Situation
 
-### Overview
-The Hypernote system currently has **two overlapping query executors** that have evolved separately, creating significant code duplication and maintenance challenges:
+We have two executors that evolved in the wrong direction:
+1. **HypernoteExecutor** - The older, more complex one with deprecated features
+2. **SimpleQueryExecutor** - A newer attempt to simplify, but still has duplication
 
-1. **SimpleQueryExecutor**: The original executor that handles basic query execution
-2. **HypernoteExecutor**: A higher-level wrapper that adds live subscriptions and delegates to SimpleQueryExecutor
+Plus we have **UnifiedResolver** which is the newest and cleanest variable resolution system.
 
-### The Architecture Today
+## Goals
+
+1. **One executor** - Merge everything into a single, simple executor
+2. **Remove deprecated features**:
+   - No JQ transformations (old and bad)
+   - No query→trigger→action chains (actions are user-triggered only)
+   - No separate fetch vs subscription (everything is a live subscription)
+3. **Keep what works**:
+   - UnifiedResolver for all variable resolution
+   - Essential pipes (first, get, default, whereIndex, pluckIndex)
+   - Clean React update boundary
+4. **Feature parity** with examples/ folder functionality
+
+## Required Features (Based on Examples Analysis)
+
+### Core Query Features
+- **Filters**: authors, kinds, limit, since, tag filters (#d, #t)
+- **Query chaining**: Using one query's result in another (`authors: $contact_list`)
+- **Pipes**: first, get, json, default/defaults, whereIndex, pluckIndex
+- **Live subscriptions**: All queries are live by default
+
+### Variable Resolution (via UnifiedResolver)
+- `user.pubkey` - Current user
+- `target.*` - Component parameters
+- `form.*` - Form field values
+- `$query.field` - Query result fields
+- `time.now` - Current timestamp
+- `value or fallback` - Fallback syntax
+- Loop variables in `[each]` blocks
+
+### Actions (User-Triggered Only)
+- Form submissions and button clicks
+- Kind 1 (text notes) with content/tags
+- Kind 25910 (JSON-RPC) for MCP integration
+- NO automatic triggers from queries
+
+### Components
+- Named component sections
+- Component parameters (npub/nevent/naddr)
+- External component references via naddr
+
+## What to Remove
+
+### From HypernoteExecutor
+```typescript
+// DELETE: Query triggers
+if (queryConfig.triggers) {
+  await this.executeAction(queryConfig.triggers, {});
+}
+
+// DELETE: JQ processing
+import { processJQTransform } from './jq-parser';
+
+// DELETE: Separate fetch logic
+// Everything becomes a live subscription
+```
+
+### From SimpleQueryExecutor
+```typescript
+// DELETE: Duplicate variable resolution
+resolveFilterVariables() // Use UnifiedResolver instead
+
+// DELETE: Duplicate reference resolution  
+resolveReferences() // Use UnifiedResolver instead
+```
+
+### From Schema
+```typescript
+// DELETE: Trigger fields
+triggers: z.string().optional(), // Remove from QueryConfig
+triggers: z.string().optional(), // Remove from EventConfig
+```
+
+## New Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                  useHypernoteExecutor                │
-│                         Hook                         │
-└──────────────────┬──────────────────────────────────┘
-                   │ Creates
-                   ▼
-┌─────────────────────────────────────────────────────┐
-│                  HypernoteExecutor                   │
-│  - Live subscriptions                                │
-│  - Action execution                                  │
-│  - Naddr expansion                                   │
-│  - DUPLICATES: Replaceable event handling            │
-│  - Uses UnifiedResolver for variables                │
-└──────────────────┬──────────────────────────────────┘
-                   │ Delegates to
-                   ▼
-┌─────────────────────────────────────────────────────┐
-│                SimpleQueryExecutor                   │
-│  - Query execution                                   │
-│  - Dependency resolution                             │
-│  - DUPLICATES: Variable resolution                   │
-│  - DUPLICATES: Replaceable event handling            │
-│  - Pipe processing                                   │
-└──────────────────────────────────────────────────────┘
-```
-
-### Critical Duplication Points
-
-#### 1. Replaceable Event Deduplication
-**Duplicated in:**
-- `SimpleQueryExecutor` lines 89-115
-- `HypernoteExecutor` lines 277-294
-
-**The exact same logic:** Group by d-tag, keep newest by created_at
-
-#### 2. Variable Resolution
-**Three implementations:**
-- `SimpleQueryExecutor.resolveFilterVariables()` - Basic variables
-- `UnifiedResolver.resolveExpression()` - Advanced resolution
-- `HypernoteExecutor` uses UnifiedResolver but SimpleQueryExecutor doesn't
-
-#### 3. Reference Resolution
-**Two parallel systems:**
-- `SimpleQueryExecutor.resolveReferences()` - Handles $query, #component, @action
-- `UnifiedResolver.resolveExpression()` - Same references, different implementation
-
-#### 4. Safety Checks
-**Duplicate unresolved reference detection:**
-- `SimpleQueryExecutor.hasUnresolvedReferences()`
-- `UnifiedResolver.hasUnresolvedReferences()`
-
-### Why This Happened
-The architecture evolved organically:
-1. SimpleQueryExecutor was built first for basic queries
-2. HypernoteExecutor was added as a wrapper for live subscriptions
-3. UnifiedResolver was created for complex variable resolution
-4. Features were added to both executors independently
-5. Bug fixes (like replaceable event handling) had to be duplicated
-
-## The Unified Architecture Vision
-
-### Design Principles
-1. **Single Source of Truth**: One executor, one place for each piece of logic
-2. **Modular Components**: Separate concerns into focused, testable units
-3. **Clear Data Flow**: Predictable path from query to result
-4. **Extensible**: Easy to add new features without touching core logic
-5. **Testable**: Each component independently testable
-
-### Proposed Architecture
-
-```
-┌─────────────────────────────────────────────────────┐
-│                  useHypernoteExecutor                │
-│                         Hook                         │
-└──────────────────┬──────────────────────────────────┘
-                   │ Creates
-                   ▼
 ┌─────────────────────────────────────────────────────┐
 │                  UnifiedExecutor                     │
 │                                                      │
 │  ┌─────────────────────────────────────────────┐    │
-│  │           Core Query Engine                  │    │
-│  │  - Query orchestration                       │    │
-│  │  - Dependency graph building                 │    │
-│  │  - Result caching                           │    │
+│  │            Query Execution Core              │    │
+│  │  - Dependency graph resolution               │    │
+│  │  - Live subscriptions for ALL queries        │    │
+│  │  - Replaceable event deduplication           │    │
+│  │  - Pipe processing (limited set)             │    │
+│  └──────────────┬──────────────────────────────┘    │
+│                 │                                    │
+│  ┌──────────────▼──────────────────────────────┐    │
+│  │           UnifiedResolver                    │    │
+│  │  - All variable resolution in one place      │    │
+│  │  - Simple, predictable rules                 │    │
+│  │  - Safety checks for unresolved refs         │    │
+│  └──────────────┬──────────────────────────────┘    │
+│                 │                                    │
+│  ┌──────────────▼──────────────────────────────┐    │
+│  │         SNSTR Client Integration             │    │
+│  │  - subscribeLive() for everything            │    │
+│  │  - publishEvent() for actions                │    │
+│  │  - Automatic cleanup on unmount              │    │
+│  └──────────────┬──────────────────────────────┘    │
+│                 │                                    │
+│  ┌──────────────▼──────────────────────────────┐    │
+│  │          React Update Boundary               │    │
+│  │  - Single, explicit update point             │    │
+│  │  - Batched updates for performance           │    │
+│  │  - Error boundaries for safety               │    │
 │  └─────────────────────────────────────────────┘    │
-│                                                      │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────┐  │
-│  │  Resolver    │  │   Fetcher    │  │  Actions  │  │
-│  │  - Variables │  │  - Network   │  │  - Sign   │  │
-│  │  - Refs     │  │  - Cache     │  │  - Publish│  │
-│  │  - Safety   │  │  - Dedup     │  │           │  │
-│  └──────────────┘  └──────────────┘  └──────────┘  │
-│                                                      │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────┐  │
-│  │ Transformer  │  │ Subscription │  │  Hooks    │  │
-│  │  - Pipes     │  │  - Live      │  │  - React  │  │
-│  │  - JQ        │  │  - Updates   │  │  - Updates│  │
-│  └──────────────┘  └──────────────┘  └──────────┘  │
 └─────────────────────────────────────────────────────┘
 ```
 
-### Component Responsibilities
+## Implementation Plan
 
-#### Core Query Engine
-- **Orchestration**: Manages the overall query execution flow
-- **Dependency Analysis**: Builds and executes dependency graph
-- **State Management**: Maintains query results and context
-- **Coordination**: Delegates to specialized components
-
-#### Resolver Module
-- **Variable Resolution**: All variable replacement logic (user.pubkey, time, etc.)
-- **Reference Resolution**: Handles $query, #component, @action references
-- **Safety Validation**: Ensures no unresolved references before execution
-- **Context Management**: Maintains resolution context
-
-#### Fetcher Module
-- **Network Operations**: All SNSTR client interactions
-- **Cache Management**: Query result caching and invalidation
-- **Event Deduplication**: Replaceable event handling (ONE implementation)
-- **Batch Optimization**: Combines similar queries when possible
-
-#### Transformer Module
-- **Pipe Processing**: All pipe operations in one place
-- **JQ Transformations**: Complex data transformations
-- **Type Coercion**: Ensures correct data types
-
-#### Subscription Module
-- **Live Subscriptions**: WebSocket subscription management
-- **Update Handling**: Processes incoming live events
-- **Cleanup**: Manages subscription lifecycle
-
-#### Actions Module
-- **Event Construction**: Builds Nostr events from templates
-- **Signing**: Integrates with NIP-07 or provided signers
-- **Publishing**: Sends events to relays
-- **Result Tracking**: Stores event IDs for reference
-
-#### Hooks Module
-- **React Integration**: useHypernoteExecutor hook
-- **Update Callbacks**: Notifies UI of changes
-- **Error Boundaries**: Handles executor errors gracefully
-
-## Migration Strategy
-
-### Phase 1: Extract Shared Logic (Week 1)
-1. **Create shared utilities**:
-   - `deduplicateReplaceableEvents()` function
-   - `resolveVariables()` unified function
-   - `validateReferences()` safety checker
-
-2. **Update both executors** to use shared utilities:
-   - Remove duplicate deduplication code
-   - Point to shared functions
-   - Add tests for shared utilities
-
-### Phase 2: Unify Resolution (Week 2)
-1. **Merge SimpleQueryExecutor resolution into UnifiedResolver**:
-   - Move `resolveFilterVariables()` logic
-   - Move `resolveReferences()` logic
-   - Consolidate `hasUnresolvedReferences()`
-
-2. **Update SimpleQueryExecutor** to use UnifiedResolver:
-   - Inject UnifiedResolver
-   - Remove duplicate resolution code
-   - Ensure backward compatibility
-
-### Phase 3: Create Unified Executor (Week 3)
-1. **Build new UnifiedExecutor class**:
-   - Start with HypernoteExecutor as base
-   - Absorb SimpleQueryExecutor logic directly
-   - Organize into modules
-
-2. **Implement modular architecture**:
-   - Create Fetcher module with deduplication
-   - Create Transformer module for pipes
-   - Create Subscription module for live updates
-
-### Phase 4: Integration & Testing (Week 4)
-1. **Update integration points**:
-   - Modify useHypernoteExecutor to use UnifiedExecutor
-   - Update all imports
-   - Ensure backward compatibility
-
-2. **Comprehensive testing**:
-   - Unit tests for each module
-   - Integration tests for full flow
-   - Performance benchmarks
-
-### Phase 5: Cleanup (Week 5)
-1. **Remove old code**:
-   - Delete SimpleQueryExecutor
-   - Delete old HypernoteExecutor
-   - Remove duplicate utilities
-
-2. **Documentation**:
-   - Update architecture docs
-   - Add module documentation
-   - Create migration guide
-
-## Implementation Details
-
-### File Structure
-```
-src/lib/executor/
-├── UnifiedExecutor.ts         # Main orchestrator
-├── modules/
-│   ├── Resolver.ts            # Variable & reference resolution
-│   ├── Fetcher.ts             # Network & cache operations
-│   ├── Transformer.ts         # Pipes & data transformation
-│   ├── Subscription.ts        # Live update handling
-│   ├── Actions.ts             # Event publishing
-│   └── Hooks.ts               # React integration
-├── utils/
-│   ├── deduplication.ts       # Replaceable event handling
-│   ├── dependency-graph.ts    # Query dependency analysis
-│   └── validation.ts          # Safety checks
-└── types.ts                   # Shared types and interfaces
-```
-
-### Key Interfaces
+### Step 1: Create UnifiedExecutor Class
 ```typescript
-interface ExecutorModule {
-  initialize(context: ExecutorContext): void;
-  cleanup(): void;
-}
-
-interface ExecutorContext {
-  queries: Map<string, QueryConfig>;
-  results: Map<string, any>;
-  user: { pubkey: string } | null;
-  target: { pubkey: string } | null;
-  form: Record<string, any>;
-  client: SNSTRClient;
-  cache: QueryCache;
-}
-
-interface QueryResult {
-  data: any;
-  timestamp: number;
-  source: 'cache' | 'network' | 'live';
+class UnifiedExecutor {
+  private resolver: UnifiedResolver;
+  private client: SNSTRClient;
+  private subscriptions: Map<string, () => void>;
+  private queryResults: Map<string, any>;
+  private onUpdate: (data: ResolvedData) => void;
+  
+  constructor(config: ExecutorConfig) {
+    this.resolver = new UnifiedResolver(config.context);
+    this.client = config.client;
+    this.subscriptions = new Map();
+    this.queryResults = new Map();
+    this.onUpdate = config.onUpdate;
+  }
+  
+  async execute(hypernote: HypernoteSchema): Promise<void> {
+    // 1. Build dependency graph
+    const graph = this.buildDependencyGraph(hypernote.queries);
+    
+    // 2. Execute queries in dependency order
+    for (const queryName of graph.executionOrder) {
+      await this.executeQuery(queryName, hypernote.queries[queryName]);
+    }
+    
+    // 3. Send initial update to React
+    this.sendUpdate();
+  }
+  
+  private async executeQuery(name: string, config: QueryConfig): Promise<void> {
+    // Resolve all variables using UnifiedResolver
+    const resolved = this.resolver.resolve(config);
+    
+    // Check for unresolved references
+    if (this.resolver.hasUnresolvedReferences(resolved)) {
+      return; // Skip queries with unresolved refs
+    }
+    
+    // Create live subscription (no separate fetch!)
+    const cleanup = this.client.subscribeLive(
+      [resolved],
+      (event) => this.handleLiveEvent(name, event, config.pipe),
+      () => {} // EOSE callback
+    );
+    
+    this.subscriptions.set(name, cleanup);
+  }
+  
+  private handleLiveEvent(queryName: string, event: NostrEvent, pipe?: Pipe[]): void {
+    // Get all events for this query
+    let events = this.getEventsForQuery(queryName);
+    events.push(event);
+    
+    // Deduplicate replaceable events
+    if (this.isReplaceableKind(event.kind)) {
+      events = this.deduplicateByDTag(events);
+    }
+    
+    // Apply pipes
+    const result = pipe ? applyPipes(events, pipe) : events;
+    
+    // Update results
+    this.queryResults.set(queryName, result);
+    
+    // Send update to React
+    this.sendUpdate();
+  }
+  
+  private sendUpdate(): void {
+    // Single, explicit update point
+    const data = Object.fromEntries(this.queryResults);
+    this.onUpdate(data);
+  }
+  
+  async executeAction(name: string, formData: Record<string, any>): Promise<string> {
+    // Update resolver context with form data
+    this.resolver.updateContext({ formData });
+    
+    // Get action config
+    const action = this.hypernote.events[name];
+    if (!action) throw new Error(`Unknown action: ${name}`);
+    
+    // Resolve all variables
+    const resolved = this.resolver.resolve(action);
+    
+    // Publish event
+    const eventId = await this.client.publishEvent(resolved);
+    
+    // Store result for reference
+    this.resolver.updateContext({ 
+      actionResults: new Map([[name, eventId]]) 
+    });
+    
+    return eventId;
+  }
+  
+  cleanup(): void {
+    // Clean up all subscriptions
+    this.subscriptions.forEach(cleanup => cleanup());
+    this.subscriptions.clear();
+  }
 }
 ```
 
-### Testing Strategy
-1. **Unit Tests**: Each module tested independently
-2. **Integration Tests**: Full query execution flows
-3. **Performance Tests**: Ensure no regression
-4. **Compatibility Tests**: Verify backward compatibility
+### Step 2: Simplify Pipe Processing
+```typescript
+// Keep only essential pipes from examples
+function applyPipes(data: any, pipes: Pipe[]): any {
+  let result = data;
+  
+  for (const pipe of pipes) {
+    switch (pipe.op) {
+      case 'first':
+        result = Array.isArray(result) ? result[0] : result;
+        break;
+        
+      case 'get':
+        result = result?.[pipe.field];
+        break;
+        
+      case 'default':
+        result = result ?? pipe.value;
+        break;
+        
+      case 'defaults':
+        result = { ...pipe.value, ...result };
+        break;
+        
+      case 'whereIndex':
+        result = result?.filter((item: any[]) => 
+          item[pipe.index] === pipe.eq
+        );
+        break;
+        
+      case 'pluckIndex':
+        result = result?.map((item: any[]) => item[pipe.index]);
+        break;
+        
+      case 'json':
+        try {
+          result = JSON.parse(result);
+        } catch {}
+        break;
+        
+      // DELETE: No more JQ or complex transformations
+    }
+  }
+  
+  return result;
+}
+```
 
-## Benefits of Unification
+### Step 3: Remove Deprecated Features
 
-### Immediate Benefits
-1. **Bug fixes apply everywhere**: No more fixing in multiple places
-2. **Easier debugging**: Single execution path to trace
-3. **Reduced bundle size**: No duplicate code
-4. **Consistent behavior**: One implementation = predictable results
+1. **Delete trigger-related code**:
+   - Remove `triggers` field from QueryConfig and EventConfig schemas
+   - Remove all `if (queryConfig.triggers)` blocks
+   - Remove trigger execution logic
 
-### Long-term Benefits
-1. **Easier to extend**: Add features in one place
-2. **Better testability**: Modular components easier to test
-3. **Clearer mental model**: Developers understand one system
-4. **Performance optimization**: Optimize one path, not two
-5. **Maintainability**: Less code = fewer bugs
+2. **Delete JQ processing**:
+   - Remove `jq-parser.ts` file entirely
+   - Remove `processJQTransform` imports
+   - Remove JQ pipe operations
 
-## Success Metrics
-- [ ] Zero code duplication for core logic
-- [ ] All tests passing with unified executor
-- [ ] No performance regression (benchmarks within 5%)
-- [ ] Bundle size reduced by at least 15%
-- [ ] Development velocity increased (measured by feature delivery time)
+3. **Delete separate fetch logic**:
+   - Remove `fetchEvents` as a separate operation
+   - Everything uses `subscribeLive`
+   - Initial data comes from the first batch of live events
 
-## Risk Mitigation
-1. **Feature flag**: Ship unified executor behind flag initially
-2. **Gradual rollout**: Test with subset of users first
-3. **Rollback plan**: Keep old executors available for quick revert
-4. **Extensive testing**: Comprehensive test suite before migration
-5. **Documentation**: Clear migration guide for any API changes
+### Step 4: Clean React Integration
+```typescript
+// In useHypernoteExecutor hook
+export function useHypernoteExecutor(hypernote: HypernoteSchema) {
+  const [data, setData] = useState<ResolvedData>({});
+  const [loading, setLoading] = useState(true);
+  const executorRef = useRef<UnifiedExecutor | null>(null);
+  
+  useEffect(() => {
+    const executor = new UnifiedExecutor({
+      hypernote,
+      client: snstrClient,
+      context: { user, target, formData: {}, ... },
+      onUpdate: (newData) => {
+        // Single, safe update point
+        setData(newData);
+        setLoading(false);
+      }
+    });
+    
+    executorRef.current = executor;
+    executor.execute();
+    
+    return () => executor.cleanup();
+  }, [hypernote]);
+  
+  const executeAction = useCallback(async (name: string, formData: any) => {
+    return executorRef.current?.executeAction(name, formData);
+  }, []);
+  
+  return { data, loading, executeAction };
+}
+```
 
-## Timeline
-- **Week 1**: Extract shared logic, create utilities
-- **Week 2**: Unify resolution logic
-- **Week 3**: Build UnifiedExecutor with modules
-- **Week 4**: Integration and testing
-- **Week 5**: Cleanup and documentation
-- **Week 6**: Buffer for issues and refinement
+## Benefits of This Approach
+
+1. **Simpler**: One executor, one resolver, one subscription model
+2. **No duplication**: Each piece of logic exists in exactly one place
+3. **Predictable**: All queries are live, all actions are user-triggered
+4. **Maintainable**: Clear separation between execution, resolution, and React
+5. **Smaller**: Remove JQ, triggers, and duplicate code (~30% reduction)
+
+## Testing Strategy
+
+### Feature Parity Tests
+Run all examples to ensure they still work:
+- [ ] counter.md - Basic counter with MCP
+- [ ] chess.md - Chess game with MCP
+- [ ] client.md - Following feed
+- [ ] profile.md - Profile display
+- [ ] publisher.md - Note publishing
+- [ ] state.md - Application state
+
+### Removed Feature Tests
+Ensure deprecated features are gone:
+- [ ] No automatic query→trigger→action chains
+- [ ] No JQ transformations
+- [ ] No separate fetch vs subscription behavior
+
+## Success Criteria
+
+1. All examples work identically to before
+2. Code size reduced by ~30%
+3. Single executor implementation
+4. All variable resolution through UnifiedResolver
+5. Clean, explicit React update boundary
+6. No deprecated features remaining
 
 ## Next Steps
-1. Review and approve this plan
-2. Create feature branch `unified-executor`
-3. Begin Phase 1: Extract shared logic
-4. Set up testing infrastructure
-5. Create tracking issue with subtasks
+
+1. Create feature branch `unified-executor`
+2. Implement UnifiedExecutor class
+3. Remove deprecated features
+4. Update useHypernoteExecutor hook
+5. Test all examples
+6. Delete old executors
+7. Update documentation
 
 ---
 
-*This plan addresses the critical technical debt of having two parallel query execution systems. By unifying them, we'll have a more maintainable, performant, and reliable codebase.*
+*This simplified plan focuses on removing complexity while maintaining feature parity with actual usage in the examples folder.*
