@@ -86,14 +86,42 @@ export class SimpleQueryExecutor {
     const events = await this.fetchEvents(resolvedFilter);
     console.log(`[SimpleQueryExecutor] Got ${events.length} events for ${queryName}`);
     
+    // Handle replaceable events - only keep the newest one per d-tag
+    let processedEvents = events;
+    if (resolvedFilter.kinds && (resolvedFilter.kinds.includes(30078) || resolvedFilter.kinds.includes(32616))) {
+      // Group by d-tag and only keep the newest
+      const byDTag = new Map();
+      for (const event of events) {
+        const dTag = event.tags?.find(t => t[0] === 'd')?.[1];
+        if (dTag) {
+          const existing = byDTag.get(dTag);
+          if (!existing || event.created_at > existing.created_at) {
+            byDTag.set(dTag, event);
+          }
+        }
+      }
+      processedEvents = Array.from(byDTag.values());
+      
+      if (events.length > processedEvents.length) {
+        console.log(`[SimpleQueryExecutor] Deduplicated replaceable events for ${queryName}: ${events.length} -> ${processedEvents.length}`);
+        // Log what we kept
+        console.log(`[SimpleQueryExecutor] Kept newest event:`, {
+          id: processedEvents[0]?.id,
+          created_at: processedEvents[0]?.created_at,
+          content: processedEvents[0]?.content,
+          d_tag: processedEvents[0]?.tags?.find(t => t[0] === 'd')?.[1]
+        });
+      }
+    }
+    
     // Apply pipes if any
     if (pipe && pipe.length > 0) {
-      const result = applyPipes(events, pipe);
+      const result = applyPipes(processedEvents, pipe);
       console.log(`[SimpleQueryExecutor] After pipes for ${queryName}:`, result);
       return result;
     }
     
-    return events;
+    return processedEvents;
   }
   
   private async resolveReferences(config: any): Promise<void> {

@@ -271,8 +271,27 @@ export class HypernoteExecutor {
       }
       
       // Get all events (including the new one) - skip cache for live updates!
-      const allEvents = await this.snstrClient.fetchEvents([resolvedFilter]);
+      let allEvents = await this.snstrClient.fetchEvents([resolvedFilter]);
       console.log(`[HypernoteExecutor] Re-fetched ${allEvents.length} events for ${queryName} (bypassed cache)`);
+      
+      // Handle replaceable events - only keep the newest one per d-tag
+      if (resolvedFilter.kinds && (resolvedFilter.kinds.includes(30078) || resolvedFilter.kinds.includes(32616))) {
+        const byDTag = new Map();
+        for (const evt of allEvents) {
+          const dTag = evt.tags?.find(t => t[0] === 'd')?.[1];
+          if (dTag) {
+            const existing = byDTag.get(dTag);
+            if (!existing || evt.created_at > existing.created_at) {
+              byDTag.set(dTag, evt);
+            }
+          }
+        }
+        const dedupedEvents = Array.from(byDTag.values());
+        if (allEvents.length > dedupedEvents.length) {
+          console.log(`[HypernoteExecutor] Deduplicated replaceable events: ${allEvents.length} -> ${dedupedEvents.length}`);
+        }
+        allEvents = dedupedEvents;
+      }
       
       // Invalidate cache for this filter so future queries get fresh data
       this.queryCache.invalidate(resolvedFilter);
