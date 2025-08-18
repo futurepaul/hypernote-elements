@@ -988,13 +988,18 @@ export function tokenize(content: string, strict: boolean = true): Token[] {
     
     // Handle plain text and inline formatting together
     let textEnd = pos;
+    let inBackticks = false;
     while (textEnd < content.length && 
            content[textEnd] !== '\n' && 
-           content[textEnd] !== '#' && 
-           content[textEnd] !== '[' && 
+           (inBackticks || content[textEnd] !== '#') && // Don't stop at # if inside backticks
+           (inBackticks || content[textEnd] !== '[') && // Don't stop at [ if inside backticks
            !(content[textEnd] === '{' && textEnd + 1 < content.length && content[textEnd + 1] === '#') && // Stop at ID markers
            !(content[textEnd] === '{' && textEnd + 1 < content.length && content.slice(textEnd, textEnd + 6) === '{class') && // Stop at style markers
            !(content[textEnd] === '!' && textEnd + 1 < content.length && content[textEnd + 1] === '[')) {
+      // Track whether we're inside backticks
+      if (content[textEnd] === '`') {
+        inBackticks = !inBackticks;
+      }
       textEnd++;
     }
     

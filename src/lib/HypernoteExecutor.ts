@@ -5,6 +5,7 @@ import { SNSTRClient } from './snstr/client';
 import { queryCache as QueryCacheInstance } from './queryCache';
 import { UnifiedResolver, type ResolutionContext } from './UnifiedResolver';
 import type { Hypernote } from './schema';
+import { nip19 } from 'nostr-tools';
 
 // Context for resolving variables (matches ResolutionContext)
 export interface ExecutorContext {
@@ -54,7 +55,8 @@ export class HypernoteExecutor {
     queryCache: typeof QueryCacheInstance,
     signEvent?: (event: any) => Promise<NostrEvent>
   ) {
-    this.queries = hypernote.queries || {};
+    // Expand any naddr strings in queries to full query objects
+    this.queries = this.expandNaddrQueries(hypernote.queries || {});
     this.actions = hypernote.events || {};
     
     // Create unified resolver with initial context
@@ -72,6 +74,52 @@ export class HypernoteExecutor {
     this.snstrClient = snstrClient;
     this.queryCache = queryCache;
     this.signEvent = signEvent;
+  }
+  
+  /**
+   * Expand naddr strings to full query objects
+   */
+  private expandNaddrQueries(queries: Record<string, any>): Record<string, any> {
+    const expanded: Record<string, any> = {};
+    
+    for (const [key, value] of Object.entries(queries)) {
+      if (typeof value === 'string' && value.startsWith('naddr')) {
+        try {
+          const decoded = nip19.decode(value);
+          
+          if (decoded.type === 'naddr') {
+            const { identifier, pubkey, kind } = decoded.data;
+            
+            // Create a query from the naddr components
+            const query: any = {
+              kinds: [kind],
+              authors: [pubkey],
+              "#d": [identifier],
+              limit: 1
+            };
+            
+            // For component queries (#), automatically add the 'first' pipe
+            if (key.startsWith('#')) {
+              query.pipe = ['first'];
+            }
+            
+            expanded[key] = query;
+            console.log(`[HypernoteExecutor] Expanded naddr for ${key}:`, query);
+          } else {
+            // Not an naddr, keep as-is
+            expanded[key] = value;
+          }
+        } catch (err) {
+          console.error(`[HypernoteExecutor] Failed to parse naddr for ${key}:`, err);
+          expanded[key] = value;
+        }
+      } else {
+        // Not a string or doesn't start with naddr
+        expanded[key] = value;
+      }
+    }
+    
+    return expanded;
   }
   
   /**

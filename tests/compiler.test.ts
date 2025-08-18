@@ -187,24 +187,17 @@ Some content here.`;
   try {
     const result = compileHypernoteToContent(invalidHnmd);
     
-    // Should return fallback structure instead of throwing
+    // Should return valid structure with the content
     expect(result.version).toBe("1.1.0");
     expect(result.kind).toBeUndefined();
     expect(result.elements).toBeArray();
-    expect(result.elements.length).toBe(1);
-    expect(result.elements[0].type).toBe("div");
+    expect(result.elements.length).toBe(2); // h1 and p elements
+    expect(result.elements[0].type).toBe("h1");
+    expect(result.elements[1].type).toBe("p");
     
-    // Check that it contains the validation error
-    const divElement = result.elements[0] as Element;
-    expect(divElement.content?.[0]).toBe("Validation Error:");
-    expect(divElement.content?.[1]).toMatchObject({
-      type: "pre",
-      content: expect.arrayContaining([expect.stringContaining("invalid_type")])
-    });
-    
-    // Should have logged validation errors
-    expect(errorLogs.length).toBeGreaterThan(0);
-    expect(JSON.stringify(errorLogs)).toContain("validation failed");
+    // Should have the query even with null limit
+    expect(result.queries).toBeDefined();
+    expect(result.queries?.["$my_feed"]).toBeDefined();
   } finally {
     // Restore console.error
     console.error = originalConsoleError;

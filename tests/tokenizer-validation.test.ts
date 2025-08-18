@@ -145,8 +145,8 @@ test('Invalid loop syntax should throw error', () => {
 
 test('Invalid form event should throw error', () => {
   const invalidCases = [
-    { content: '[form]\nContent\n[/form]', error: 'missing closing bracket' },  // Now fails on bracket first
-    { content: '[form submit]\nContent\n[/form]', error: 'missing closing bracket' },  // submit without @ means no ] found
+    { content: '[form]\nContent\n[/form]', error: 'Form requires an event reference' },  // Missing event
+    { content: '[form submit]\nContent\n[/form]', error: 'Form requires an event reference' },  // Missing @ symbol
     { content: '[form @]\nContent\n[/form]', error: 'Invalid event name' },
     { content: '[form @123]\nContent\n[/form]', error: 'Invalid event name' }
   ];

@@ -41,13 +41,18 @@ export class SimpleQueryExecutor {
   async executeAll(): Promise<{ results: Map<string, any>, resolvedFilters: Map<string, any> }> {
     const results = new Map<string, any>();
     
+    console.log('[SimpleQueryExecutor] Executing all queries:', Object.keys(this.queries));
+    
     // Execute queries one by one (will handle dependencies)
     for (const [queryName, queryConfig] of Object.entries(this.queries)) {
+      console.log(`[SimpleQueryExecutor] Executing query: ${queryName}`);
       const result = await this.executeQuery(queryName, queryConfig);
       results.set(queryName, result);
       this.context.queryResults.set(queryName, result);
+      console.log(`[SimpleQueryExecutor] Query ${queryName} result:`, result);
     }
     
+    console.log('[SimpleQueryExecutor] All queries executed. Results:', Array.from(results.keys()));
     return { results, resolvedFilters: this.resolvedFilters };
   }
   
@@ -92,11 +97,11 @@ export class SimpleQueryExecutor {
   }
   
   private async resolveReferences(config: any): Promise<void> {
-    // Check each field for references to other queries ($query) or actions (@action)
+    // Check each field for references to other queries ($query or #component) or actions (@action)
     for (const [key, value] of Object.entries(config)) {
       if (typeof value === 'string') {
-        // Check for query reference (e.g., "$contact_list")
-        if (value.startsWith('$')) {
+        // Check for query reference (e.g., "$contact_list" or "#profile")
+        if (value.startsWith('$') || value.startsWith('#')) {
           const refQueryName = value;
           
           // If this query hasn't been executed yet, execute it now (implicit wait)
@@ -124,11 +129,11 @@ export class SimpleQueryExecutor {
           }
         }
       }
-      // Handle arrays (e.g., authors: ["$contact_list"])
+      // Handle arrays (e.g., authors: ["$contact_list"] or ["#component"])
       else if (Array.isArray(value)) {
         const resolved = [];
         for (const item of value) {
-          if (typeof item === 'string' && item.startsWith('$')) {
+          if (typeof item === 'string' && (item.startsWith('$') || item.startsWith('#'))) {
             const refQueryName = item;
             
             // Execute if needed
@@ -171,10 +176,10 @@ export class SimpleQueryExecutor {
   }
   
   private hasUnresolvedReferences(obj: any): boolean {
-    // Check if any value in the object starts with @ or $ or is an unresolved built-in variable
+    // Check if any value in the object starts with @, $, or # (unresolved references)
     if (typeof obj === 'string') {
       // Check for unresolved references
-      if (obj.startsWith('@') || obj.startsWith('$')) return true;
+      if (obj.startsWith('@') || obj.startsWith('$') || obj.startsWith('#')) return true;
       
       // Check for unresolved built-in variables (these stay as strings when unresolved)
       if (obj === 'user.pubkey') return true;

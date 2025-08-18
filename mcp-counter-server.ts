@@ -180,7 +180,9 @@ function applyMove(board: string[][], move: string, turn: 'w' | 'b'): { board: s
 // IMPORTANT: Replace with your own private key
 const SERVER_PRIVATE_KEY_HEX =
   process.env.SERVER_PRIVATE_KEY || "your-32-byte-server-private-key-in-hex";
-const RELAYS = ["wss://relay.damus.io", "wss://nos.lol", "wss://relay.primal.net"];
+// const RELAYS = ["wss://relay.damus.io/", "wss://nos.lol/", "wss://relay.primal.net/"];
+// nos.lol has a nicer rate limit
+const RELAYS = ["wss://nos.lol"];
 
 // --- Main Server Logic ---
 async function main() {
@@ -201,6 +203,30 @@ async function main() {
     version: "1.0.0",
   });
 
+  // Helper function to publish with retry on rate limit
+  async function publishWithRetry(event: any, maxRetries = 3, initialDelay = 1000): Promise<void> {
+    let delay = initialDelay;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Publishing event kind ${event.kind} to relays...`);
+        await relayPool.publish(event);
+        console.log(`Successfully published event ${event.id} to relays`);
+        
+        return; // Success!
+      } catch (error: any) {
+        console.error(`Failed to publish event:`, error);
+        if (error.message?.includes('rate-limited') && attempt < maxRetries) {
+          console.log(`Rate limited, waiting ${delay}ms before retry (attempt ${attempt}/${maxRetries})...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          delay *= 2; // Exponential backoff
+        } else {
+          throw error; // Re-throw if not rate limit or max retries reached
+        }
+      }
+    }
+  }
+
   // Helper function to publish counter data as a simple value (kind 30078)
   async function publishCounterData(count: number): Promise<void> {
     const dataEvent = {
@@ -214,7 +240,7 @@ async function main() {
     };
 
     const signedDataEvent = await signer.signEvent(dataEvent);
-    await relayPool.publish(signedDataEvent);
+    await publishWithRetry(signedDataEvent);
     console.log(`Published counter data: ${count}`);
   }
 
@@ -261,20 +287,145 @@ async function main() {
 
     // Sign the event using the signer's signEvent method
     const signedEvent = await signer.signEvent(eventTemplate);
-    await relayPool.publish(signedEvent);
+    await publishWithRetry(signedEvent);
     
     console.log(`Published counter UI for count=${count}, event ID: ${signedEvent.id}`);
 
-    // Return naddr as resource identifier
+    // Return naddr as resource identifier (without relay hints)
     return nip19.naddrEncode({
       kind: 32616,
       pubkey: serverPubkey,
-      identifier: "counter-ui",
-      relays: RELAYS
+      identifier: "counter-ui"
     });
   }
 
-  // 3. Define counter tools
+  // Initialize and publish counter UI on startup
+  console.log('Publishing initial counter state...');
+  try {
+    await publishCounterData(counterState);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    await publishCounterUI(counterState);
+    console.log('Initial counter state published successfully');
+  } catch (err) {
+    console.error('Failed to publish initial counter state:', err);
+  }
+
+  // 3. Register MCP Resources for reading counter state
+  
+  // Resource for raw counter data (via naddr)
+
+  const counterDataNaddr = nip19.naddrEncode({
+    kind: 30078,
+    pubkey: serverPubkey,
+    identifier: "counter-value"
+  });
+
+  console.log(`Counter Data naddr: ${counterDataNaddr}`);
+  
+  mcpServer.registerResource(
+    "counter-data",
+    `${counterDataNaddr}`,
+    {
+      title: "Counter Data",
+      description: "Current counter value as Nostr event",
+      mimeType: "application/json",
+    },
+    async (uri) => {
+      // Return the current counter state as if it were fetched from Nostr
+      const dataEvent = {
+        kind: 30078,
+        content: String(counterState),
+        tags: [
+          ["d", "counter-value"],
+          ["description", "Current counter value"]
+        ],
+        created_at: Math.floor(Date.now() / 1000),
+        pubkey: serverPubkey
+      };
+      
+      return {
+        contents: [{
+          uri: uri.href,
+          name: "counter-value",
+          mimeType: "application/json",
+          text: JSON.stringify(dataEvent),
+        }]
+      };
+    }
+  );
+  
+  // Resource for Hypernote UI element (via naddr)
+
+  const counterUiNaddr = nip19.naddrEncode({
+    kind: 32616,
+    pubkey: serverPubkey,
+    identifier: "counter-ui"
+  });
+  
+  console.log(`Counter UI naddr: ${counterUiNaddr}`);
+  
+  mcpServer.registerResource(
+    "counter-ui",
+    `${counterUiNaddr}`,
+    {
+      title: "Counter UI Element",
+      description: "Hypernote element for rendering counter",
+      mimeType: "application/json",
+    },
+    async (uri) => {
+      // Build the Hypernote JSON
+      const hypernoteJson = {
+        version: "1.1.0",
+        type: "element",
+        component_kind: null,
+        elements: [
+          {
+            type: "div",
+            elements: [
+              {
+                type: "h2",
+                content: [`Current count: ${counterState}`]
+              }
+            ],
+            style: {
+              textAlign: "center",
+              fontSize: "2rem",
+              fontWeight: "bold",
+              color: "rgb(59,130,246)",
+              padding: "1rem",
+              backgroundColor: "rgb(239,246,255)",
+              borderRadius: "0.5rem",
+              marginBottom: "1rem"
+            }
+          }
+        ]
+      };
+      
+      // Return as a Nostr event
+      const uiEvent = {
+        kind: 32616,
+        content: JSON.stringify(hypernoteJson),
+        tags: [
+          ["d", "counter-ui"],
+          ["hypernote", "1.1.0"],
+          ["description", "MCP Counter UI Element"]
+        ],
+        created_at: Math.floor(Date.now() / 1000),
+        pubkey: serverPubkey
+      };
+      
+      return {
+        contents: [{
+          uri: uri.href,
+          name: "counter-ui",
+          mimeType: "application/json",
+          text: JSON.stringify(uiEvent),
+        }]
+      };
+    }
+  );
+
+  // 4. Define counter tools (with resource update notifications)
   mcpServer.registerTool(
     "addone",
     {
@@ -287,13 +438,23 @@ async function main() {
       counterState += 1;
       console.log(`addone: counter is now ${counterState}`);
       
-      // Publish both the data and the UI element
-      publishCounterData(counterState).catch(err => 
-        console.error('Failed to publish counter data:', err)
-      );
-      publishCounterUI(counterState).catch(err => 
-        console.error('Failed to publish counter UI:', err)
-      );
+      // Publish our events to Nostr
+      try {
+        await publishCounterData(counterState);
+        // Small delay to avoid rate limit
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await publishCounterUI(counterState);
+      } catch (err) {
+        console.error('Failed to publish counter events:', err);
+      }
+      
+      // Note: MCP doesn't have per-resource update notifications
+      // Clients will need to poll or re-read the resources
+      // We could send a generic resource list changed notification if resources were added/removed
+      // but for value changes, clients need to re-read
+      
+      // Delay before returning RPC response to avoid rate limit
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       return {
         content: [{ type: "text", text: `${counterState}` }],
@@ -313,13 +474,23 @@ async function main() {
       counterState -= 1;
       console.log(`minusone: counter is now ${counterState}`);
       
-      // Publish both the data and the UI element
-      publishCounterData(counterState).catch(err => 
-        console.error('Failed to publish counter data:', err)
-      );
-      publishCounterUI(counterState).catch(err => 
-        console.error('Failed to publish counter UI:', err)
-      );
+      // Publish our events to Nostr
+      try {
+        await publishCounterData(counterState);
+        // Small delay to avoid rate limit
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await publishCounterUI(counterState);
+      } catch (err) {
+        console.error('Failed to publish counter events:', err);
+      }
+      
+      // Note: MCP doesn't have per-resource update notifications
+      // Clients will need to poll or re-read the resources
+      // We could send a generic resource list changed notification if resources were added/removed
+      // but for value changes, clients need to re-read
+      
+      // Delay before returning RPC response to avoid rate limit
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       return {
         content: [{ type: "text", text: `${counterState}` }],
@@ -339,13 +510,23 @@ async function main() {
       counterState = value;
       console.log(`Initializing counter to ${counterState}`);
       
-      // Publish both the data and the UI element
-      publishCounterData(counterState).catch(err => 
-        console.error('Failed to publish counter data:', err)
-      );
-      publishCounterUI(counterState).catch(err => 
-        console.error('Failed to publish counter UI:', err)
-      );
+      // Publish our events to Nostr
+      try {
+        await publishCounterData(counterState);
+        // Small delay to avoid rate limit
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await publishCounterUI(counterState);
+      } catch (err) {
+        console.error('Failed to publish counter events:', err);
+      }
+      
+      // Note: MCP doesn't have per-resource update notifications
+      // Clients will need to poll or re-read the resources
+      // We could send a generic resource list changed notification if resources were added/removed
+      // but for value changes, clients need to re-read
+      
+      // Delay before returning RPC response to avoid rate limit
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       return {
         content: [{ type: "text", text: `Counter initialized to ${counterState}` }],

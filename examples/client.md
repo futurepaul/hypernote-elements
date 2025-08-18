@@ -27,7 +27,13 @@ name: "nostr-client"
   content: "{form.message}"
   tags: [["client", "hypernote-client"]]
 
-"#profile": naddr1qvzqqqrldqpzqrtvswydevzfhrw5ljxnmrpmhy778k5sh2pguncfezks7dry3z3nqy88wumn8ghj7mn0wvhxcmmv9uq32amnwvaz7tmjv4kxz7fwv3sk6atn9e5k7tcpzamhxue69uhhyetvv9ujuurjd9kkzmpwdejhgtcqp4c8ymmxd9kx2ttzv9jxwegsqyvt2
+"#profile":
+  kinds: [32616]
+  authors: ["0d6c8388dcb049b8dd4fc8d3d8c3bb93de3da90ba828e4f09c8ad0f346488a33"]
+  "#d": ["profile-badge"]
+  limit: 1
+  pipe:
+    - first
 ---
 
 # Nostr Client

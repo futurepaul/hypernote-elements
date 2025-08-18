@@ -22,12 +22,11 @@ describe("Safe Compiler", () => {
     const validResult = safeCompileHypernote("# Valid Content");
     expect(validResult.success).toBe(true);
     
-    // Now try to compile something that would fail with validation on
-    // Since validation is off, we need something that breaks parsing
-    // The tokenizer is very forgiving, so let's use malformed YAML
+    // Now try to compile something that would fail
+    // Use a tokenizer error - unclosed bracket
     const invalidResult = safeCompileHypernote(`---
-invalid yaml {{{ no quotes
 ---
+[div
 # Content`);
     
     expect(invalidResult.success).toBe(false);
@@ -43,10 +42,8 @@ invalid yaml {{{ no quotes
   test("returns error structure when no last valid state", () => {
     clearLastValidResult();
     
-    // Try to compile invalid YAML with no cached result
-    const result = safeCompileHypernote(`---
-invalid: yaml {{{ 
----`);
+    // Try to compile with tokenizer error and no cached result
+    const result = safeCompileHypernote(`[div unclosed bracket`);
     
     expect(result.success).toBe(false);
     expect(result.isStale).toBe(false); // No cached result
@@ -89,10 +86,9 @@ invalid: yaml {{{
     // Set up a valid state
     safeCompileHypernote("# Valid");
     
-    // Compile invalid without fallback
-    const result = safeCompileHypernote(`---
-bad: yaml {{{
----`, false);
+    // Compile invalid without fallback (unclosed element)
+    const result = safeCompileHypernote(`[div class="test"
+Unclosed div element`, false);
     
     expect(result.success).toBe(false);
     expect(result.isStale).toBe(false);

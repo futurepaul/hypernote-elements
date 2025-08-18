@@ -15,24 +15,8 @@ name: "hypermedia-counter"
     - get: content  # Just the raw count value
     - default: "0"
 
-# Query the Hypernote UI element (kind 32616 - full UI)
-"$counter_ui":
-  kinds: [32616]  # HYPERNOTE_ELEMENT_KIND
-  authors: ["19f5b5cd2fce663a3b4916b42c378c0280cce2bffd0af384380e91356fcff1d6"]
-  "#d": ["counter-ui"]
-  limit: 1
-  pipe:
-    - first
-
-# Get the event ID for component loading
-"$counter_ui_id":
-  kinds: [32616]
-  authors: ["19f5b5cd2fce663a3b4916b42c378c0280cce2bffd0af384380e91356fcff1d6"]
-  "#d": ["counter-ui"]
-  limit: 1
-  pipe:
-    - first
-    - get: id
+# Component query - using naddr directly (will be expanded automatically)
+"#counter_ui": "naddr1qvzqqqrldqpzqx04khxjlnnx8ga5j9459smccq5qen3tllg27wzrsr53x4huluwkqy28wumn8ghj7un9d3shjtnyv9kh2uewd9hszrthwden5te0dehhxtnvdakqz9nhwden5te0wfjkccte9ec8y6tdv9kzumn9wsqq5cm0w4h8getj946kjghtjhh"
 
 # Simple increment action - no callbacks or triggers!
 "@increment":
@@ -90,16 +74,10 @@ This counter demonstrates the power of hypermedia - the MCP server publishes com
 [/div]
 
 ### View 2: Hypermedia Element (kind 32616)
-[if $counter_ui_id]
-  [div class="p-4 bg-blue-50 rounded-lg mb-4"]
-    *Rendered Hypernote element from MCP:*
-    [#counter_element $counter_ui_id]
-  [/div]
-[else]
-  [div class="p-4 bg-gray-100 rounded-lg mb-4 text-center"]
-    *No Hypernote UI element yet - click Initialize*
-  [/div]
-[/if]
+[div class="p-4 bg-blue-50 rounded-lg mb-4"]
+  *Rendered Hypernote element from MCP:*
+  [#counter_ui]
+[/div]
 
 ## Controls
 

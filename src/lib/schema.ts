@@ -306,9 +306,6 @@ export const hypernoteSchema = z.object({
   // For component definitions: 0 (npub input), 1 (nevent input), undefined (not a component)
   kind: z.union([z.literal(0), z.literal(1)]).optional(),
   
-  // Maps aliases used in HNMD to their Nostr identifiers (naddr, nevent, etc.)
-  imports: z.record(z.string().min(1), z.string().min(1)).optional(),
-  
   // Root-level styles as CSS-in-JS object (compiled from HNMD Tailwind classes)
   // In HNMD, this is specified as Tailwind classes, but gets compiled to a style object
   style: StylePropertiesSchema.optional(),

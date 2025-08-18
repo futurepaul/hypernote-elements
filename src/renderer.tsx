@@ -29,7 +29,6 @@ interface RenderContext {
   
   // Component support
   resolver?: ComponentResolver;
-  imports?: Record<string, string>;
   depth: number;
   
   // Loading hints
@@ -85,46 +84,18 @@ export function RenderHypernoteContent({ content }: { content: Hypernote }) {
   const resolverRef = useRef<ComponentResolver | undefined>(undefined);
   const [componentsLoaded, setComponentsLoaded] = useState(false);
 
-  // Create imports hash for stable dependency tracking
-  const importsHash = useMemo(() => {
-    if (!content.imports) return '';
-    return JSON.stringify(content.imports);
-  }, [content.imports]);
-
-  // Prefetch all imported components
+  // Initialize component resolver for argument parsing
   useEffect(() => {
-    const loadComponents = async () => {
-      if (content.imports && Object.keys(content.imports).length > 0) {
-        // Wait for snstrClient to be available
-        if (!snstrClient) {
-          console.log('[Renderer] Waiting for SNSTRClient to initialize...');
-          return;
-        }
-
-        // Reuse existing resolver if possible
-        let resolver = resolverRef.current;
-        if (!resolver) {
-          console.log('[Renderer] Creating new ComponentResolver');
-          resolver = new ComponentResolver(snstrClient);
-          resolverRef.current = resolver;
-        } else {
-          console.log('[Renderer] Reusing existing ComponentResolver');
-        }
-
-        try {
-          console.log('[Renderer] Loading imported components');
-          await resolver.prefetchComponents(content.imports);
-          setComponentsLoaded(true);
-        } catch (error) {
-          console.error('[Renderer] Failed to load components:', error);
-          setComponentsLoaded(true); // Set loaded even on error to prevent infinite loading
-        }
-      } else {
-        setComponentsLoaded(true);
+    if (snstrClient) {
+      if (!resolverRef.current) {
+        console.log('[Renderer] Creating ComponentResolver for argument parsing');
+        resolverRef.current = new ComponentResolver(snstrClient);
       }
-    };
-    loadComponents();
-  }, [importsHash, snstrClient]);
+      setComponentsLoaded(true);
+    } else {
+      console.log('[Renderer] Waiting for SNSTRClient to initialize...');
+    }
+  }, [snstrClient]);
 
   // Set up form data state
   const [formData, setFormData] = useState<Record<string, string>>({});
@@ -263,7 +234,6 @@ export function RenderHypernoteContent({ content }: { content: Hypernote }) {
     userPubkey: pubkey,
     loopVariables: {},
     resolver: resolverRef.current,
-    imports: content.imports,
     depth: 0,
     loadingQueries,
     onFormSubmit: handleFormSubmit,
@@ -735,30 +705,51 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
     );
   }
   
-  // Check if resolver is available
-  if (!ctx.resolver) {
+  // Components are now queries! Look up the query result
+  const componentQueryName = `#${alias}`;
+  console.log(`[ComponentWrapper] Looking for component query: ${componentQueryName}`);
+  console.log(`[ComponentWrapper] Available query results:`, Object.keys(ctx.queryResults));
+  const componentQueryResult = ctx.queryResults[componentQueryName];
+  
+  // Check if component query is still loading
+  if (ctx.loadingQueries?.has(componentQueryName)) {
     return (
       <div style={{ color: '#f59e0b', padding: '0.5rem', backgroundColor: '#fef3c7', borderRadius: '0.25rem' }}>
-        ⚠️ Components not loaded yet...
+        ⏳ Loading component: #{alias}...
       </div>
     );
   }
   
-  // Get cached component definition
-  const componentDef = ctx.resolver.getComponent(alias);
-  if (!componentDef) {
+  // Check if we have the component event
+  if (!componentQueryResult) {
     return (
       <div style={{ color: '#ef4444', padding: '0.5rem', border: '1px solid #ef4444', borderRadius: '0.25rem' }}>
-        ⚠️ Unknown component: #{alias}
+        ⚠️ Component not found: #{alias}
       </div>
     );
   }
   
-  // Validate component has kind field
-  if (componentDef.kind === undefined) {
+  // Get the component definition from the event content
+  // Handle both array results and single event results (from pipes like 'first')
+  let componentDef: Hypernote;
+  try {
+    const event = Array.isArray(componentQueryResult) ? componentQueryResult[0] : componentQueryResult;
+    
+    if (!event) {
+      throw new Error('No event found in query result');
+    }
+    
+    console.log(`[Component] Component event:`, event);
+    componentDef = JSON.parse(event.content);
+    
+    // Validate it's a Hypernote element
+    if (componentDef.type !== 'element') {
+      throw new Error('Component must be of type "element"');
+    }
+  } catch (error) {
     return (
       <div style={{ color: '#ef4444', padding: '0.5rem', border: '1px solid #ef4444', borderRadius: '0.25rem' }}>
-        ⚠️ Component #{alias} is not a valid component (missing kind field)
+        ⚠️ Invalid component format: #{alias}
       </div>
     );
   }
@@ -813,6 +804,15 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
   
   useEffect(() => {
     const loadTarget = async () => {
+      // If component doesn't require an argument (no kind field), skip target loading
+      if (componentDef.kind === undefined) {
+        console.log(`[Component] Component ${alias} doesn't require an argument (no kind field)`);
+        setTargetContext(null);
+        setTargetLoading(false);
+        setTargetError(null);
+        return;
+      }
+      
       if (!resolvedArgument) {
         setTargetError('No argument provided');
         setTargetLoading(false);
@@ -867,8 +867,8 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
     );
   }
   
-  // Show error state
-  if (targetError) {
+  // Show error state (only if component expects an argument)
+  if (targetError && componentDef.kind !== undefined) {
     // Special handling for "waiting for data" state
     if (targetError === 'Waiting for data...') {
       return (
@@ -898,7 +898,8 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
   }
   
   // Don't render component until target is ready (prevents bad queries)
-  if (!targetContext) {
+  // But only check this if the component expects an argument
+  if (!targetContext && componentDef.kind !== undefined) {
     return (
       <div style={{ 
         padding: '0.5rem', 

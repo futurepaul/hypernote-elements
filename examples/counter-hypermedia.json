@@ -63,78 +63,34 @@
       ]
     },
     {
-      "type": "if",
+      "type": "div",
       "elements": [
         {
-          "type": "div",
-          "elements": [
+          "type": "p",
+          "content": [
+            "  ",
             {
-              "type": "p",
+              "type": "em",
               "content": [
-                "    ",
-                {
-                  "type": "em",
-                  "content": [
-                    "Rendered Hypernote element from MCP:"
-                  ]
-                },
-                " ",
-                "    ",
-                "    ",
-                {
-                  "type": "strong",
-                  "content": [
-                    "Hypernote UI element published by MCP"
-                  ]
-                },
-                " ",
-                "    ",
-                "    (TODO: Dynamic component rendering)",
-                " ",
-                "  "
+                "Rendered Hypernote element from MCP:"
               ]
-            }
-          ],
-          "style": {
-            "padding": "1rem",
-            "backgroundColor": "rgb(239,246,255)",
-            "borderRadius": "0.5rem",
-            "marginBottom": "1rem",
-            "textAlign": "center"
-          }
+            },
+            " ",
+            "  "
+          ]
         },
         {
-          "type": "else",
-          "content": []
-        },
-        {
-          "type": "div",
-          "elements": [
-            {
-              "type": "p",
-              "content": [
-                "    ",
-                {
-                  "type": "em",
-                  "content": [
-                    "No Hypernote UI element yet"
-                  ]
-                },
-                " ",
-                "  "
-              ]
-            }
-          ],
-          "style": {
-            "padding": "1rem",
-            "backgroundColor": "rgb(243,244,246)",
-            "borderRadius": "0.5rem",
-            "marginBottom": "1rem",
-            "textAlign": "center"
-          }
+          "type": "component",
+          "alias": "counter_ui",
+          "argument": ""
         }
       ],
-      "condition": "$counter_ui"
+      "style": {
+        "padding": "1rem",
+        "backgroundColor": "rgb(239,246,255)",
+        "borderRadius": "0.5rem",
+        "marginBottom": "1rem"
+      }
     },
     {
       "type": "h2",
@@ -313,7 +269,7 @@
         }
       ]
     },
-    "$counter_ui": {
+    "#counter_ui": {
       "kinds": [
         32616
       ],
@@ -324,6 +280,11 @@
         "counter-ui"
       ],
       "limit": 1,
+      "relays": [
+        "wss://relay.damus.io",
+        "wss://nos.lol",
+        "wss://relay.primal.net"
+      ],
       "pipe": [
         {
           "op": "first"

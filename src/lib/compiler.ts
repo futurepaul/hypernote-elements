@@ -3,6 +3,7 @@ import { tokenize, parseTokens, TokenizerError } from './tokenizer';
 import { safeValidateHypernote, type Hypernote } from './schema';
 import { parseTailwindClasses } from './tailwind-parser';
 import { processPipes } from './pipe-compiler';
+import { nip19 } from 'nostr-tools';
 
 // Debug mode can be enabled via environment variable (check if process exists for browser compatibility)
 const DEBUG_MODE = typeof process !== 'undefined' && process.env?.HYPERNOTE_DEBUG === 'true';
@@ -21,6 +22,48 @@ function debugLog(message: string, data?: any) {
 
 // Cache for Tailwind conversions to avoid reprocessing identical class strings
 const tailwindCache = new Map<string, Record<string, any> | null>();
+
+/**
+ * Parses an naddr string into a query object
+ */
+function parseNaddrToQuery(naddrString: string, isComponent: boolean): any {
+  try {
+    const decoded = nip19.decode(naddrString);
+    
+    if (decoded.type === 'naddr') {
+      const { identifier, pubkey, kind, relays } = decoded.data;
+      
+      // Create a query from the naddr components
+      const query: any = {
+        kinds: [kind],
+        authors: [pubkey],
+        "#d": [identifier],
+        limit: 1
+      };
+      
+      // Skip relay hints - let the app use its configured relays
+      // if (relays && relays.length > 0) {
+      //   query.relays = relays;
+      // }
+      
+      // For component queries, automatically add the 'first' pipe to get single element
+      if (isComponent) {
+        query.pipe = ['first'];
+      }
+      
+      debugLog(`Converted naddr to query:`, query);
+      return query;
+    } else {
+      // Not an naddr, return as-is
+      debugLog(`Invalid naddr format, keeping as-is`);
+      return naddrString;
+    }
+  } catch (err) {
+    // Failed to parse as naddr, return the original value
+    debugLog(`Failed to parse naddr:`, err);
+    return naddrString;
+  }
+}
 
 /**
  * Converts Tailwind classes to CSS-in-JS object with caching
@@ -156,8 +199,16 @@ export function compileHypernoteToContent(hnmd: string, options?: { strictValida
           if (!result.queries) {
             result.queries = {};
           }
-          result.queries[key] = frontmatter[key];
-          debugLog(`Added query: ${key}`, frontmatter[key]);
+          
+          // Check if the value is a string that looks like an naddr
+          const value = frontmatter[key];
+          if (typeof value === 'string' && value.startsWith('naddr')) {
+            // Convert naddr to query format
+            result.queries[key] = parseNaddrToQuery(value, false);
+          } else {
+            result.queries[key] = value;
+          }
+          debugLog(`Added query: ${key}`, result.queries[key]);
         } else if (key === 'kind') {
           // Handle component kind (0 for npub input, 1 for nevent input)
           result.kind = frontmatter[key];
@@ -179,12 +230,20 @@ export function compileHypernoteToContent(hnmd: string, options?: { strictValida
           result.name = frontmatter[key];
           debugLog(`Set name: ${frontmatter[key]}`);
         } else if (key.startsWith('#')) {
-          // Handle imports - create imports object if it doesn't exist
-          if (!result.imports) {
-            result.imports = {};
+          // Handle component queries - treat them the same as data queries
+          if (!result.queries) {
+            result.queries = {};
           }
-          result.imports[key] = frontmatter[key];
-          debugLog(`Added import: ${key}`, frontmatter[key]);
+          
+          // Check if the value is a string that looks like an naddr
+          const value = frontmatter[key];
+          if (typeof value === 'string' && value.startsWith('naddr')) {
+            // Convert naddr to query format - for components, add 'first' pipe
+            result.queries[key] = parseNaddrToQuery(value, true);
+          } else {
+            result.queries[key] = value;
+          }
+          debugLog(`Added component query: ${key}`, result.queries[key]);
         }
         // We can add more frontmatter sections here as needed
       }

@@ -1,16 +1,13 @@
 import { nip19 } from 'nostr-tools';
-import type { Hypernote } from './schema';
 import type { SNSTRClient } from './snstr/client';
 import type { Filter } from './snstr/client';
 import { queryCache } from './queryCache';
 import { getTargetBatcher } from './TargetBatcher';
 
 /**
- * Manages fetching and caching of Hypernote components
+ * Handles parsing of component arguments (npub/nevent targets)
  */
 export class ComponentResolver {
-  private cache = new Map<string, Hypernote>();
-  private fetchPromises = new Map<string, Promise<Hypernote>>();
   private client: SNSTRClient | null = null;
   
   constructor(client?: SNSTRClient) {
@@ -21,130 +18,7 @@ export class ComponentResolver {
     this.client = client;
   }
 
-  /**
-   * Pre-fetch all components referenced in imports
-   * @param imports Map of aliases to Nostr identifiers
-   */
-  async prefetchComponents(imports: Record<string, string> | undefined): Promise<void> {
-    if (!imports) return;
-    
-    const fetches = Object.entries(imports).map(([alias, reference]) => {
-      // Check if already cached
-      const key = alias.startsWith('#') ? alias.slice(1) : alias;
-      if (this.cache.has(key)) {
-        console.log(`[ComponentResolver] Component ${key} already cached, skipping fetch`);
-        return Promise.resolve();
-      }
-      
-      return this.fetchComponent(reference)
-        .then(component => {
-          // Store without # prefix
-          this.cache.set(key, component);
-          console.log(`[ComponentResolver] Cached component ${key}`);
-        })
-        .catch(error => {
-          console.error(`[ComponentResolver] Failed to fetch component ${alias}:`, error);
-          // Don't throw - allow other components to load
-        });
-    });
-    
-    await Promise.all(fetches);
-  }
-
-  /**
-   * Get cached component definition
-   * @param alias Component alias (with or without # prefix)
-   */
-  getComponent(alias: string): Hypernote | null {
-    // Remove # prefix if present
-    const key = alias.startsWith('#') ? alias.slice(1) : alias;
-    return this.cache.get(key) || null;
-  }
-
-  /**
-   * Fetch component by reference (naddr/nevent)
-   * @param reference Nostr identifier
-   */
-  private async fetchComponent(reference: string): Promise<Hypernote> {
-    // Check if we're already fetching this reference
-    if (this.fetchPromises.has(reference)) {
-      return this.fetchPromises.get(reference)!;
-    }
-
-    // Create fetch promise
-    const fetchPromise = this.doFetch(reference);
-    this.fetchPromises.set(reference, fetchPromise);
-
-    try {
-      const result = await fetchPromise;
-      return result;
-    } finally {
-      // Clean up promise cache
-      this.fetchPromises.delete(reference);
-    }
-  }
-
-  private async doFetch(reference: string): Promise<Hypernote> {
-    if (!this.client) {
-      console.warn('SNSTRClient not initialized yet. Cannot fetch component:', reference);
-      throw new Error('SNSTRClient not initialized. Cannot fetch components.');
-    }
-    
-    console.log(`Fetching component from relays: ${reference}`);
-    
-    try {
-      // 1. Decode the naddr
-      const decoded = nip19.decode(reference);
-      if (decoded.type !== 'naddr') {
-        throw new Error(`Expected naddr, got ${decoded.type}`);
-      }
-      
-      const { identifier, pubkey, kind } = decoded.data;
-      
-      // 2. Create filter for the replaceable event
-      const filter: Filter = {
-        kinds: [kind],
-        authors: [pubkey],
-        '#d': [identifier],
-        limit: 1
-      };
-      
-      console.log(`Fetching component with filter:`, JSON.stringify(filter));
-      
-      // 3. Fetch from relays using cache to prevent duplicates
-      const events = await queryCache.getOrFetch(filter, async (f) => {
-        console.log('Cache miss for component, fetching from relays');
-        return await this.client.fetchEvents([f]);
-      });
-      
-      if (events.length === 0) {
-        throw new Error(`Component not found: ${reference}`);
-      }
-      
-      const event = events[0];
-      console.log(`Fetched event:`, event.id);
-      
-      // 4. Parse the content as JSON
-      let content: any;
-      try {
-        content = JSON.parse(event.content);
-      } catch (e) {
-        throw new Error(`Failed to parse component content as JSON: ${e}`);
-      }
-      
-      // 5. Validate it's a valid component
-      if (content.kind === undefined) {
-        throw new Error(`Not a valid component (missing kind field)`);
-      }
-      
-      console.log(`Successfully fetched component with kind: ${content.kind}`);
-      
-      return content as Hypernote;
-    } catch (error) {
-      console.error(`Error fetching component:`, error);
-      throw error;
-    }
-  }
+  // Component fetching methods removed - components are now queries
 }
 
 /**
