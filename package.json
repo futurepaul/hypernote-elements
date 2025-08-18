@@ -14,7 +14,8 @@
     "query": "bun run src/utils/query-test.ts",
     "update-examples": "bun scripts/update-example-json.ts",
     "mcp-counter": "bun run mcp-counter-server.ts",
-    "mcp-chess": "bun run mcp-chess-server.ts"
+    "mcp-chess": "bun run mcp-chess-server.ts",
+    "mcp-service": "bun run mcp-service.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.0",
