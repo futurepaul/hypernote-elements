@@ -3,6 +3,7 @@ import { NostrServerTransport } from "@contextvm/sdk";
 import { PrivateKeySigner } from "@contextvm/sdk";
 import { SimpleRelayPool } from "@contextvm/sdk";
 import { z } from "zod";
+import { nip19, finalizeEvent, getPublicKey } from "nostr-tools";
 
 // Chess helper functions
 function initializeBoard(): string[][] {
@@ -183,6 +184,9 @@ const RELAYS = ["wss://relay.damus.io", "wss://nos.lol", "wss://relay.primal.net
 
 // --- Main Server Logic ---
 async function main() {
+  // Counter state maintained server-side
+  let counterState = 0;
+  
   // 1. Setup Signer and Relay Pool
   const signer = new PrivateKeySigner(SERVER_PRIVATE_KEY_HEX);
   const relayPool = new SimpleRelayPool(RELAYS);
@@ -197,6 +201,79 @@ async function main() {
     version: "1.0.0",
   });
 
+  // Helper function to publish counter data as a simple value (kind 30078)
+  async function publishCounterData(count: number): Promise<void> {
+    const dataEvent = {
+      kind: 30078,  // APP_STATE_KIND - simple data
+      content: String(count),  // Just the raw count value
+      tags: [
+        ["d", "counter-value"],  // Replaceable identifier
+        ["description", "Current counter value"]
+      ],
+      created_at: Math.floor(Date.now() / 1000)
+    };
+
+    const signedDataEvent = await signer.signEvent(dataEvent);
+    await relayPool.publish(signedDataEvent);
+    console.log(`Published counter data: ${count}`);
+  }
+
+  // Helper function to create and publish counter Hypernote element
+  async function publishCounterUI(count: number): Promise<string> {
+    const hypernoteJson = {
+      version: "1.1.0",
+      type: "element",
+      component_kind: null,
+      elements: [
+        {
+          type: "div",
+          elements: [
+            {
+              type: "h2",
+              content: [`Current count: ${count}`]
+            }
+          ],
+          style: {
+            textAlign: "center",
+            fontSize: "2rem",
+            fontWeight: "bold",
+            color: "rgb(59,130,246)",
+            padding: "1rem",
+            backgroundColor: "rgb(239,246,255)",
+            borderRadius: "0.5rem",
+            marginBottom: "1rem"
+          }
+        }
+      ]
+    };
+
+    // Create the Nostr event template
+    const eventTemplate = {
+      kind: 32616,  // HYPERNOTE_ELEMENT_KIND
+      content: JSON.stringify(hypernoteJson),
+      tags: [
+        ["d", "counter-ui"],  // Shared counter state
+        ["hypernote", "1.1.0"],
+        ["description", "MCP Counter UI Element"]
+      ],
+      created_at: Math.floor(Date.now() / 1000)
+    };
+
+    // Sign the event using the signer's signEvent method
+    const signedEvent = await signer.signEvent(eventTemplate);
+    await relayPool.publish(signedEvent);
+    
+    console.log(`Published counter UI for count=${count}, event ID: ${signedEvent.id}`);
+
+    // Return naddr as resource identifier
+    return nip19.naddrEncode({
+      kind: 32616,
+      pubkey: serverPubkey,
+      identifier: "counter-ui",
+      relays: RELAYS
+    });
+  }
+
   // 3. Define counter tools
   mcpServer.registerTool(
     "addone",
@@ -206,11 +283,20 @@ async function main() {
       inputSchema: { a: z.union([z.string(), z.number()]) },
     },
     async ({ a }: { a: string | number }) => {
-      const num = typeof a === 'string' ? parseInt(a, 10) : a;
-      const result = num + 1;
-      console.log(`addone: ${num} + 1 = ${result}`);
+      // Ignore the input and use server state
+      counterState += 1;
+      console.log(`addone: counter is now ${counterState}`);
+      
+      // Publish both the data and the UI element
+      publishCounterData(counterState).catch(err => 
+        console.error('Failed to publish counter data:', err)
+      );
+      publishCounterUI(counterState).catch(err => 
+        console.error('Failed to publish counter UI:', err)
+      );
+      
       return {
-        content: [{ type: "text", text: `${result}` }],
+        content: [{ type: "text", text: `${counterState}` }],
       };
     },
   );
@@ -223,11 +309,46 @@ async function main() {
       inputSchema: { a: z.union([z.string(), z.number()]) },
     },
     async ({ a }: { a: string | number }) => {
-      const num = typeof a === 'string' ? parseInt(a, 10) : a;
-      const result = num - 1;
-      console.log(`minusone: ${num} - 1 = ${result}`);
+      // Ignore the input and use server state
+      counterState -= 1;
+      console.log(`minusone: counter is now ${counterState}`);
+      
+      // Publish both the data and the UI element
+      publishCounterData(counterState).catch(err => 
+        console.error('Failed to publish counter data:', err)
+      );
+      publishCounterUI(counterState).catch(err => 
+        console.error('Failed to publish counter UI:', err)
+      );
+      
       return {
-        content: [{ type: "text", text: `${result}` }],
+        content: [{ type: "text", text: `${counterState}` }],
+      };
+    },
+  );
+
+  // Initialize counter tool
+  mcpServer.registerTool(
+    "initialize_counter",
+    {
+      title: "Initialize Counter",
+      description: "Initialize the counter to a specific value",
+      inputSchema: { value: z.number().default(0) },
+    },
+    async ({ value }: { value: number }) => {
+      counterState = value;
+      console.log(`Initializing counter to ${counterState}`);
+      
+      // Publish both the data and the UI element
+      publishCounterData(counterState).catch(err => 
+        console.error('Failed to publish counter data:', err)
+      );
+      publishCounterUI(counterState).catch(err => 
+        console.error('Failed to publish counter UI:', err)
+      );
+      
+      return {
+        content: [{ type: "text", text: `Counter initialized to ${counterState}` }],
       };
     },
   );

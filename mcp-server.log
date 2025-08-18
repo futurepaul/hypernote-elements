@@ -1,0 +1,16 @@
+Server Public Key: 19f5b5cd2fce663a3b4916b42c378c0280cce2bffd0af384380e91356fcff1d6
+Connecting to relays...
+Server is running and listening for requests on Nostr...
+Press Ctrl+C to exit.
+Initializing counter to 0
+Published counter UI for count=0, event ID: ca67d8808493737c023150004486dcbf2c8ca95f3e0aa4d41bf13b38698c6c83
+addone: 0 + 1 = 1
+Published counter UI for count=1, event ID: 9e5731363b9ed54d693b07eaee55b968c130e5ade73e9f2658ffcc49fa2b649c
+addone: 0 + 1 = 1
+Published counter UI for count=1, event ID: 25590c8b48b496fbee1477739726ae995461ae6f29d6c3c62f18fcbcd67d01cd
+addone: 0 + 1 = 1
+Published counter UI for count=1, event ID: e57dd060d22a3d0ba69d2ef3cd2928be7fc4b3786aabd08ec9c08d07d08f754e
+addone: 0 + 1 = 1
+Published counter UI for count=1, event ID: c9204ee8ab3691f148e6e466ed74270ef4a1073fcb6190914f51f38940396d3f
+addone: 1 + 1 = 2
+Published counter UI for count=2, event ID: 5d8d48d03b8e5e9dbcd29f89837bde219b885bbeda8b5e9f671ddd1800f5387f
