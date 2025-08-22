@@ -20,12 +20,14 @@ const SimpleOps = z.union([
   z.literal("min"),     // Min of array
   z.literal("max"),     // Max of array
   z.literal("average"), // Average of array
+  z.literal("length"),  // Length of array or string
 ]);
 
 // Operations with single field parameter
 const FieldOps = z.union([
   z.object({ op: z.literal("get"), field: z.string() }),
   z.object({ op: z.literal("pluck"), field: z.string() }),
+  z.object({ op: z.literal("groupBy"), field: z.string() }), // Group array by field value
 ]);
 
 // Operations with value parameter
@@ -115,6 +117,12 @@ const MapOp = z.object({
   pipe: z.lazy(() => z.array(PipeOperation)), // Recursive: apply pipes to each item
 });
 
+// Construct operation (build new object with transformed fields)
+const ConstructOp = z.object({
+  op: z.literal("construct"),
+  fields: z.record(z.string(), z.lazy(() => z.array(PipeOperation))), // Each field has its own pipe
+});
+
 // All pipe operations
 export const PipeOperation = z.union([
   // Simple ops (as objects with just op field)
@@ -128,6 +136,7 @@ export const PipeOperation = z.union([
   StringOps,
   ObjectOps,
   MapOp,
+  ConstructOp,
 ]);
 
 // Pipe array (used in queries and reactive events)

@@ -49,6 +49,7 @@ export function compileCompactPipe(yamlPipe: any): any[] {
         
         case 'get':
         case 'pluck':
+        case 'groupBy':
           return { op, field: value };
         
         case 'limit':
@@ -107,6 +108,19 @@ export function compileCompactPipe(yamlPipe: any): any[] {
             return { op, pipe: compileCompactPipe(value) };
           }
           return { op, pipe: value };
+        
+        case 'construct':
+          // Recursive compilation for each field's pipes
+          if (value.fields && typeof value.fields === 'object') {
+            const compiledFields: Record<string, any> = {};
+            for (const [fieldName, fieldPipe] of Object.entries(value.fields)) {
+              compiledFields[fieldName] = Array.isArray(fieldPipe) 
+                ? compileCompactPipe(fieldPipe)
+                : fieldPipe;
+            }
+            return { op, fields: compiledFields };
+          }
+          return { op, fields: value };
         
         case 'where':
           return { op, expression: value };

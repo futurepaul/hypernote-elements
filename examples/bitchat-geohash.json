@@ -1,0 +1,252 @@
+{
+  "version": "1.1.0",
+  "component_kind": null,
+  "elements": [
+    {
+      "type": "h1",
+      "content": [
+        "Bitchat Geohash Activity"
+      ]
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Top Locations (last 100 messages)"
+      ]
+    },
+    {
+      "type": "loop",
+      "elements": [
+        {
+          "type": "p",
+          "content": [
+            {
+              "type": "strong",
+              "content": [
+                "{$location.geohash}"
+              ]
+            },
+            ": ",
+            "{$location.count}",
+            " messages",
+            " "
+          ]
+        }
+      ],
+      "source": "$top_geohashes",
+      "variable": "$location"
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Recent Messages"
+      ]
+    },
+    {
+      "type": "loop",
+      "elements": [
+        {
+          "type": "p",
+          "content": [
+            {
+              "type": "code",
+              "content": [
+                "#"
+              ]
+            },
+            "{$bs.geohash}",
+            " ",
+            {
+              "type": "strong",
+              "content": [
+                "{$bs.nickname}"
+              ]
+            },
+            ": ",
+            "{$bs.msg}",
+            " "
+          ]
+        }
+      ],
+      "source": "$bitchat_structured",
+      "variable": "$bs"
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Raw Events"
+      ]
+    },
+    {
+      "type": "json",
+      "content": [],
+      "attributes": {
+        "variable": "$bitchat_events"
+      }
+    },
+    {
+      "type": "h2",
+      "content": [
+        "Structured Data"
+      ]
+    },
+    {
+      "type": "json",
+      "content": [],
+      "attributes": {
+        "variable": "$bitchat_structured"
+      }
+    }
+  ],
+  "type": "hypernote",
+  "title": "Bitchat Geohash Activity",
+  "description": "Live global heatmap showing bitchat geohash activity",
+  "name": "bitchat-geohash",
+  "queries": {
+    "$bitchat_events": {
+      "kinds": [
+        20000
+      ],
+      "limit": 5
+    },
+    "$bitchat_structured": {
+      "kinds": [
+        20000
+      ],
+      "limit": 10,
+      "pipe": [
+        {
+          "op": "construct",
+          "fields": {
+            "geohash": [
+              {
+                "op": "get",
+                "field": "tags"
+              },
+              {
+                "op": "whereIndex",
+                "index": 0,
+                "eq": "g"
+              },
+              {
+                "op": "first"
+              },
+              {
+                "op": "pluckIndex",
+                "index": 1
+              },
+              {
+                "op": "default",
+                "value": ""
+              }
+            ],
+            "nickname": [
+              {
+                "op": "get",
+                "field": "tags"
+              },
+              {
+                "op": "whereIndex",
+                "index": 0,
+                "eq": "n"
+              },
+              {
+                "op": "first"
+              },
+              {
+                "op": "pluckIndex",
+                "index": 1
+              },
+              {
+                "op": "default",
+                "value": "anon"
+              }
+            ],
+            "msg": [
+              {
+                "op": "get",
+                "field": "content"
+              },
+              {
+                "op": "default",
+                "value": ""
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "$top_geohashes": {
+      "kinds": [
+        20000
+      ],
+      "limit": 100,
+      "pipe": [
+        {
+          "op": "construct",
+          "fields": {
+            "geohash": [
+              {
+                "op": "get",
+                "field": "tags"
+              },
+              {
+                "op": "whereIndex",
+                "index": 0,
+                "eq": "g"
+              },
+              {
+                "op": "first"
+              },
+              {
+                "op": "pluckIndex",
+                "index": 1
+              },
+              {
+                "op": "default",
+                "value": "unknown"
+              }
+            ]
+          }
+        },
+        {
+          "op": "groupBy",
+          "field": "geohash"
+        },
+        {
+          "op": "map",
+          "pipe": [
+            {
+              "op": "construct",
+              "fields": {
+                "geohash": [
+                  {
+                    "op": "first"
+                  },
+                  {
+                    "op": "get",
+                    "field": "geohash"
+                  }
+                ],
+                "count": [
+                  {
+                    "op": "length"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "op": "sort",
+          "by": "count",
+          "order": "desc"
+        },
+        {
+          "op": "take",
+          "count": 5
+        }
+      ]
+    }
+  }
+}

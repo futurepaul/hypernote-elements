@@ -47,6 +47,16 @@ export function applyPipes(data: any, pipes?: PipeOperation[]): any {
           ? current.filter(x => x != null)
           : current;
         break;
+        
+      case 'length':
+        if (Array.isArray(current)) {
+          current = current.length;
+        } else if (typeof current === 'string') {
+          current = current.length;
+        } else {
+          current = 0;
+        }
+        break;
 
       // Object operations
       case 'get':
@@ -57,6 +67,21 @@ export function applyPipes(data: any, pipes?: PipeOperation[]): any {
         current = Array.isArray(current)
           ? current.map(item => item?.[pipe.field])
           : current?.[pipe.field];
+        break;
+        
+      case 'groupBy':
+        if (Array.isArray(current)) {
+          const groups: Record<string, any[]> = {};
+          for (const item of current) {
+            const key = item?.[pipe.field] || 'undefined';
+            if (!groups[key]) {
+              groups[key] = [];
+            }
+            groups[key].push(item);
+          }
+          // Convert to array of grouped arrays
+          current = Object.values(groups);
+        }
         break;
         
       case 'keys':
@@ -255,12 +280,17 @@ export function applyPipes(data: any, pipes?: PipeOperation[]): any {
         break;
         
       case 'pluckIndex':
-        if (Array.isArray(current)) {
+        if (Array.isArray(current) && current.length > 0 && !Array.isArray(current[0])) {
+          // If it's a flat array (like ["g", "9yzh"]), get the index directly
+          current = current[pipe.index];
+        } else if (Array.isArray(current)) {
+          // If it's an array of arrays, map over it
           current = current.map(item => 
             Array.isArray(item) ? item[pipe.index] : null
           );
-        } else if (Array.isArray(current)) {
-          current = current[pipe.index];
+        } else {
+          // Single item that's not an array
+          current = null;
         }
         break;
 
@@ -324,6 +354,32 @@ export function applyPipes(data: any, pipes?: PipeOperation[]): any {
       case 'map':
         if (Array.isArray(current)) {
           current = current.map(item => applyPipes(item, pipe.pipe));
+        }
+        break;
+
+      // Construct operation (build new object)
+      case 'construct':
+        // Check if we're at the top level with an array of items
+        // vs being called inside a map operation on a single item/group
+        if (Array.isArray(current) && current.length > 0 && 
+            !Array.isArray(current[0]) && // Not an array of arrays (from groupBy)
+            typeof current[0] === 'object' && // Is an array of objects
+            'id' in current[0]) { // Looks like Nostr events
+          // We're at top level with an array of events - map over each
+          current = current.map(item => {
+            const constructed: Record<string, any> = {};
+            for (const [fieldName, fieldPipe] of Object.entries(pipe.fields)) {
+              constructed[fieldName] = applyPipes(item, fieldPipe);
+            }
+            return constructed;
+          });
+        } else {
+          // We're in a map context or have a single item - construct one object
+          const constructed: Record<string, any> = {};
+          for (const [fieldName, fieldPipe] of Object.entries(pipe.fields)) {
+            constructed[fieldName] = applyPipes(current, fieldPipe);
+          }
+          current = constructed;
         }
         break;
 

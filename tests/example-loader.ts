@@ -10,6 +10,7 @@ import imageVariablesMd from "../examples/image-variables.md";
 import hypernotesMd from "../examples/hypernotes.md";
 import counterMd from "../examples/counter.md";
 import chessMd from "../examples/chess.md";
+import bitchatGeohashMd from "../examples/bitchat-geohash.md";
 
 // Import all JSON examples directly using Bun's built-in JSON loader
 import basicHelloJson from "../examples/basic-hello.json";
@@ -21,6 +22,7 @@ import imageVariablesJson from "../examples/image-variables.json";
 import hypernotesJson from "../examples/hypernotes.json";
 import counterJson from "../examples/counter.json";
 import chessJson from "../examples/chess.json";
+import bitchatGeohashJson from "../examples/bitchat-geohash.json";
 
 // Map of example names to their imported content
 const EXAMPLE_MAP = {
@@ -33,6 +35,7 @@ const EXAMPLE_MAP = {
   "hypernotes": { markdown: hypernotesMd, json: hypernotesJson },
   "counter": { markdown: counterMd, json: counterJson },
   "chess": { markdown: chessMd, json: chessJson },
+  "bitchat-geohash": { markdown: bitchatGeohashMd, json: bitchatGeohashJson },
 } as const;
 
 export interface ExampleData {
@@ -78,6 +81,7 @@ export const AVAILABLE_EXAMPLES = [
   "hypernotes",
   "counter",
   "chess",
+  "bitchat-geohash",
 ] as const;
 
 export type ExampleName = typeof AVAILABLE_EXAMPLES[number]; 
