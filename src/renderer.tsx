@@ -8,7 +8,7 @@ import { useNostrSubscription } from './lib/snstr/hooks';
 import { useHypernoteExecutor } from './hooks/useHypernoteExecutor';
 import type { Hypernote, AnyElement } from './lib/schema';
 import { toast } from 'sonner';
-import { applyPipeOperation } from './lib/jq-parser';
+// applyPipeOperation from jq-parser unused - using pipes.ts instead
 import type { NostrEvent } from './lib/snstr/nip07';
 import { ComponentResolver, parseTarget, type TargetContext } from './lib/componentResolver';
 import { nip19 } from 'nostr-tools';

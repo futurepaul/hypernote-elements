@@ -62,7 +62,7 @@ export class HypernoteExecutor {
     // Create unified resolver with initial context
     const resolutionContext: ResolutionContext = {
       queryResults: context.queryResults || new Map(),
-      actionResults: context.actionResults || new Map(),
+      actionResults: context.actionResults instanceof Map ? context.actionResults : new Map(Object.entries(context.actionResults || {})),
       formData: context.formData || {},
       loopVariables: context.loopVariables || {},
       user: context.user,
