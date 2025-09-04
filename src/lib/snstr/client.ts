@@ -1,7 +1,7 @@
 // Simplified SNSTR client wrapper for Hypernote
 // This provides basic relay functionality without requiring private keys for queries
 
-import { EventTemplate, NostrEvent } from "./nip07";
+import type { EventTemplate, NostrEvent } from "./nip07";
 
 export interface Filter {
   ids?: string[];
