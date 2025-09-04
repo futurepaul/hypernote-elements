@@ -72,7 +72,7 @@ export async function publishHypernote(
     // Publish to relays
     const publishResult = await client.publishEvent(signedEvent);
     
-    if (!publishResult || publishResult.length === 0) {
+    if (!publishResult || publishResult.successCount === 0) {
       throw new Error("Failed to publish to any relay");
     }
     

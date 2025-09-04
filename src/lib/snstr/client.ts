@@ -338,7 +338,7 @@ export class SNSTRClient {
     }
     
     this.logger(`[LIVE] Starting live subscription with ${connectedRelays.length} relays`);
-    this.logger(`[LIVE] Filters:`, JSON.stringify(filters));
+    this.logger(`[LIVE] Filters: ${JSON.stringify(filters)}`);
     
     const subIds: string[] = [];
     const seenIds = new Set<string>();
