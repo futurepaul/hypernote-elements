@@ -1,6 +1,6 @@
 import "./index.css";
 import "../styles/hypernote-base.css";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { 
   ResizableHandle, 
@@ -9,8 +9,10 @@ import {
 } from "@/components/ui/resizable";
 import { useNostrStore, RELAY_SETS, type RelaySet } from "./stores/nostrStore";
 import "./utils/key-converter"; // Load key conversion utilities
-import { HypernoteRenderer } from "./renderer";
+import { HypernoteRenderer, RenderHypernoteContent } from "./renderer";
 import { HypernoteJsonOutput } from "./renderer";
+import { createServices } from "./lib/adapters";
+import { useAuthStore } from "./stores/authStore";
 import {
   Select,
   SelectContent,
@@ -55,7 +57,14 @@ export function App() {
   });
   const [template, setTemplate] = useState<TemplateKey>("basic-hello");
   
-  const { relayHandler, initialize, cleanup, logs, currentRelaySet, switchRelaySet } = useNostrStore();
+  const { relayHandler, initialize, cleanup, logs, currentRelaySet, switchRelaySet, snstrClient } = useNostrStore();
+  const { pubkey, signEvent } = useAuthStore();
+  
+  // Create services bundle for dependency injection
+  const services = useMemo(() => {
+    if (!relayHandler || !signEvent) return null;
+    return createServices(snstrClient, relayHandler, signEvent, pubkey);
+  }, [snstrClient, relayHandler, signEvent, pubkey]);
 
   // Debug logging
   // console.log("App: Current template:", template);
