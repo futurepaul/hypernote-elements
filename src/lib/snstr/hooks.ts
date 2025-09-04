@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { useSubscriptionStore } from '../../stores/subscriptionStore';
-import { Filter } from './client';
-import { NostrEvent } from './nip07';
+import type { Filter } from './client';
+import type { NostrEvent } from './nip07';
 
 // Stable empty array reference to avoid infinite re-renders
 const EMPTY_EVENTS: NostrEvent[] = [];

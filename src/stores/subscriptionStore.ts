@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { NostrEvent } from '../lib/snstr/nip07';
-import { Filter } from '../lib/snstr/client';
+import type { NostrEvent } from '../lib/snstr/nip07';
+import type { Filter } from '../lib/snstr/client';
 import { useNostrStore } from './nostrStore';
 
 interface Subscription {
