@@ -369,7 +369,7 @@ export function applyPipes(data: any, pipes?: PipeOperation[]): any {
           current = current.map(item => {
             const constructed: Record<string, any> = {};
             for (const [fieldName, fieldPipe] of Object.entries(pipe.fields)) {
-              constructed[fieldName] = applyPipes(item, fieldPipe);
+              constructed[fieldName] = applyPipes(item, fieldPipe as PipeOperation[]);
             }
             return constructed;
           });
@@ -377,7 +377,7 @@ export function applyPipes(data: any, pipes?: PipeOperation[]): any {
           // We're in a map context or have a single item - construct one object
           const constructed: Record<string, any> = {};
           for (const [fieldName, fieldPipe] of Object.entries(pipe.fields)) {
-            constructed[fieldName] = applyPipes(current, fieldPipe);
+            constructed[fieldName] = applyPipes(current, fieldPipe as PipeOperation[]);
           }
           current = constructed;
         }
