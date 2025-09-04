@@ -10,6 +10,7 @@
     "start": "NODE_ENV=production bun src/index.tsx", 
     "build": "bun run build.ts",
     "check": "bunx tsc --noEmit",
+    "lines": "bun scripts/check-lines.ts",
     "seed": "bun run src/utils/seed.ts",
     "test:seed": "bun run src/utils/seed.ts && bun test tests/seed.test.ts",
     "query": "bun run src/utils/query-test.ts",
