@@ -27,7 +27,7 @@ export function useHypernoteExecutor(
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const executorRef = useRef<HypernoteExecutor>();
+  const executorRef = useRef<HypernoteExecutor | undefined>(undefined);
   const { snstrClient } = useNostrStore();
   const { pubkey, signEvent } = useAuthStore();
   

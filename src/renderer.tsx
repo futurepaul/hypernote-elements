@@ -243,7 +243,7 @@ export function RenderHypernoteContent({ content }: { content: Hypernote }) {
   // Show error banner if there was a query error, but still render the page
   const errorBanner = queryError ? (
     <div style={{ backgroundColor: '#fee', color: '#c00', padding: '10px', marginBottom: '10px', borderRadius: '4px' }}>
-      ⚠️ Some data failed to load: {queryError.message}
+      ⚠️ Some data failed to load: {queryError}
     </div>
   ) : null;
 
