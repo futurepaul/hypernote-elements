@@ -15,6 +15,7 @@ import { nip19 } from 'nostr-tools';
 import { applyPipes, resolveVariables, resolveObjectVariables } from './lib/pipes';
 import { resolveExpression, processString } from './lib/renderHelpers';
 import type { Services } from './lib/services';
+import { deriveInitialFormData } from './lib/core/forms';
 
 // Pure render context - all data needed for rendering
 interface RenderContext {
@@ -100,8 +101,14 @@ export function RenderHypernoteContent({ content, services }: { content: Hyperno
     }
   }, [snstrClient]);
 
-  // Set up form data state
-  const [formData, setFormData] = useState<Record<string, string>>({});
+  // Set up form data state with pure derived initial values (no setTimeout!)
+  const initialFormData = useMemo(() => deriveInitialFormData(content), [content]);
+  const [formData, setFormData] = useState<Record<string, string>>(initialFormData);
+  
+  // Update form data when content changes
+  useEffect(() => {
+    setFormData(initialFormData);
+  }, [initialFormData]);
 
   // Get user pubkey from auth store (NIP-07)
   const { pubkey } = useAuthStore();
@@ -404,11 +411,7 @@ function renderElement(element: HypernoteElement, ctx: RenderContext): React.Rea
       const inputType = element.attributes?.type || 'text';
       const defaultValue = element.attributes?.value || '';
       
-      // For hidden inputs, set the value immediately if not already set
-      if (inputType === 'hidden' && name && !ctx.formData[name]) {
-        // Use a setTimeout to avoid updating state during render
-        setTimeout(() => ctx.onInputChange(name, defaultValue), 0);
-      }
+      // ✅ FIXED: Hidden input values now derived at initialization (no setTimeout!)
       
       return (
         <input
