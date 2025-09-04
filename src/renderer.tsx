@@ -16,6 +16,7 @@ import { applyPipes, resolveVariables, resolveObjectVariables } from './lib/pipe
 import { resolveExpression, processString } from './lib/renderHelpers';
 import type { Services } from './lib/services';
 import { deriveInitialFormData } from './lib/core/forms';
+import { defaultClock } from './lib/services';
 
 // Pure render context - all data needed for rendering
 interface RenderContext {
@@ -490,8 +491,8 @@ function renderIf(element: HypernoteElement & { condition?: string }, ctx: Rende
   if (cleanCondition.includes(' == ')) {
     // Handle equality comparison
     const [leftExpr, rightExpr] = cleanCondition.split(' == ').map(s => s.trim());
-    const leftValue = resolveExpression(leftExpr, ctx);
-    const rightValue = resolveExpression(rightExpr, ctx);
+    const leftValue = resolveExpression(leftExpr, ctx, defaultClock);
+    const rightValue = resolveExpression(rightExpr, ctx, defaultClock);
     
     // Remove quotes from string literals for comparison
     const cleanRight = rightExpr.startsWith('"') && rightExpr.endsWith('"') 
@@ -501,7 +502,7 @@ function renderIf(element: HypernoteElement & { condition?: string }, ctx: Rende
     isTruthy = leftValue == cleanRight;
   } else {
     // Evaluate as truthy/falsy expression
-    const value = resolveExpression(cleanCondition, ctx);
+    const value = resolveExpression(cleanCondition, ctx, defaultClock);
     
     // Determine truthiness
     if (value === undefined || value === null) {
@@ -554,7 +555,7 @@ function renderLoop(element: HypernoteElement, ctx: RenderContext): React.ReactN
       data = ctx.loopVariables[source];
     } else if (source.includes('.')) {
       // Nested field access like $board_state.board
-      data = resolveExpression(source, ctx);
+      data = resolveExpression(source, ctx, defaultClock);
     } else {
       // Direct query result
       data = ctx.queryResults[source];
@@ -562,7 +563,7 @@ function renderLoop(element: HypernoteElement, ctx: RenderContext): React.ReactN
     }
   } else {
     // Try to resolve as an expression
-    data = resolveExpression(source, ctx);
+    data = resolveExpression(source, ctx, defaultClock);
   }
   
   // Ensure data is an array
@@ -680,7 +681,7 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
   const resolvedArgument = useMemo(() => {
     const resolved = argument.startsWith('{') && argument.endsWith('}') 
       ? processString(argument, ctx)  // Has braces, use processString
-      : String(resolveExpression(argument, ctx));  // No braces, resolve directly
+      : String(resolveExpression(argument, ctx, defaultClock));  // No braces, resolve directly
     
     // console.log(`[Component] Resolving argument for ${alias}: "${argument}" -> "${resolved}"`);
     // console.log(`[Component] Component def kind: ${componentDef.kind}`);
@@ -903,7 +904,7 @@ function renderJson(element: HypernoteElement, ctx: RenderContext): React.ReactN
   const variablePath = element.attributes?.variable || '$data';
   
   // Use the unified resolver!
-  const actualData = resolveExpression(variablePath, ctx);
+  const actualData = resolveExpression(variablePath, ctx, defaultClock);
   
   let displayContent: string;
   

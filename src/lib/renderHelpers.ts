@@ -4,6 +4,8 @@
  */
 
 import { resolveVariables } from './pipes';
+import { resolveTimeExpression } from './core/clock';
+import type { Clock } from './services';
 
 // Simple render context interface for helpers (no React-specific stuff)
 export interface RenderContext {
@@ -18,8 +20,9 @@ export interface RenderContext {
 /**
  * Single pure function for ALL variable resolution
  * Extracted from renderer.tsx - zero React dependencies
+ * Now accepts injected clock for safe time expressions
  */
-export function resolveExpression(expr: string, ctx: RenderContext): any {
+export function resolveExpression(expr: string, ctx: RenderContext, clock?: Clock): any {
   // Normalize expression - handle with or without $ prefix
   const cleanExpr = expr.startsWith('$') ? expr.slice(1) : expr;
   
@@ -83,14 +86,11 @@ export function resolveExpression(expr: string, ctx: RenderContext): any {
     return result;
   }
   
-  // Special handling for time expressions
-  if (value === undefined && expr.includes('time.now')) {
-    try {
-      const timeNow = Date.now();
-      const result = expr.replace(/time\.now/g, timeNow.toString());
-      return new Function('return ' + result)();
-    } catch (e) {
-      console.warn(`Failed to evaluate time expression: ${expr}`);
+  // ✅ SAFE: Time expressions with injected clock (no dangerous eval!)
+  if (value === undefined && expr.includes('time.now') && clock) {
+    const timeResult = resolveTimeExpression(expr, clock);
+    if (timeResult !== undefined) {
+      return timeResult;
     }
   }
   
