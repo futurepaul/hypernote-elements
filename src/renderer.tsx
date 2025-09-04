@@ -2,10 +2,9 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useDebounce } from 'use-debounce';
 import { RelayHandler } from './lib/relayHandler';
 import { safeCompileHypernote } from './lib/safe-compiler';
-import { useNostrStore } from './stores/nostrStore';
-import { useAuthStore } from './stores/authStore';
+// Store imports removed - using services injection instead
 import { useNostrSubscription } from './lib/snstr/hooks';
-import { useHypernoteExecutor } from './hooks/useHypernoteExecutor';
+// useHypernoteExecutor removed - using services.queryEngine instead
 import type { Hypernote, AnyElement } from './lib/schema';
 import { toast } from 'sonner';
 // applyPipeOperation from jq-parser unused - using pipes.ts instead
@@ -38,6 +37,9 @@ interface RenderContext {
   // Loading hints
   loadingQueries?: Set<string>; // Which queries are still loading
   
+  // Services injection
+  services?: Services;
+  
   // Callbacks (pure functions passed from parent)
   onFormSubmit: (eventName: string) => void;
   onInputChange: (name: string, value: string) => void;
@@ -61,7 +63,7 @@ interface HypernoteElement {
 // (Old RendererProps interface removed - using RenderContext instead)
 
 // (Old ElementRenderer removed - using pure render functions below)
-export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string, relayHandler: RelayHandler }) {
+export function HypernoteRenderer({ markdown, relayHandler, services }: { markdown: string, relayHandler: RelayHandler, services: Services }) {
   // Debounce the markdown input to prevent re-rendering on every keystroke
   const [debouncedMarkdown] = useDebounce(markdown || '', 300);
 
@@ -76,14 +78,13 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
   const error = compileResult.error;
 
   // Just render the content - errors are shown in the JSON output area
-  return <RenderHypernoteContent content={content} />;
+  return <RenderHypernoteContent content={content} services={services} />;
 }
 
 // New: Render from compiled Hypernote JSON directly
-export function RenderHypernoteContent({ content, services }: { content: Hypernote; services?: Services }) {
-  // Get SNSTR client from services or fallback to store (gradual migration)
-  const { snstrClient } = useNostrStore();
-  // TODO: Replace with services.queryEngine when fully migrated
+export function RenderHypernoteContent({ content, services }: { content: Hypernote; services: Services }) {
+  // Get SNSTR client from services
+  const snstrClient = services.snstrClient;
 
   // Set up component resolver
   const resolverRef = useRef<ComponentResolver | undefined>(undefined);
@@ -111,8 +112,8 @@ export function RenderHypernoteContent({ content, services }: { content: Hyperno
     setFormData(initialFormData);
   }, [initialFormData]);
 
-  // Get user pubkey from auth store (NIP-07)
-  const { pubkey } = useAuthStore();
+  // Get user pubkey from services
+  const pubkey = services.userPubkey;
 
   const userContext = { pubkey };
 
@@ -159,23 +160,50 @@ export function RenderHypernoteContent({ content, services }: { content: Hyperno
     onTriggerAction
   }), [publishedEventIds, onTriggerAction]);
 
-  // Execute all queries with dependency resolution
-  const { 
-    queryResults, 
-    extractedVariables, 
-    loading: queriesLoading, 
-    error: queryError,
-    executeAction: hypernoteExecuteAction
-  } = useHypernoteExecutor(content, queryExecutionOptions);
+  // Execute all queries with dependency resolution using services
+  const [queryResults, setQueryResults] = useState<Record<string, any>>({});
+  const [extractedVariables, setExtractedVariables] = useState<Record<string, any>>({});
+  const [queriesLoading, setQueriesLoading] = useState(false);
+  const [queryError, setQueryError] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const runQueriesWithServices = async () => {
+      try {
+        setQueriesLoading(true);
+        setQueryError(null);
+        
+        const result = await services.queryEngine.runAll(content, queryExecutionOptions);
+        setQueryResults(result.queryResults);
+        setExtractedVariables(result.extractedVariables);
+      } catch (err) {
+        console.error('[Services] Query error:', err);
+        setQueryError(err instanceof Error ? err.message : 'Unknown error');
+      } finally {
+        setQueriesLoading(false);
+      }
+    };
+    
+    runQueriesWithServices();
+  }, [services, queriesHash, queryExecutionOptions]);
 
   // Debug: Log when queryResults changes
   // useEffect(() => {
   //   console.log('[Renderer] queryResults changed:', Object.keys(queryResults).map(k => `${k}: ${queryResults[k]?.length} items`));
   // }, [queryResults]);
 
-  // Action execution is built into HypernoteExecutor
+  // Action execution using services
   const executeAction = async (actionName: string) => {
-    const eventId = await hypernoteExecuteAction(actionName, formData);
+    const eventId = await services.actionExecutor.execute(
+      actionName,
+      formData,
+      content,
+      {
+        queryResults,
+        extractedVariables,
+        userPubkey: pubkey
+      }
+    );
+    
     if (eventId) {
       setPublishedEventIds(prev => ({
         ...prev,
@@ -247,6 +275,7 @@ export function RenderHypernoteContent({ content, services }: { content: Hyperno
     resolver: resolverRef.current,
     depth: 0,
     loadingQueries,
+    services, // Pass services to context
     onFormSubmit: handleFormSubmit,
     onInputChange: handleInputChange
   };
@@ -692,7 +721,9 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
   const [targetContext, setTargetContext] = useState<TargetContext | null>(null);
   const [targetLoading, setTargetLoading] = useState(true);
   const [targetError, setTargetError] = useState<string | null>(null);
-  const { snstrClient: componentSnstrClient } = useNostrStore();
+  
+  // Get SNSTR client from services
+  const componentSnstrClient = ctx.services?.snstrClient;
   
   // Pre-resolved queries for ANY component with target data
   // MUST be called before any conditional returns to maintain hook order
@@ -759,8 +790,8 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
         
         console.log(`[Component] Loading target for ${alias} with argument: ${resolvedArgument}`);
         
-        // Parse the target based on component kind
-        const target = await parseTarget(resolvedArgument, componentDef.kind as (0 | 1), componentSnstrClient || undefined);
+        // Parse the target based on component kind using services
+        const target = await ctx.services!.targetParser.parse(resolvedArgument, componentDef.kind as (0 | 1));
         console.log(`[Component] Parsed target for ${alias}:`, target);
         setTargetContext(target);
       } catch (error) {
@@ -870,9 +901,35 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
     parentExtracted: ctx.extractedVariables
   }), [targetContext, ctx.extractedVariables]);
   
-  // Use same executor flag as parent
-  const { queryResults, extractedVariables, loading: queriesLoading } = 
-    useHypernoteExecutor(componentDef, queryOptions);
+  // Use services from context for component queries
+  // If component has queries, execute them using services
+  const [componentQueryResults, setComponentQueryResults] = useState<Record<string, any>>({});
+  const [componentExtractedVars, setComponentExtractedVars] = useState<Record<string, any>>({});
+  const [componentQueriesLoading, setComponentQueriesLoading] = useState(false);
+  
+  useEffect(() => {
+    const hasQueries = componentDef.queries && Object.keys(componentDef.queries).length > 0;
+    if (!hasQueries || !ctx.services) return;
+    
+    const runComponentQueries = async () => {
+      try {
+        setComponentQueriesLoading(true);
+        const result = await ctx.services!.queryEngine.runAll(componentDef, queryOptions);
+        setComponentQueryResults(result.queryResults);
+        setComponentExtractedVars(result.extractedVariables);
+      } catch (err) {
+        console.error('[Component] Query error:', err);
+      } finally {
+        setComponentQueriesLoading(false);
+      }
+    };
+    
+    runComponentQueries();
+  }, [componentDef, queryOptions, ctx.services]);
+  
+  const queryResults = componentQueryResults;
+  const extractedVariables = componentExtractedVars;
+  const queriesLoading = componentQueriesLoading;
   
   // Update context with query results
   const finalCtx: RenderContext = {

@@ -169,10 +169,11 @@ export function App() {
                     <ResizablePanel defaultSize={33}>
                       <div className="h-full p-4 overflow-auto">
                         <div className="prose prose-slate max-w-none dark:prose-invert">
-                          {relayHandler && (
+                          {relayHandler && services && (
                             <HypernoteRenderer 
                               markdown={markdownStates[template]} 
                               relayHandler={relayHandler}
+                              services={services}
                             />
                           )}
                         </div>

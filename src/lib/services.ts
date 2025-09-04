@@ -49,7 +49,16 @@ export interface QueryEngine {
  * Action executor contract - handles event publishing
  */
 export interface ActionExecutor {
-  execute(actionName: string, form: Record<string, string>): Promise<string | void>;
+  execute(
+    actionName: string, 
+    form: Record<string, string>,
+    hypernote: Hypernote,
+    context: {
+      queryResults: Record<string, any>;
+      extractedVariables: Record<string, any>;
+      userPubkey: string | null;
+    }
+  ): Promise<string | void>;
 }
 
 /**
@@ -76,9 +85,9 @@ export interface Services {
   clock: Clock;
   userPubkey: string | null;
   
-  // TODO: Remove these when fully migrated to service interfaces
-  snstrClient?: any; // Temporary for gradual migration
-  relayHandler?: any; // Temporary for gradual migration
+  // Legacy support - kept for ComponentWrapper compatibility
+  snstrClient: any; // Required for component target resolution
+  relayHandler: any; // Required for action execution
 }
 
 /**
