@@ -75,6 +75,10 @@ export interface Services {
   targetParser: TargetParser;
   clock: Clock;
   userPubkey: string | null;
+  
+  // TODO: Remove these when fully migrated to service interfaces
+  snstrClient?: any; // Temporary for gradual migration
+  relayHandler?: any; // Temporary for gradual migration
 }
 
 /**

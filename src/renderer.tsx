@@ -61,7 +61,7 @@ interface HypernoteElement {
 // (Old RendererProps interface removed - using RenderContext instead)
 
 // (Old ElementRenderer removed - using pure render functions below)
-export function HypernoteRenderer({ markdown, relayHandler, services }: { markdown: string, relayHandler: RelayHandler, services?: Services }) {
+export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string, relayHandler: RelayHandler }) {
   // Debounce the markdown input to prevent re-rendering on every keystroke
   const [debouncedMarkdown] = useDebounce(markdown || '', 300);
 
@@ -76,7 +76,7 @@ export function HypernoteRenderer({ markdown, relayHandler, services }: { markdo
   const error = compileResult.error;
 
   // Just render the content - errors are shown in the JSON output area
-  return <RenderHypernoteContent content={content} services={services} />;
+  return <RenderHypernoteContent content={content} />;
 }
 
 // New: Render from compiled Hypernote JSON directly

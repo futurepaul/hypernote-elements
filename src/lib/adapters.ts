@@ -66,6 +66,10 @@ export function createServices(
     actionExecutor: new RelayActionExecutor(relayHandler, signEvent), 
     targetParser: new SNSTRTargetParser(snstrClient || undefined),
     clock: { now: () => Date.now() },
-    userPubkey
+    userPubkey,
+    
+    // Temporary for gradual migration
+    snstrClient,
+    relayHandler
   };
 }
