@@ -41,13 +41,17 @@ export function useHypernoteExecutor(
   }, [hypernote.queries, hypernote.events]);
   
   useEffect(() => {
-    // Skip if no queries or no client
-    if (!hypernote.queries || Object.keys(hypernote.queries).length === 0) {
+    // Skip if no client
+    if (!snstrClient) {
       setLoading(false);
       return;
     }
     
-    if (!snstrClient) {
+    // If no queries but we have events, still create executor for action handling
+    const hasQueries = hypernote.queries && Object.keys(hypernote.queries).length > 0;
+    const hasEvents = hypernote.events && Object.keys(hypernote.events).length > 0;
+    
+    if (!hasQueries && !hasEvents) {
       setLoading(false);
       return;
     }
@@ -95,7 +99,7 @@ export function useHypernoteExecutor(
       });
     };
     
-    // Execute queries
+    // Execute queries (if any)
     const runQueries = async () => {
       try {
         setLoading(true);
@@ -105,9 +109,11 @@ export function useHypernoteExecutor(
         const staticData = executor.resolveStaticData();
         setData(staticData);
         
-        // Phase 2: Execute queries
-        const queryData = await executor.executeQueries();
-        setData(queryData);
+        // Phase 2: Execute queries (only if we have queries)
+        if (hasQueries) {
+          const queryData = await executor.executeQueries();
+          setData(queryData);
+        }
         
         // Phase 3: Live subscriptions are set up automatically in executeQueries
         
