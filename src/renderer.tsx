@@ -14,6 +14,7 @@ import { ComponentResolver, parseTarget, type TargetContext } from './lib/compon
 import { nip19 } from 'nostr-tools';
 import { applyPipes, resolveVariables, resolveObjectVariables } from './lib/pipes';
 import { resolveExpression, processString } from './lib/renderHelpers';
+import type { Services } from './lib/services';
 
 // Pure render context - all data needed for rendering
 interface RenderContext {
@@ -77,9 +78,10 @@ export function HypernoteRenderer({ markdown, relayHandler }: { markdown: string
 }
 
 // New: Render from compiled Hypernote JSON directly
-export function RenderHypernoteContent({ content }: { content: Hypernote }) {
-  // Get SNSTR client from store
+export function RenderHypernoteContent({ content, services }: { content: Hypernote; services?: Services }) {
+  // Get SNSTR client from services or fallback to store (gradual migration)
   const { snstrClient } = useNostrStore();
+  // TODO: Replace with services.queryEngine when fully migrated
 
   // Set up component resolver
   const resolverRef = useRef<ComponentResolver | undefined>(undefined);
