@@ -850,6 +850,15 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
   
   // Skip query execution if we have pre-populated data (prevents infinite loops)
   if (hasPrePopulatedData || !hasQueries) {
+    // Safety check before rendering
+    if (!componentDef) {
+      return (
+        <div style={{ color: '#ef4444', padding: '0.5rem', border: '1px solid #ef4444', borderRadius: '0.25rem' }}>
+          ⚠️ Component definition is null: #{alias} (no queries path)
+        </div>
+      );
+    }
+    
     // Directly render with pre-populated or no data
     return (
       <div id={element.elementId} style={element.style}>
@@ -940,6 +949,15 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
     return (
       <div style={{ color: '#ef4444', padding: '0.5rem', border: '1px solid #ef4444', borderRadius: '0.25rem' }}>
         ⚠️ Invalid component format: #{alias} ({parseError || 'Unknown error'})
+      </div>
+    );
+  }
+
+  // Final safety check - this shouldn't happen but let's be defensive
+  if (!componentDef) {
+    return (
+      <div style={{ color: '#ef4444', padding: '0.5rem', border: '1px solid #ef4444', borderRadius: '0.25rem' }}>
+        ⚠️ Component definition is null: #{alias}
       </div>
     );
   }
