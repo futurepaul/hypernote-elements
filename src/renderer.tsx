@@ -12,7 +12,7 @@ import type { NostrEvent } from './lib/snstr/nip07';
 import { ComponentResolver, parseTarget, type TargetContext } from './lib/componentResolver';
 import { nip19 } from 'nostr-tools';
 import { applyPipes, resolveVariables, resolveObjectVariables } from './lib/pipes';
-import { resolveExpression, processString } from './lib/renderHelpers';
+import { resolveExpression, processString, renderLoop, renderIf, renderJson } from './lib/renderHelpers';
 import type { Services } from './lib/services';
 import { deriveInitialFormData } from './lib/core/forms';
 import { defaultClock } from './lib/services';
@@ -484,10 +484,10 @@ function renderElement(element: HypernoteElement, ctx: RenderContext): React.Rea
       return <img {...props} src={src} alt={alt} />;
 
     case 'loop':
-      return renderLoop(element, ctx);
+      return renderLoop(element, ctx, renderElement);
     
     case 'if':
-      return renderIf(element, ctx);
+      return renderIf(element, ctx, renderElement);
 
     case 'json':
       return renderJson(element, ctx);
@@ -507,139 +507,9 @@ function renderElement(element: HypernoteElement, ctx: RenderContext): React.Rea
   }
 }
 
-// Pure loop renderer
-function renderIf(element: HypernoteElement & { condition?: string }, ctx: RenderContext): React.ReactNode {
-  const condition = element.condition || '';
-  
-  // Check if condition starts with ! for negation
-  const isNegated = condition.startsWith('!');
-  const cleanCondition = isNegated ? condition.slice(1).trim() : condition;
-  
-  // Check for equality comparison
-  let isTruthy = false;
-  if (cleanCondition.includes(' == ')) {
-    // Handle equality comparison
-    const [leftExpr, rightExpr] = cleanCondition.split(' == ').map(s => s.trim());
-    const leftValue = resolveExpression(leftExpr, ctx, defaultClock);
-    const rightValue = resolveExpression(rightExpr, ctx, defaultClock);
-    
-    // Remove quotes from string literals for comparison
-    const cleanRight = rightExpr.startsWith('"') && rightExpr.endsWith('"') 
-      ? rightExpr.slice(1, -1) 
-      : rightValue;
-    
-    isTruthy = leftValue == cleanRight;
-  } else {
-    // Evaluate as truthy/falsy expression
-    const value = resolveExpression(cleanCondition, ctx, defaultClock);
-    
-    // Determine truthiness
-    if (value === undefined || value === null) {
-      isTruthy = false;
-    } else if (typeof value === 'boolean') {
-      isTruthy = value;
-    } else if (typeof value === 'string') {
-      isTruthy = value.length > 0;
-    } else if (typeof value === 'number') {
-      isTruthy = value !== 0;
-    } else if (Array.isArray(value)) {
-      isTruthy = value.length > 0;
-    } else if (typeof value === 'object') {
-      isTruthy = Object.keys(value).length > 0;
-    } else {
-      isTruthy = !!value;
-    }
-  }
-  
-  // Apply negation if needed
-  if (isNegated) {
-    isTruthy = !isTruthy;
-  }
-  
-  // Only render children if condition is truthy
-  if (!isTruthy) {
-    return null;
-  }
-  
-  return (
-    <div id={element.elementId} style={element.style}>
-      {element.elements?.map((child, i) => 
-        <React.Fragment key={i}>{renderElement(child, ctx)}</React.Fragment>
-      )}
-    </div>
-  );
-}
+// ✅ MOVED: renderIf extracted to renderHelpers.ts
 
-function renderLoop(element: HypernoteElement, ctx: RenderContext): React.ReactNode {
-  const source = element.source || '';
-  const varName = element.variable || '$item';
-  
-  // Check if source is a query result or a nested field
-  let data;
-  let isLoading = false;
-  
-  if (source.startsWith('$')) {
-    // Check if it's a loop variable first
-    if (ctx.loopVariables && ctx.loopVariables[source]) {
-      data = ctx.loopVariables[source];
-    } else if (source.includes('.')) {
-      // Nested field access like $board_state.board
-      data = resolveExpression(source, ctx, defaultClock);
-    } else {
-      // Direct query result
-      data = ctx.queryResults[source];
-      isLoading = ctx.loadingQueries?.has(source);
-    }
-  } else {
-    // Try to resolve as an expression
-    data = resolveExpression(source, ctx, defaultClock);
-  }
-  
-  // Ensure data is an array
-  if (data && !Array.isArray(data)) {
-    data = [];
-  }
-  
-  return (
-    <div id={element.elementId} style={element.style}>
-      {isLoading ? (
-        // Show skeleton loader while query is loading
-        <div style={{ padding: '1rem' }}>
-          <div style={{ 
-            backgroundColor: '#e2e8f0', 
-            borderRadius: '0.25rem', 
-            height: '1rem', 
-            marginBottom: '0.5rem',
-            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
-          }} />
-          <div style={{ 
-            backgroundColor: '#e2e8f0', 
-            borderRadius: '0.25rem', 
-            height: '1rem', 
-            width: '75%',
-            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
-          }} />
-        </div>
-      ) : !data || data.length === 0 ? (
-        <div style={{ color: '#6b7280', padding: '1rem' }}>No data found</div>
-      ) : (
-        data.map((item, i) => {
-          const loopCtx = {
-            ...ctx,
-            loopVariables: { ...ctx.loopVariables, [varName]: item }
-          };
-          return (
-            <div key={item?.id || i}>
-              {element.elements?.map((child, j) => 
-                <React.Fragment key={j}>{renderElement(child, loopCtx)}</React.Fragment>
-              )}
-            </div>
-          );
-        })
-      )}
-    </div>
-  );
-}
+// ✅ MOVED: renderLoop extracted to renderHelpers.ts
 
 // Component wrapper that handles loading target context
 function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alias?: string; argument?: string }, ctx: RenderContext }) {
@@ -689,6 +559,11 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
   const [targetLoading, setTargetLoading] = useState(true);
   const [targetError, setTargetError] = useState<string | null>(null);
   
+  // Component query state hooks - MUST be declared at top level
+  const [componentQueryResults, setComponentQueryResults] = useState<Record<string, any>>({});
+  const [componentExtractedVars, setComponentExtractedVars] = useState<Record<string, any>>({});
+  const [componentQueriesLoading, setComponentQueriesLoading] = useState(false);
+  
   // Get SNSTR client from services
   const componentSnstrClient = ctx.services?.snstrClient;
   
@@ -720,6 +595,12 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
     
     return queries;
   }, [componentDef?.kind, targetContext]);
+  
+  // Move queryOptions useMemo BEFORE any conditional returns
+  const queryOptions = useMemo(() => ({
+    target: targetContext,
+    parentExtracted: ctx.extractedVariables
+  }), [targetContext, ctx.extractedVariables]);
   
   useEffect(() => {
     const loadTarget = async () => {
@@ -871,17 +752,9 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
     );
   }
   
-  // Only execute queries if needed
-  const queryOptions = useMemo(() => ({
-    target: targetContext,
-    parentExtracted: ctx.extractedVariables
-  }), [targetContext, ctx.extractedVariables]);
+  // Only execute queries if needed (queryOptions already defined above)
   
-  // Use services from context for component queries
-  // If component has queries, execute them using services
-  const [componentQueryResults, setComponentQueryResults] = useState<Record<string, any>>({});
-  const [componentExtractedVars, setComponentExtractedVars] = useState<Record<string, any>>({});
-  const [componentQueriesLoading, setComponentQueriesLoading] = useState(false);
+  // Use services from context for component queries (state already declared above)
   
   useEffect(() => {
     const hasQueries = componentDef?.queries && Object.keys(componentDef?.queries || {}).length > 0;
@@ -979,34 +852,4 @@ function renderComponent(element: HypernoteElement & { alias?: string; argument?
   return <ComponentWrapper element={element} ctx={ctx} />;
 }
 
-// Pure JSON renderer
-function renderJson(element: HypernoteElement, ctx: RenderContext): React.ReactNode {
-  const variablePath = element.attributes?.variable || '$data';
-  
-  // Use the unified resolver!
-  const actualData = resolveExpression(variablePath, ctx, defaultClock);
-  
-  let displayContent: string;
-  
-  if (actualData !== undefined && actualData !== variablePath) {
-    // resolveExpression returns the original expression if not found
-    try {
-      displayContent = JSON.stringify(actualData, null, 2);
-    } catch (e) {
-      displayContent = String(actualData);
-    }
-  } else {
-    displayContent = `No data found for variable: ${variablePath}`;
-  }
-  
-  return (
-    <details id={element.elementId} style={element.style}>
-      <summary style={{ cursor: 'pointer', padding: '0.5rem', backgroundColor: '#e2e8f0', borderRadius: '0.25rem', fontSize: '0.875rem' }}>
-        {variablePath} (JSON)
-      </summary>
-      <pre style={{ backgroundColor: '#f1f5f9', padding: '1rem', borderRadius: '0.25rem', overflow: 'auto', fontSize: '0.75rem', lineHeight: '1rem', fontFamily: 'monospace', marginTop: '0.5rem' }}>
-        {displayContent}
-      </pre>
-    </details>
-  );
-} 
+// ✅ MOVED: renderJson extracted to renderHelpers.ts 
