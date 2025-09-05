@@ -85,6 +85,9 @@ export interface Services {
   clock: Clock;
   userPubkey: string | null;
   
+  // Shared executor for subscription deduplication
+  sharedExecutor: any; // HypernoteExecutor instance shared across all queries
+  
   // Legacy support - kept for ComponentWrapper compatibility
   snstrClient: any; // Required for component target resolution
   relayHandler: any; // Required for action execution

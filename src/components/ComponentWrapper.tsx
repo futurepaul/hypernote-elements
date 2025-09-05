@@ -64,7 +64,45 @@ export function ComponentWrapper({
   
   // Components are now queries! Look up the query result
   const componentQueryName = `#${alias}`;
-  const componentQueryResult = ctx.queryResults[componentQueryName];
+  
+  // Use live query result from shared executor if available
+  const [liveComponentResult, setLiveComponentResult] = useState<any>(null);
+  
+  // Subscribe to live updates for this component query
+  useEffect(() => {
+    if (!ctx.services?.sharedExecutor) return;
+    
+    const sharedExecutor = ctx.services.sharedExecutor;
+    
+    // Set up callback for when this component query updates
+    const originalOnUpdate = sharedExecutor.onUpdate;
+    sharedExecutor.onUpdate = (data: any) => {
+      // Call original callback first
+      if (originalOnUpdate) {
+        originalOnUpdate(data);
+      }
+      
+      // Check if our component query was updated
+      if (data.queryResults && data.queryResults[componentQueryName]) {
+        console.log(`[ComponentWrapper] Live update for ${componentQueryName}:`, data.queryResults[componentQueryName]);
+        setLiveComponentResult(data.queryResults[componentQueryName]);
+      }
+    };
+    
+    // Initial check - get current result if available
+    const currentResult = sharedExecutor.resolver?.getContext()?.queryResults?.get(componentQueryName);
+    if (currentResult) {
+      setLiveComponentResult(currentResult);
+    }
+    
+    return () => {
+      // Restore original callback on cleanup
+      sharedExecutor.onUpdate = originalOnUpdate;
+    };
+  }, [componentQueryName, ctx.services?.sharedExecutor]);
+  
+  // Use live result if available, otherwise fall back to context
+  const componentQueryResult = liveComponentResult || ctx.queryResults[componentQueryName];
   
   // ALWAYS CALL ALL HOOKS FIRST - no early returns before hooks!
   

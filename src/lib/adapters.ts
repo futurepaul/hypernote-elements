@@ -16,7 +16,8 @@ export class SNSTRQueryEngine implements QueryEngine {
   constructor(
     private client: SNSTRClient | null,
     private queryCache: any,
-    private userPubkey: string | null
+    private userPubkey: string | null,
+    private sharedExecutor: any = null
   ) {}
   
   async runAll(h: Hypernote, opts: any) {
@@ -28,10 +29,54 @@ export class SNSTRQueryEngine implements QueryEngine {
       };
     }
     
-    // Use existing HypernoteExecutor for now
+    // Use shared executor if available for subscription deduplication
+    if (this.sharedExecutor) {
+      console.log(`[SNSTRQueryEngine] Using SHARED executor for`, Object.keys(h.queries || {}));
+      return this.runWithSharedExecutor(h, opts);
+    }
+    
+    // Fallback to individual executor (should rarely happen now)
+    console.log(`[SNSTRQueryEngine] Using INDIVIDUAL executor for`, Object.keys(h.queries || {}));
+    return this.runWithIndividualExecutor(h, opts);
+  }
+  
+  private async runWithSharedExecutor(h: Hypernote, opts: any) {
+    // Add new queries to the shared executor dynamically
+    const hasQueries = h.queries && Object.keys(h.queries).length > 0;
+    if (!hasQueries) {
+      return { queryResults: {}, extractedVariables: {} };
+    }
+    
+    // The shared executor will handle subscription deduplication automatically
+    // Since it maintains a single subscription map across all queries
+    console.log(`[SNSTRQueryEngine] Using shared executor for queries:`, Object.keys(h.queries));
+    
+    try {
+      // Add queries to shared executor and execute
+      Object.assign(this.sharedExecutor.queries, h.queries);
+      
+      // Update context for this execution
+      this.sharedExecutor.resolver.updateContext({
+        target: opts.target,
+        actionResults: opts.actionResults ? new Map(Object.entries(opts.actionResults)) : new Map(),
+        formData: opts.formData || {}
+      });
+      
+      const queryData = await this.sharedExecutor.executeQueries();
+      return {
+        queryResults: queryData.queryResults,
+        extractedVariables: queryData.extractedVariables
+      };
+    } catch (error) {
+      console.error('[SNSTRQueryEngine] Shared executor error:', error);
+      throw error;
+    }
+  }
+  
+  private async runWithIndividualExecutor(h: Hypernote, opts: any) {
+    // Original implementation as fallback
     const { HypernoteExecutor } = await import('./HypernoteExecutor');
     
-    // Convert actionResults to Map format expected by executor
     const actionResults = new Map();
     if (opts.actionResults) {
       for (const [key, value] of Object.entries(opts.actionResults)) {
@@ -46,27 +91,18 @@ export class SNSTRQueryEngine implements QueryEngine {
       actionResults
     };
     
-    // Add parent extracted variables if provided
     if (opts.parentExtracted) {
       for (const [key, value] of Object.entries(opts.parentExtracted)) {
         context.queryResults.set(key, value);
       }
     }
     
-    const executor = new HypernoteExecutor(
-      h,
-      context,
-      this.client,
-      this.queryCache,
-      undefined // Don't pass signEvent to query-only engine
-    );
+    const executor = new HypernoteExecutor(h, context, this.client, this.queryCache, undefined);
     
     try {
-      // Phase 1: Static resolution
       const staticData = executor.resolveStaticData();
-      
-      // Phase 2: Execute queries if any exist
       const hasQueries = h.queries && Object.keys(h.queries).length > 0;
+      
       if (hasQueries) {
         const queryData = await executor.executeQueries();
         return {
@@ -201,14 +237,41 @@ export function createServices(
   // Import queryCache for the query engine
   const { queryCache } = require('./queryCache');
   
+  // Create shared HypernoteExecutor for subscription deduplication
+  let sharedExecutor = null;
+  if (snstrClient) {
+    const { HypernoteExecutor } = require('./HypernoteExecutor');
+    
+    // Create a global context for the shared executor
+    const sharedContext = {
+      user: { pubkey: userPubkey },
+      target: undefined,
+      queryResults: new Map(),
+      actionResults: new Map()
+    };
+    
+    // Create shared executor with empty hypernote initially
+    // It will accumulate queries as they come through runAll()
+    sharedExecutor = new HypernoteExecutor(
+      { elements: [], queries: {}, events: {} }, // Empty initial hypernote
+      sharedContext,
+      snstrClient,
+      queryCache,
+      signEvent
+    );
+  }
+
   return {
-    queryEngine: new SNSTRQueryEngine(snstrClient, queryCache, userPubkey),
+    queryEngine: new SNSTRQueryEngine(snstrClient, queryCache, userPubkey, sharedExecutor),
     actionExecutor: new RelayActionExecutor(snstrClient, signEvent, userPubkey), 
     targetParser: new SNSTRTargetParser(snstrClient || undefined),
     clock: { now: () => Date.now() },
     userPubkey,
     
-    // Temporary for gradual migration
+    // Shared executor for subscription deduplication
+    sharedExecutor,
+    
+    // Legacy support - kept for ComponentWrapper compatibility
     snstrClient,
     relayHandler
   };
