@@ -646,62 +646,29 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
   const alias = element.alias || 'unknown';
   const argument = element.argument || '';
   
-  // Prevent nested components (max depth = 1)
-  if (ctx.depth > 0) {
-    return (
-      <div style={{ color: '#ef4444', padding: '0.5rem', border: '1px solid #ef4444', borderRadius: '0.25rem' }}>
-        ⚠️ Error: Components cannot include other components (max depth: 1)
-      </div>
-    );
-  }
-  
   // Components are now queries! Look up the query result
   const componentQueryName = `#${alias}`;
-  console.log(`[ComponentWrapper] Looking for component query: ${componentQueryName}`);
-  console.log(`[ComponentWrapper] Available query results:`, Object.keys(ctx.queryResults));
   const componentQueryResult = ctx.queryResults[componentQueryName];
   
-  // Check if component query is still loading
-  if (ctx.loadingQueries?.has(componentQueryName)) {
-    return (
-      <div style={{ color: '#f59e0b', padding: '0.5rem', backgroundColor: '#fef3c7', borderRadius: '0.25rem' }}>
-        ⏳ Loading component: #{alias}...
-      </div>
-    );
-  }
+  // ALWAYS CALL ALL HOOKS FIRST - no early returns before hooks!
   
-  // Check if we have the component event
-  if (!componentQueryResult) {
-    return (
-      <div style={{ color: '#ef4444', padding: '0.5rem', border: '1px solid #ef4444', borderRadius: '0.25rem' }}>
-        ⚠️ Component not found: #{alias}
-      </div>
-    );
-  }
+  // Parse component definition (try to parse even if we might error)
+  let componentDef: Hypernote | null = null;
+  let parseError: string | null = null;
   
-  // Get the component definition from the event content
-  // Handle both array results and single event results (from pipes like 'first')
-  let componentDef: Hypernote;
   try {
-    const event = Array.isArray(componentQueryResult) ? componentQueryResult[0] : componentQueryResult;
-    
-    if (!event) {
-      throw new Error('No event found in query result');
-    }
-    
-    console.log(`[Component] Component event:`, event);
-    componentDef = JSON.parse(event.content);
-    
-    // Validate it's a Hypernote element
-    if (componentDef.type !== 'element') {
-      throw new Error('Component must be of type "element"');
+    if (componentQueryResult) {
+      const event = Array.isArray(componentQueryResult) ? componentQueryResult[0] : componentQueryResult;
+      if (event) {
+        componentDef = JSON.parse(event.content);
+        // Validate it's a Hypernote element
+        if (componentDef && componentDef.type !== 'element') {
+          throw new Error('Component must be of type "element"');
+        }
+      }
     }
   } catch (error) {
-    return (
-      <div style={{ color: '#ef4444', padding: '0.5rem', border: '1px solid #ef4444', borderRadius: '0.25rem' }}>
-        ⚠️ Invalid component format: #{alias}
-      </div>
-    );
+    parseError = error instanceof Error ? error.message : 'Parse error';
   }
   
   // Resolve the argument to get npub/nevent value
@@ -715,7 +682,7 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
     // console.log(`[Component] Resolving argument for ${alias}: "${argument}" -> "${resolved}"`);
     // console.log(`[Component] Component def kind: ${componentDef.kind}`);
     return resolved;
-  }, [argument, ctx.loopVariables, ctx.queryResults, ctx.extractedVariables, ctx.userPubkey, alias, componentDef.kind]);
+  }, [argument, ctx.loopVariables, ctx.queryResults, ctx.extractedVariables, ctx.userPubkey, alias, componentDef?.kind]);
   
   // Parse target context from the argument
   const [targetContext, setTargetContext] = useState<TargetContext | null>(null);
@@ -739,25 +706,25 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
       // etc.
       
       // For now, keep the simple heuristic but make it extensible
-      if (componentDef.kind === 0 && targetContext.name) {
+      if (componentDef?.kind === 0 && targetContext.name) {
         queries['$profile'] = {
           name: targetContext.name,
           picture: targetContext.picture,
           nip05: targetContext.nip05
         };
-      } else if (componentDef.kind === 1 && targetContext.content) {
+      } else if (componentDef?.kind === 1 && targetContext.content) {
         queries['$note'] = targetContext;
       }
       // Add more patterns as needed
     }
     
     return queries;
-  }, [componentDef.kind, targetContext]);
+  }, [componentDef?.kind, targetContext]);
   
   useEffect(() => {
     const loadTarget = async () => {
       // If component doesn't require an argument (no kind field), skip target loading
-      if (componentDef.kind === undefined) {
+      if (componentDef?.kind === undefined) {
         console.log(`[Component] Component ${alias} doesn't require an argument (no kind field)`);
         setTargetContext(null);
         setTargetLoading(false);
@@ -791,7 +758,7 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
         console.log(`[Component] Loading target for ${alias} with argument: ${resolvedArgument}`);
         
         // Parse the target based on component kind using services
-        const target = await ctx.services!.targetParser.parse(resolvedArgument, componentDef.kind as (0 | 1));
+        const target = await ctx.services!.targetParser.parse(resolvedArgument, componentDef!.kind as (0 | 1));
         console.log(`[Component] Parsed target for ${alias}:`, target);
         setTargetContext(target);
       } catch (error) {
@@ -803,7 +770,7 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
     };
     
     loadTarget();
-  }, [resolvedArgument, componentDef.kind, componentSnstrClient, alias]);
+  }, [resolvedArgument, componentDef?.kind, componentSnstrClient, alias]);
   
   // Show loading state
   if (targetLoading) {
@@ -820,7 +787,7 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
   }
   
   // Show error state (only if component expects an argument)
-  if (targetError && componentDef.kind !== undefined) {
+  if (targetError && componentDef?.kind !== undefined) {
     // Special handling for "waiting for data" state
     if (targetError === 'Waiting for data...') {
       return (
@@ -851,7 +818,7 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
   
   // Don't render component until target is ready (prevents bad queries)
   // But only check this if the component expects an argument
-  if (!targetContext && componentDef.kind !== undefined) {
+  if (!targetContext && componentDef?.kind !== undefined) {
     return (
       <div style={{ 
         padding: '0.5rem', 
@@ -879,7 +846,7 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
   
   // Check if we need to execute queries
   const hasPrePopulatedData = preResolvedQueries && Object.keys(preResolvedQueries).length > 0;
-  const hasQueries = componentDef.queries && Object.keys(componentDef.queries).length > 0;
+  const hasQueries = componentDef?.queries && Object.keys(componentDef?.queries || {}).length > 0;
   
   // Skip query execution if we have pre-populated data (prevents infinite loops)
   if (hasPrePopulatedData || !hasQueries) {
@@ -908,8 +875,8 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
   const [componentQueriesLoading, setComponentQueriesLoading] = useState(false);
   
   useEffect(() => {
-    const hasQueries = componentDef.queries && Object.keys(componentDef.queries).length > 0;
-    if (!hasQueries || !ctx.services) return;
+    const hasQueries = componentDef?.queries && Object.keys(componentDef?.queries || {}).length > 0;
+    if (!hasQueries || !ctx.services || !componentDef) return;
     
     const runComponentQueries = async () => {
       try {
@@ -936,9 +903,47 @@ function ComponentWrapper({ element, ctx }: { element: HypernoteElement & { alia
     ...componentCtx,
     queryResults: { ...preResolvedQueries, ...queryResults },
     extractedVariables,
-    loadingQueries: queriesLoading ? new Set(Object.keys(componentDef.queries || {})) : new Set()
+    loadingQueries: queriesLoading ? new Set(Object.keys(componentDef?.queries || {})) : new Set()
   };
   
+  // CONDITIONAL RENDERING - after all hooks are called
+  
+  // Prevent nested components (max depth = 1)
+  if (ctx.depth > 0) {
+    return (
+      <div style={{ color: '#ef4444', padding: '0.5rem', border: '1px solid #ef4444', borderRadius: '0.25rem' }}>
+        ⚠️ Error: Components cannot include other components (max depth: 1)
+      </div>
+    );
+  }
+  
+  // Check if component query is still loading
+  if (ctx.loadingQueries?.has(componentQueryName)) {
+    return (
+      <div style={{ color: '#f59e0b', padding: '0.5rem', backgroundColor: '#fef3c7', borderRadius: '0.25rem' }}>
+        ⏳ Loading component: #{alias}...
+      </div>
+    );
+  }
+  
+  // Check if we have the component event
+  if (!componentQueryResult) {
+    return (
+      <div style={{ color: '#ef4444', padding: '0.5rem', border: '1px solid #ef4444', borderRadius: '0.25rem' }}>
+        ⚠️ Component not found: #{alias}
+      </div>
+    );
+  }
+  
+  // Check for parsing errors
+  if (parseError || !componentDef) {
+    return (
+      <div style={{ color: '#ef4444', padding: '0.5rem', border: '1px solid #ef4444', borderRadius: '0.25rem' }}>
+        ⚠️ Invalid component format: #{alias} ({parseError || 'Unknown error'})
+      </div>
+    );
+  }
+
   // Render component with query results
   return (
     <div id={element.elementId} style={element.style}>
