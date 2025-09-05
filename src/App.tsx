@@ -62,7 +62,11 @@ export function App() {
   
   // Create services bundle for dependency injection
   const services = useMemo(() => {
-    if (!relayHandler || !signEvent) return null;
+    if (!relayHandler || !signEvent) {
+      console.log('[App] Services not ready - relayHandler:', !!relayHandler, 'signEvent:', !!signEvent);
+      return null;
+    }
+    console.log('[App] Services created successfully');
     return createServices(snstrClient, relayHandler, signEvent, pubkey);
   }, [snstrClient, relayHandler, signEvent, pubkey]);
 

@@ -90,10 +90,9 @@ export class SNSTRQueryEngine implements QueryEngine {
  */
 export class RelayActionExecutor implements ActionExecutor {
   constructor(
-    private relayHandler: RelayHandler,
+    private snstrClient: any, // Use snstrClient for publishing (working method)
     private signEvent: (event: any) => Promise<any>,
-    private userPubkey: string | null,
-    private queryCache: any
+    private userPubkey: string | null
   ) {}
   
   async execute(
@@ -152,18 +151,24 @@ export class RelayActionExecutor implements ActionExecutor {
       
       console.log(`[RelayActionExecutor] Publishing event:`, unsignedEvent);
       
-      // Sign the event
-      const signedEvent = await this.signEvent(unsignedEvent);
+      // Sign the event if signing function is available
+      const eventToPublish = this.signEvent 
+        ? await this.signEvent(unsignedEvent)
+        : { ...unsignedEvent, pubkey: '', id: '', sig: '' };
       
-      // Publish to relays
-      const result = await this.relayHandler.publishEvent(
-        signedEvent.kind,
-        signedEvent.content,
-        signedEvent.tags
-      );
+      // The signed event should have an id
+      const eventId = eventToPublish.id;
       
-      console.log(`[RelayActionExecutor] Published to ${result.successCount} relays`);
-      return result.eventId;
+      if (!eventId) {
+        console.error(`[RelayActionExecutor] Signed event has no ID:`, eventToPublish);
+        return undefined;
+      }
+      
+      // Publish the event using the same method that works in HypernoteExecutor
+      const publishResult = await this.snstrClient.publishEvent(eventToPublish);
+      
+      console.log(`[RelayActionExecutor] Published event ${eventId} for action ${actionName}`);
+      return eventId;
       
     } catch (error) {
       console.error(`[RelayActionExecutor] Error executing action ${actionName}:`, error);
@@ -198,7 +203,7 @@ export function createServices(
   
   return {
     queryEngine: new SNSTRQueryEngine(snstrClient, queryCache, userPubkey),
-    actionExecutor: new RelayActionExecutor(relayHandler, signEvent, userPubkey, queryCache), 
+    actionExecutor: new RelayActionExecutor(snstrClient, signEvent, userPubkey), 
     targetParser: new SNSTRTargetParser(snstrClient || undefined),
     clock: { now: () => Date.now() },
     userPubkey,
