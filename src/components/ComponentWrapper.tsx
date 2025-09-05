@@ -199,6 +199,12 @@ export function ComponentWrapper({
     loadTarget();
   }, [resolvedArgument, componentDef?.kind, componentSnstrClient, alias]);
   
+  // Create a stable hash of component queries to prevent infinite re-execution
+  const componentQueriesHash = useMemo(() => {
+    if (!componentDef?.queries) return '';
+    return JSON.stringify(componentDef.queries);
+  }, [componentDef?.queries]);
+  
   // Use services from context for component queries (state already declared above)
   useEffect(() => {
     const hasQueries = componentDef?.queries && Object.keys(componentDef?.queries || {}).length > 0;
@@ -218,7 +224,7 @@ export function ComponentWrapper({
     };
     
     runComponentQueries();
-  }, [componentDef, queryOptions, ctx.services]);
+  }, [componentQueriesHash, queryOptions, ctx.services]); // Use hash instead of componentDef
   
   const queryResults = componentQueryResults;
   const extractedVariables = componentExtractedVars;
